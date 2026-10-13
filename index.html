@@ -396,6 +396,24 @@
       <div id="invMsg" class="msg"></div>
     </div>
     <div class="card">
+      <button id="newInkToggle" class="wide" style="margin-top:0">+ Add an ink that's not on the list</button>
+      <div id="newInkForm" class="hidden">
+        <h2>Add an ink</h2>
+        <p class="muted" style="margin-top:0">For inks that aren't on any job, like the primary colors used for mixing.</p>
+        <div class="row2">
+          <div><label for="niInk">Ink name or number</label><input id="niInk" autocomplete="off" placeholder="e.g. Process Blue"></div>
+          <div><label for="niColor">Color (optional)</label><input id="niColor" autocomplete="off" placeholder="e.g. Blue"></div>
+        </div>
+        <label for="niCount">Bottles on the shelf now (optional)</label>
+        <input id="niCount" inputmode="decimal" placeholder="e.g. 4 or 2.5">
+        <label class="check" style="margin-top:12px"><input type="checkbox" id="niMixing" checked> Mixing base: include it in every shelf count</label>
+        <div class="row2">
+          <button id="niCancel" class="wide">Cancel</button>
+          <button id="niSave" class="primary wide">Add ink</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
       <div class="cardhead">
         <h2>Ink on the shelf</h2>
         <div class="seg small" id="invScope">
@@ -491,7 +509,13 @@
       <div class="card">
         <h2>Active states</h2>
         <p class="muted" style="margin-top:0">Only active states count for ink ordering and the shelf count. All ink can still be counted.</p>
+        <p id="stateActiveNow" style="font-weight:700"></p>
         <div id="stateList"></div>
+        <label for="newState">Add a state that's not on the list</label>
+        <div class="row2">
+          <input id="newState" autocomplete="off" placeholder="e.g. Ohio">
+          <button id="newStateAdd" class="wide" style="margin-top:0">Add state</button>
+        </div>
       </div>
     </div>
   </section>
@@ -1244,6 +1268,21 @@
         (ch.length ? 'Fixed: ' + ch.map(function (c) { return c.ink + ' ' + (c.adjust > 0 ? '+' : '') + c.adjust; }).join(', ') + '.' : 'All matched the log.'), 'ok');
     }, function (e) { $('countSave').disabled = false; setMsg('invMsg', errText(e), 'err'); });
   });
+  /* add an ink that isn't on any job */
+  function niReset() { ['niInk', 'niColor', 'niCount'].forEach(function (id) { $(id).value = ''; }); $('niMixing').checked = true; }
+  $('newInkToggle').addEventListener('click', function () { show('newInkForm', true); show('newInkToggle', false); $('niInk').focus(); });
+  $('niCancel').addEventListener('click', function () { niReset(); show('newInkForm', false); show('newInkToggle', true); });
+  $('niSave').addEventListener('click', function () {
+    var ink = $('niInk').value.trim();
+    if (!ink) { setMsg('invMsg', 'Type the ink name or number.', 'err'); return; }
+    $('niSave').disabled = true; setMsg('invMsg', 'Adding ' + ink + '…');
+    srv('invAddInk', [ink, $('niColor').value, $('niMixing').checked, $('niCount').value], function (d) {
+      $('niSave').disabled = false; niReset(); show('newInkForm', false); show('newInkToggle', true);
+      invShow(d); $('recvInk').value = d.added;
+      setMsg('invMsg', d.added + ' added to the ink list.', 'ok');
+    }, function (e) { $('niSave').disabled = false; setMsg('invMsg', errText(e), 'err'); });
+  });
+
   $('recvSave').addEventListener('click', function () {
     var ink = $('recvInk').value, qty = $('recvQty').value;
     if (!ink) { setMsg('invMsg', 'Choose the ink.', 'err'); return; }
@@ -1415,12 +1454,20 @@
 
   /* active states */
   function statesShow(d) {
+    var on = d.states.filter(function (x) { return x.active; }).map(function (x) { return x.state; });
+    $('stateActiveNow').textContent = 'Active now: ' + (on.length ? on.join(', ') : 'none');
     $('stateList').innerHTML = d.states.map(function (x) {
-      return '<div class="item"><div class="t">' + esc(x.state) + '</div><div class="acts">' +
-        '<button data-state="' + esc(x.state) + '" data-on="' + (x.active ? '0' : '1') + '" class="' + (x.active ? 'primary' : '') + '">' +
-        (x.active ? 'Active' : 'Off') + '</button></div></div>';
+      return '<div class="item"><div><div class="t">' + esc(x.state) + '</div>' +
+        badge(x.active ? 'green' : 'gray', x.active ? 'Active' : 'Not active') + '</div><div class="acts">' +
+        '<button data-state="' + esc(x.state) + '" data-on="' + (x.active ? '0' : '1') + '" class="' + (x.active ? '' : 'primary') + '">' +
+        (x.active ? 'Turn off' : 'Turn on') + '</button></div></div>';
     }).join('');
   }
+  $('newStateAdd').addEventListener('click', function () {
+    var name = $('newState').value.trim();
+    if (!name) { setMsg('mMsg', 'Type the state name.', 'err'); return; }
+    srv('stateAdd', [name, true], function (d) { $('newState').value = ''; statesShow(d); setMsg('mMsg', name + ' added and turned on.', 'ok'); }, mErr);
+  });
   $('stateList').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-state]'); if (!b) return;
     b.disabled = true;
