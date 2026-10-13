@@ -164,6 +164,17 @@
     .push.yellow { background: #fff4c2; color: #6b4e00; }
     button.danger { border-color: var(--bad); color: var(--bad); }
     .chip.low { border-color: var(--warn); color: var(--warn); }
+    .setup-head { margin-top: 14px; font-weight: 700; font-size: 16px; }
+    table.setup { table-layout: fixed; }
+    table.setup td, table.setup th { padding: 7px 4px; vertical-align: top; overflow-wrap: anywhere; }
+    table.setup th:nth-child(1) { width: 44px; }
+    table.setup th:nth-child(3) { width: 28%; }
+    table.setup th:nth-child(4) { width: 68px; }
+    table.setup td b { font-size: 16px; }
+    .setupbox { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+    .setupbox summary { cursor: pointer; font-weight: 700; color: var(--accent); font-size: 16px; padding: 4px 0; }
+    .rmpanel { grid-column: 1 / -1; background: var(--warn-soft); border-radius: 10px; padding: 10px; }
+    .rmpanel select { margin: 6px 0; }
     .jrow { display: grid; grid-template-columns: 96px 64px 1fr; gap: 6px; padding: 12px 0; border-top: 1px solid var(--line); }
     .jrow:first-child { border-top: 0; }
     .jrow .wide2 { grid-column: 3; }
@@ -319,6 +330,10 @@
           <h2 id="runTitle"></h2>
           <div id="runMeta" class="muted"></div>
           <div id="staleNote" class="stale hidden"></div>
+          <details class="setupbox" id="runSetup">
+            <summary>Setup sheet: position, ink, anilox</summary>
+            <div id="runSetupBody"></div>
+          </details>
         </div>
 
         <div class="card">
@@ -827,19 +842,30 @@
     $('startBtn').disabled = !j;
     if (!j) { $('jobPreview').innerHTML = ''; return; }
     var goal = S.goalRuns || 5;
-    var html = '<h3>' + (j.verified ? '<span class="badge ok">Verified</span>' : '<span class="badge unv">Not verified yet</span>') +
-      ' <span class="badge ' + j.flag + '">' + (j.runs ? 'Tracked ' + j.runs + ' of ' + goal : 'Never tracked') + '</span></h3>';
+    var html = '<h3><span class="badge ' + j.flag + '">' + (j.runs ? 'Tracked ' + j.runs + ' of ' + goal : 'Never tracked') + '</span></h3>';
     if (j.flag === 'red') html += '<div class="push red">This job has never been tracked. Please track it this run.</div>';
     else if (j.flag === 'yellow') html += '<div class="push yellow">Tracked ' + j.runs + ' of ' + goal + ' times. Please keep tracking it.</div>';
+    html += setupHtml(j);
+    $('jobPreview').innerHTML = html;
+  }
+
+  /* The job's setup sheet: press position, ink, color and anilox for each side. */
+  function setupHtml(j) {
+    if (!j) return '<p class="muted">This job is no longer on the Jobs list.</p>';
+    var html = '<div class="setup-head">Setup sheet ' + (j.verified ? '<span class="badge ok">Approved</span>'
+      : '<span class="badge unv">Not verified yet</span>') + '</div>';
+    if (!j.verified) html += '<p class="muted" style="margin:4px 0 0">Management hasn\'t checked this setup yet. Tell them if something is wrong.</p>';
     ['Front', 'Back'].forEach(function (side) {
       var inks = j.inks.filter(function (k) { return k.side === side; });
       if (!inks.length) return;
-      html += '<div class="muted"><b>' + side + '</b></div><ol class="preview">' + inks.map(function (k) {
-        return '<li>' + esc(k.ink) + (k.color ? ' <span class="muted">· ' + esc(k.color) + '</span>' : '') +
-          (k.anilox ? ' <span class="muted">· ' + esc(k.anilox) + '</span>' : '') + '</li>';
-      }).join('') + '</ol>';
+      html += '<h3>' + side + '</h3><table class="setup"><tr><th class="n">Pos</th><th>Ink</th><th>Color</th><th class="n">Anilox</th></tr>' +
+        inks.map(function (k) {
+          return '<tr><td class="n">' + (k.order === 999 ? '–' : esc(k.order)) + '</td><td><b>' + esc(k.ink) + '</b>' +
+            (k.notes ? '<div class="muted">' + esc(k.notes) + '</div>' : '') + '</td><td>' + esc(k.color || '') +
+            '</td><td class="n">' + esc(k.anilox || '–') + '</td></tr>';
+        }).join('') + '</table>';
     });
-    $('jobPreview').innerHTML = html;
+    return html;
   }
   $('stateSel').addEventListener('change', function () { store('inkState', this.value); renderJobs(); });
   $('jobSel').addEventListener('change', renderPreview);
@@ -859,6 +885,8 @@
     $('runTitle').textContent = r.job;
     $('runMeta').innerHTML = esc(r.press) + ' · started ' + esc(r.started) + ' &nbsp;' +
       (r.verified ? '<span class="badge ok">Verified</span>' : '<span class="badge unv">Not verified yet</span>');
+
+    $('runSetupBody').innerHTML = setupHtml(S.jobs.filter(function (j) { return j.key === r.jobKey; })[0]);
 
     var stale = r.openHours >= r.staleHours;
     show('staleNote', stale);
@@ -1475,10 +1503,33 @@
         (x.activeState ? ' ' + badge('ok', 'Active state') : '') + '</div>' +
         '<div class="s">On hand ' + fmt(x.onHand, x.onHand % 1 ? 2 : 0) + ' ' + badge(STOCK_BADGE[x.status], x.status) + '</div></div>' +
         '<div class="acts"><input data-min="' + esc(x.ink) + '" value="' + x.min + '" inputmode="decimal" style="width:70px" aria-label="Keep at least, ' + esc(x.ink) + '">' +
-        '<button data-minsave="' + esc(x.ink) + '">Save</button></div></div>';
+        '<button data-minsave="' + esc(x.ink) + '">Save</button><button class="danger" data-rm="' + esc(x.ink) + '">Remove</button></div></div>';
     }).join('');
+    M.stock = d.inks;
+  }
+  function rmPanel(ink) {
+    var x = M.stock.filter(function (i) { return i.ink === ink; })[0];
+    var row = document.querySelector('[data-rm="' + CSS.escape(ink) + '"]').closest('.item');
+    var old = document.querySelector('.rmpanel'); if (old) old.remove();
+    var have = x.onHand ? fmt(x.onHand, x.onHand % 1 ? 2 : 0) : '0';
+    row.insertAdjacentHTML('beforeend', '<div class="rmpanel"><b>Remove ' + esc(ink) + ' from the list?</b>' +
+      (x.onHand ? '<div class="s">It has ' + have + ' bottle' + (x.onHand === 1 ? '' : 's') + ' on hand. If it\'s the same ink under another name, move them:</div>' +
+        '<select data-rmto>' + opt('', 'Don\'t move them (write them off)') + M.stock.filter(function (i) { return i.ink !== ink; })
+          .map(function (i) { return opt(i.ink, 'Move to ' + i.ink + (i.color ? ' · ' + i.color : '')); }).join('') + '</select>' : '') +
+      '<div class="row2"><button data-rmcancel="1">Cancel</button><button class="primary" data-rmgo="' + esc(ink) + '">Remove</button></div></div>');
   }
   $('minList').addEventListener('click', function (e) {
+    var rm = e.target.closest('button[data-rm]');
+    if (rm) { rmPanel(rm.getAttribute('data-rm')); return; }
+    if (e.target.closest('button[data-rmcancel]')) { e.target.closest('.rmpanel').remove(); return; }
+    var go = e.target.closest('button[data-rmgo]');
+    if (go) {
+      var sel = go.closest('.rmpanel').querySelector('[data-rmto]');
+      go.disabled = true;
+      srv('invRemoveInk', [go.getAttribute('data-rmgo'), sel ? sel.value : ''], function (d) { minShow(d); setMsg('mMsg', d.message, 'ok'); },
+        function (e) { go.disabled = false; mErr(e); });
+      return;
+    }
     var b = e.target.closest('button[data-minsave]'); if (!b) return;
     var ink = b.getAttribute('data-minsave');
     var v = document.querySelector('[data-min="' + CSS.escape(ink) + '"]').value;
