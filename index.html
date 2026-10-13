@@ -1,0 +1,1499 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Press Tools</title>
+<script>
+  // Press Tools outside Google: each server call goes to the Apps Script web app.
+  (function () {
+    var API = "https://script.google.com/macros/s/AKfycbwMgwtxB1V7RS2l8aKheG8IsMR0C5MsdENcJ2QVPPWMdT9ahNBUmjbcdYWwFKU_UtEyBQ/exec";
+    function runner(ok, fail) {
+      return new Proxy({}, { get: function (_, name) {
+        if (name === "withSuccessHandler") return function (f) { return runner(f, fail); };
+        if (name === "withFailureHandler") return function (f) { return runner(ok, f); };
+        return function () {
+          var body = JSON.stringify({ fn: name, args: Array.prototype.slice.call(arguments) });
+          // text/plain keeps this a "simple" request, which Apps Script answers without a CORS preflight.
+          fetch(API, { method: "POST", body: body, headers: { "Content-Type": "text/plain;charset=utf-8" } })
+            .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+            .then(function (r) {
+              if (r.error) { if (fail) fail(new Error(r.error)); } else if (ok) ok(r.value);
+            }, function (e) {
+              if (fail) fail(new Error("NetworkError: " + (e && e.message ? e.message : "connection failed")));
+            });
+        };
+      } });
+    }
+    window.google = { script: {} };
+    Object.defineProperty(google.script, "run", { get: function () { return runner(null, null); } });
+  })();
+</script>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --bg: #f4f5f7; --card: #ffffff; --text: #1d2330; --muted: #667085;
+      --line: #d9dde5; --accent: #1f5fbf; --accent-soft: #e8effa;
+      --good: #1a7f4b; --good-soft: #e6f4ec; --warn: #9a4a06; --warn-soft: #fdf1e3; --bad: #b42318;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text);
+      font: 17px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+    .wrap { max-width: 560px; margin: 0 auto; padding: 16px 16px 40px; }
+    h1 { font-size: 22px; margin: 4px 0 12px; }
+    h2 { font-size: 18px; margin: 0 0 8px; }
+    h3 { font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 18px 0 8px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+    label { display: block; font-weight: 600; font-size: 15px; margin: 12px 0 5px; }
+    select, input { width: 100%; font-size: 19px; padding: 12px; border: 1px solid var(--line);
+      border-radius: 10px; background: #fff; color: var(--text); }
+    input:focus, select:focus { outline: 3px solid #b7cdf0; border-color: var(--accent); }
+    button { font: inherit; font-weight: 700; border-radius: 12px; border: 2px solid var(--accent);
+      background: #fff; color: var(--accent); padding: 13px; cursor: pointer; }
+    button.primary { background: var(--accent); color: #fff; }
+    button.wide { width: 100%; margin-top: 14px; font-size: 18px; }
+    button.link { border: 0; background: none; color: var(--muted); font-weight: 600; padding: 8px; font-size: 15px; text-decoration: underline; }
+    button:disabled { opacity: .5; }
+    .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+    .seg button { padding: 10px 4px; font-size: 16px; border-color: var(--line); color: var(--text); font-weight: 600; }
+    .seg button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .badge { display: inline-block; font-size: 13px; font-weight: 700; padding: 3px 9px; border-radius: 99px; }
+    .badge.ok { background: var(--good-soft); color: var(--good); }
+    .badge.unv { background: var(--warn-soft); color: var(--warn); }
+    .muted { color: var(--muted); font-size: 14px; }
+    .msg { margin: 10px 0 0; font-weight: 600; min-height: 1.2em; }
+    .msg.err { color: var(--bad); }
+    .msg.ok { color: var(--good); }
+    .preview li { padding: 4px 0; }
+    .preview { margin: 6px 0 0; padding-left: 20px; }
+    .ink { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px;
+      padding: 12px 0; border-top: 1px solid var(--line); }
+    .ink:first-of-type { border-top: 0; }
+    .ink .name { font-weight: 700; font-size: 18px; }
+    .ink .sub { color: var(--muted); font-size: 14px; }
+    .ink .count { font-size: 15px; margin-top: 2px; }
+    .ink .count b { font-size: 20px; }
+    .ink .acts { display: flex; gap: 8px; align-items: center; }
+    .ink .plus { font-size: 18px; padding: 14px 16px; background: var(--accent); color: #fff; min-width: 116px; }
+    .ink .minus { padding: 14px 12px; border-color: var(--line); color: var(--muted); }
+    .end-ink { padding: 12px 0; border-top: 1px solid var(--line); }
+    .end-ink:first-of-type { border-top: 0; }
+    .end-ink .name { font-weight: 700; margin-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 15px; }
+    th, td { text-align: left; padding: 8px 4px; border-top: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 600; font-size: 13px; border-top: 0; }
+    td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+    .hidden { display: none !important; }
+    .banner { margin: 10px 0 0; padding: 12px 14px; border-radius: 12px; font-weight: 700;
+      background: #fff4c2; color: #6b4e00; border: 1px solid #f0d36b; }
+    .stale { margin-top: 10px; padding: 10px 12px; border-radius: 10px; font-weight: 600; font-size: 15px;
+      background: var(--warn-soft); color: var(--warn); }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .hint { color: var(--muted); font-size: 13px; margin-top: 4px; }
+
+    details.sec { margin-bottom: 16px; }
+    details.sec > summary { list-style: none; cursor: pointer; background: var(--card); border: 1px solid var(--line);
+      border-radius: 14px; padding: 14px 16px; font-size: 19px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; }
+    details.sec > summary::-webkit-details-marker { display: none; }
+    details.sec > summary::after { content: '\25BE'; color: var(--muted); }
+    details.sec:not([open]) > summary::after { content: '\25B8'; }
+    details.sec[open] > summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+    details.sec > .body { border: 1px solid var(--line); border-top: 0; border-radius: 0 0 14px 14px; padding: 12px; background: var(--bg); }
+
+    .wbtns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+    .wbtns button { padding: 14px; font-size: 18px; }
+    .wbtns .clear { grid-column: 1 / -1; border-color: var(--line); color: var(--muted); font-weight: 600; font-size: 16px; padding: 10px; }
+    .out { display: grid; grid-template-columns: 1fr auto; row-gap: 8px; }
+    .out div:nth-child(odd) { color: var(--muted); }
+    .out div:nth-child(even) { font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+    .big { font-size: 28px; font-weight: 800; text-align: center; margin: 4px 0 10px; }
+    .recent { list-style: none; padding: 0; margin: 0; }
+    .recent li { display: flex; justify-content: space-between; padding: 9px 0; border-top: 1px solid var(--line); font-size: 15px; }
+    .recent li:first-child { border-top: 0; }
+    .recent .when { color: var(--muted); font-size: 13px; }
+
+    .pal { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; }
+    .pal .count { font-size: 15px; }
+    .pal .count b { font-size: 22px; }
+    .pal .acts { display: flex; gap: 8px; align-items: center; }
+    .pal .plus { font-size: 18px; padding: 14px 16px; background: var(--accent); color: #fff; min-width: 116px; }
+    .pal .minus { padding: 14px 12px; border-color: var(--line); color: var(--muted); }
+
+    .view { margin-top: 4px; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0 0 12px; flex-wrap: wrap; }
+    .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 19px; }
+    .logo-sm { height: 26px; width: auto; }
+    .who { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 15px; }
+    .chip { padding: 8px 12px; font-size: 14px; border-radius: 99px; border-color: var(--line); color: var(--text); font-weight: 600; }
+    .login { max-width: 360px; margin: 18px auto 0; }
+    .logo { display: grid; place-items: center; min-height: 90px; margin-bottom: 6px; }
+    .logo img { width: 203px; max-width: 100%; height: auto; background: #fff; padding: 10px 14px; border-radius: 12px; box-sizing: content-box; }
+    .pin-dots { display: flex; justify-content: center; gap: 12px; margin: 12px 0 18px; min-height: 22px; }
+    .pin-dots span { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--accent); }
+    .pin-dots span.on { background: var(--accent); }
+    .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .keypad button { font-size: 26px; padding: 16px 0; border-color: var(--line); color: var(--text); }
+    .keypad button.primary { font-size: 18px; color: #fff; border-color: var(--accent); }
+    .keypad button.soft { color: var(--muted); }
+    .rolebtns { display: grid; gap: 10px; }
+    .rolebtns button { font-size: 20px; padding: 18px; text-align: left; }
+    .rolebtns button small { display: block; font-size: 14px; font-weight: 500; color: var(--muted); margin-top: 2px; }
+    .cardhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .cardhead h2 { margin: 0; }
+    .seg.small button { padding: 7px 10px; font-size: 14px; }
+    .tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 8px; -webkit-overflow-scrolling: touch; }
+    .tabs button { flex: 0 0 auto; padding: 10px 14px; font-size: 15px; border-color: var(--line); color: var(--text); font-weight: 600; }
+    .tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .check { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 15px; margin: 0; }
+    .check input { width: 22px; height: 22px; }
+    .item { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line); }
+    .item:first-child { border-top: 0; }
+    .item .t { font-weight: 700; }
+    .item .s { color: var(--muted); font-size: 14px; }
+    .item .acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    .item .acts button { padding: 9px 12px; font-size: 15px; }
+    .item input, .item select { font-size: 17px; padding: 9px; }
+    .count-in { display: grid; grid-template-columns: 74px 92px; gap: 6px; }
+    .badge.red { background: #fde7e7; color: var(--bad); }
+    .badge.yellow { background: #fff4c2; color: #6b4e00; }
+    .badge.green { background: var(--good-soft); color: var(--good); }
+    .badge.gray { background: #eef0f3; color: var(--muted); }
+    .push { margin-top: 10px; padding: 10px 12px; border-radius: 10px; font-weight: 600; font-size: 15px; }
+    .push.red { background: #fde7e7; color: var(--bad); }
+    .push.yellow { background: #fff4c2; color: #6b4e00; }
+    button.danger { border-color: var(--bad); color: var(--bad); }
+    .chip.low { border-color: var(--warn); color: var(--warn); }
+    .assign { border-left: 6px solid var(--accent); }
+    .assign .now { font-size: 22px; font-weight: 800; margin-top: 2px; }
+    .assign .nowsub { color: var(--muted); margin-top: 2px; }
+    .assign .next { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 15px; }
+    .assign .next b { font-size: 16px; }
+    .qpress { display: flex; gap: 6px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
+    .qpress select { width: auto; font-size: 16px; padding: 8px; }
+    .qpress button { padding: 8px 12px; font-size: 16px; }
+    .sheet { position: fixed; inset: 0; z-index: 10; background: rgba(15, 20, 30, .45); display: flex; align-items: flex-end; justify-content: center; }
+    .sheet-card { background: var(--card); width: 100%; max-width: 560px; border-radius: 18px 18px 0 0; padding: 18px 16px 24px; max-height: 92vh; overflow-y: auto; }
+    table.rep td, table.rep th { padding: 7px 4px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <!-- ===================== TOP BAR (after login) ===================== -->
+  <header id="topBar" class="topbar hidden">
+    <div class="brand"><img id="logoSm" class="logo-sm" alt="Specialty Roll Products"><span id="viewTitle">Press Tools</span></div>
+    <div class="who"><span id="whoName"></span>
+      <button id="lowBtn" class="chip low hidden">Low supply</button>
+      <button id="rolesBtn" class="chip">Menu</button>
+      <button id="switchBtn" class="chip">Switch user</button>
+    </div>
+  </header>
+
+  <!-- ===================== LOGIN ===================== -->
+  <section id="loginView" class="view">
+    <div class="login">
+      <div class="logo" id="logoBox"><img id="logoImg" alt="Specialty Roll Products"></div>
+      <h1 style="text-align:center">Press Tools</h1>
+      <p class="muted" style="text-align:center;margin-top:-6px">Enter your PIN</p>
+      <div class="pin-dots" id="pinDots" aria-live="polite"></div>
+      <div class="keypad" id="keypad">
+        <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+        <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+        <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+        <button data-k="back" class="soft" aria-label="Delete">⌫</button><button data-k="0">0</button>
+        <button data-k="ok" class="primary" id="pinOk">Log in</button>
+      </div>
+      <div id="loginMsg" class="msg" style="text-align:center"></div>
+    </div>
+  </section>
+
+  <!-- ===================== ROLE CHOOSER ===================== -->
+  <section id="roleView" class="view hidden">
+    <div class="card">
+      <h2 id="helloName">Hello</h2>
+      <p class="muted" style="margin-top:0">What are you doing?</p>
+      <div id="roleBtns" class="rolebtns"></div>
+    </div>
+  </section>
+
+  <!-- ===================== OPERATOR ===================== -->
+  <section id="operatorView" class="view hidden">
+  <div class="card">
+    <label style="margin-top:0">Press</label>
+    <div class="seg" id="pressSeg"></div>
+  </div>
+
+  <div id="assignCard" class="card assign hidden">
+    <h2 id="assignTitle">Job assignment</h2>
+    <div id="assignNow"></div>
+    <div id="assignNext"></div>
+  </div>
+
+  <!-- ===================== WASTE CALCULATOR ===================== -->
+  <details class="sec" id="secWaste" open>
+    <summary>Waste Calculator</summary>
+    <div class="body">
+      <div class="card">
+        <label for="w_rollNumber" style="margin-top:0">Roll Number</label>
+        <input id="w_rollNumber" autocomplete="off" autocapitalize="characters">
+
+        <label for="w_packageLength">Package Length</label>
+        <input id="w_packageLength" inputmode="decimal">
+
+        <div class="row2">
+          <div>
+            <label for="w_startCounter">Starting Counter</label>
+            <input id="w_startCounter" inputmode="decimal">
+          </div>
+          <div>
+            <label for="w_endCounter">Ending Counter</label>
+            <input id="w_endCounter" inputmode="decimal">
+          </div>
+        </div>
+
+        <label>Pallets (slips on each)</label>
+        <div class="row3">
+          <input id="w_pallet1" inputmode="numeric" placeholder="Pallet 1" aria-label="Pallet 1">
+          <input id="w_pallet2" inputmode="numeric" placeholder="Pallet 2" aria-label="Pallet 2">
+          <input id="w_pallet3" inputmode="numeric" placeholder="Pallet 3" aria-label="Pallet 3">
+        </div>
+        <div class="hint">Type the slip count on each pallet, including a partial one. Leave a pallet blank if there isn't one.</div>
+
+        <div class="wbtns">
+          <button id="w_calcBtn">Calculate</button>
+          <button id="w_saveBtn" class="primary">Save Roll</button>
+          <button id="w_clearBtn" class="clear">Clear for next roll</button>
+        </div>
+        <div id="w_msg" class="msg"></div>
+      </div>
+
+      <div id="w_resultCard" class="card hidden">
+        <h2 id="w_resultTitle">Results</h2>
+        <div class="big" id="w_bigWaste"></div>
+        <div class="out">
+          <div>Starting Footage</div><div id="w_oStart"></div>
+          <div>Machine Count</div><div id="w_oMachine"></div>
+          <div>Finished Product</div><div id="w_oFinished"></div>
+          <div>Waste (ft)</div><div id="w_oWaste"></div>
+          <div>Waste %</div><div id="w_oPct"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Recently saved</h2>
+        <ul id="w_recent" class="recent"><li><span class="when">Loading…</span></li></ul>
+      </div>
+    </div>
+  </details>
+
+  <!-- ===================== INK TRACKER ===================== -->
+  <details class="sec" id="secInk" open>
+    <summary>Ink Tracker</summary>
+    <div class="body">
+      <div id="msg" class="msg"></div>
+      <div id="queueBanner" class="banner hidden" role="status"></div>
+
+      <!-- No run open: pick a job -->
+      <div id="setupView" class="card hidden">
+        <h2>Start a run</h2>
+        <label for="stateSel">State</label>
+        <select id="stateSel"></select>
+        <label for="jobSel">Job</label>
+        <select id="jobSel"></select>
+        <div id="jobPreview"></div>
+        <button id="startBtn" class="primary wide">Start Run</button>
+        <p class="muted">Starting logs one startup bottle for every ink on the job.</p>
+      </div>
+
+      <!-- Run open: tap pallets and bottles -->
+      <div id="runView" class="hidden">
+        <div class="card">
+          <h2 id="runTitle"></h2>
+          <div id="runMeta" class="muted"></div>
+          <div id="staleNote" class="stale hidden"></div>
+        </div>
+
+        <div class="card">
+          <h2>Pallets sent out</h2>
+          <div class="pal">
+            <div>
+              <div class="count">Full pallets: <b id="palCount">0</b></div>
+              <div class="muted">Slips so far: <span id="palSlips">0</span></div>
+            </div>
+            <div class="acts">
+              <button class="minus" id="palMinus" aria-label="Take back one pallet">−</button>
+              <button class="plus" id="palPlus">+1 Pallet</button>
+            </div>
+          </div>
+          <label for="partialIn">Last partial pallet (slips)</label>
+          <input id="partialIn" inputmode="numeric" placeholder="Only for the last, not-full pallet">
+          <button id="partialSave" class="wide" style="margin-top:10px">Save partial pallet</button>
+        </div>
+
+        <div class="card">
+          <h2>Ink bottles</h2>
+          <div id="runInks"></div>
+        </div>
+
+        <div class="card">
+          <button id="addToggle" class="wide" style="margin-top:0">+ Add ink not on list</button>
+          <div id="addForm" class="hidden">
+            <label for="addInk">Ink name or number</label>
+            <input id="addInk" autocomplete="off">
+            <label>Side</label>
+            <div class="seg" id="addSide">
+              <button data-v="Front" class="on">Front</button>
+              <button data-v="Back">Back</button>
+            </div>
+            <div class="row2">
+              <button id="addCancel" class="wide">Cancel</button>
+              <button id="addSave" class="primary wide">Add ink</button>
+            </div>
+            <p class="muted">It gets a startup bottle and is added to this job's list, marked to check.</p>
+          </div>
+        </div>
+
+        <button id="endToggle" class="primary wide">End Run</button>
+        <div style="text-align:center"><button id="cancelRun" class="link">Started by mistake? Cancel run</button></div>
+      </div>
+
+      <!-- Ending a run -->
+      <div id="endView" class="card hidden">
+        <h2>End run</h2>
+        <p class="muted" style="margin-top:0">How much is left in the last bottle opened of each ink?</p>
+        <div id="endInks"></div>
+        <label for="slips">Slips printed</label>
+        <input id="slips" inputmode="numeric" placeholder="Can be filled in later">
+        <div class="hint" id="slipsHint"></div>
+        <div class="row2">
+          <button id="endBack" class="wide">Back</button>
+          <button id="endSave" class="primary wide">Finish Run</button>
+        </div>
+      </div>
+
+      <!-- Run finished -->
+      <div id="doneView" class="card hidden">
+        <h2 id="doneTitle">Run finished</h2>
+        <div id="doneMeta" class="muted"></div>
+        <div id="doneTable"></div>
+        <button id="nextBtn" class="primary wide">Start next run</button>
+      </div>
+    </div>
+  </details>
+  </section>
+
+  <!-- ===================== INK INVENTORY ===================== -->
+  <section id="inventoryView" class="view hidden">
+    <div class="card">
+      <h2>Receive ink</h2>
+      <label for="recvInk">Ink</label>
+      <select id="recvInk"></select>
+      <div class="row2">
+        <div><label for="recvQty">Bottles</label><input id="recvQty" inputmode="decimal" placeholder="e.g. 6"></div>
+        <div><label for="recvNote">Note (optional)</label><input id="recvNote" placeholder="PO, supplier…"></div>
+      </div>
+      <button id="recvSave" class="primary wide">Add to stock</button>
+      <div id="invMsg" class="msg"></div>
+    </div>
+    <div class="card">
+      <div class="cardhead">
+        <h2>Ink on the shelf</h2>
+        <div class="seg small" id="invScope">
+          <button data-v="active" class="on">Active states</button><button data-v="all">All inks</button>
+        </div>
+      </div>
+      <p class="muted" id="invHint" style="margin-top:4px">Only inks used by active states. Switch to "All inks" to count everything in the building.</p>
+      <button id="countToggle" class="wide" style="margin-top:6px">Count the shelf</button>
+      <div id="invList"></div>
+      <div id="countBar" class="hidden">
+        <button id="countSave" class="primary wide">Save counts</button>
+        <button id="countCancel" class="wide">Cancel count</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== MANAGEMENT ===================== -->
+  <section id="manageView" class="view hidden">
+    <div class="tabs" id="mTabs">
+      <button data-t="queue" class="on">Job queue</button>
+      <button data-t="needed">Ink needed</button>
+      <button data-t="waste">Waste</button>
+      <button data-t="supplies">Low supplies</button>
+      <button data-t="stock">Ink stock</button>
+      <button data-t="states">States</button>
+    </div>
+    <div id="mMsg" class="msg"></div>
+
+    <div id="m_queue" class="mpane">
+      <div class="card">
+        <h2>Add a job to the queue</h2>
+        <div class="row2">
+          <div><label for="qState">State</label><select id="qState"></select></div>
+          <div><label for="qJob">Job</label><select id="qJob"></select></div>
+        </div>
+        <div class="row2">
+          <div><label for="qSlips">Slips ordered</label><input id="qSlips" inputmode="numeric" placeholder="500000"></div>
+          <div><label for="qDue">Due date</label><input id="qDue" type="date"></div>
+        </div>
+        <button id="qAdd" class="primary wide">Add to queue</button>
+      </div>
+      <div class="card">
+        <div class="cardhead"><h2>Not shipped yet</h2>
+          <label class="check"><input type="checkbox" id="qShowShipped"> Show shipped</label></div>
+        <div id="qList"></div>
+      </div>
+    </div>
+
+    <div id="m_needed" class="mpane hidden">
+      <div class="card">
+        <h2>Ink needed for the queue</h2>
+        <p class="muted" style="margin-top:0">Unshipped jobs in active states: 1 startup bottle per ink plus the job's average use for the slips ordered, compared with the shelf and the minimum.</p>
+        <div id="needList"></div>
+      </div>
+    </div>
+
+    <div id="m_waste" class="mpane hidden">
+      <div class="card">
+        <h2>Waste report</h2>
+        <label for="wOp">Operator</label>
+        <select id="wOp"><option value="all">Everyone</option></select>
+        <label>Group by</label>
+        <div class="seg" id="wPeriod">
+          <button data-v="day">Day</button><button data-v="week" class="on">Week</button><button data-v="month">Month</button><button data-v="year">Year</button>
+        </div>
+        <div id="wReport"></div>
+      </div>
+      <div class="card">
+        <h2>Clear old waste data</h2>
+        <p class="muted" style="margin-top:0">Rolls saved before this date move to the Rolls Archive tab. Nothing is deleted.</p>
+        <input id="archBefore" type="date">
+        <button id="archBtn" class="wide">Archive older rolls</button>
+      </div>
+    </div>
+
+    <div id="m_supplies" class="mpane hidden">
+      <div class="card">
+        <div class="cardhead"><h2>Low supply reports</h2>
+          <label class="check"><input type="checkbox" id="supShowAll"> Show received</label></div>
+        <div id="supList"></div>
+      </div>
+    </div>
+
+    <div id="m_stock" class="mpane hidden">
+      <div class="card">
+        <h2>Ink stock and minimums</h2>
+        <p class="muted" style="margin-top:0">Change "Keep at least" and tap Save on that line. Inks used by active states are marked.</p>
+        <div id="minList"></div>
+      </div>
+    </div>
+
+    <div id="m_states" class="mpane hidden">
+      <div class="card">
+        <h2>Active states</h2>
+        <p class="muted" style="margin-top:0">Only active states count for ink ordering and the shelf count. All ink can still be counted.</p>
+        <div id="stateList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== ADMIN ===================== -->
+  <section id="adminView" class="view hidden">
+    <div class="card">
+      <div class="cardhead"><h2>People and PINs</h2><button id="userNew" class="chip">+ Add person</button></div>
+      <div id="userForm" class="hidden">
+        <input type="hidden" id="uRow">
+        <div class="row2">
+          <div><label for="uName">Name</label><input id="uName" autocomplete="off"></div>
+          <div><label for="uPin">PIN (4–8 digits)</label><input id="uPin" inputmode="numeric" autocomplete="off"></div>
+        </div>
+        <div class="row2">
+          <div><label for="uLevel">Level</label>
+            <select id="uLevel"><option value="1">1 · Operator + Ink Inventory</option><option value="2">2 · + Management</option><option value="3">3 · + Admin</option></select></div>
+          <div><label class="check" style="margin-top:38px"><input type="checkbox" id="uActive" checked> Can log in</label></div>
+        </div>
+        <div class="row2">
+          <button id="uCancel" class="wide">Cancel</button>
+          <button id="uSave" class="primary wide">Save</button>
+        </div>
+      </div>
+      <div id="userList"></div>
+      <div id="aMsg" class="msg"></div>
+    </div>
+    <div class="card">
+      <h2>Backups</h2>
+      <p class="muted" style="margin-top:0">A copy of every tab every night. The last 14 days are kept as separate spreadsheets in your Google Drive.</p>
+      <button id="backupBtn" class="wide">Turn on nightly backup</button>
+    </div>
+    <div class="card">
+      <h2>Delete archived waste data</h2>
+      <p class="muted" style="margin-top:0">Permanently deletes archived rolls saved before this date. This can't be undone.</p>
+      <input id="purgeBefore" type="date">
+      <button id="purgeBtn" class="wide danger">Delete archived rolls</button>
+    </div>
+    <div class="card">
+      <div class="cardhead"><h2>Change log</h2><button id="auditLoad" class="chip">Show</button></div>
+      <div id="auditList"></div>
+    </div>
+    <button id="toManage" class="wide">Open Management screens</button>
+  </section>
+
+  <!-- ===================== REPORT LOW SUPPLY ===================== -->
+  <div id="lowSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="lowTitle">
+    <div class="sheet-card">
+      <h2 id="lowTitle">Report low supply</h2>
+      <label for="lowItem">Item</label>
+      <input id="lowItem" list="lowItems" autocomplete="off" placeholder="Pick or type: Yellow Magic, 185…">
+      <datalist id="lowItems"></datalist>
+      <label>How low?</label>
+      <div class="seg" id="lowLevel"><button data-v="Low" class="on">Running low</button><button data-v="Out">Out</button></div>
+      <label for="lowNote">Note (optional)</label>
+      <input id="lowNote" placeholder="e.g. one jug left">
+      <div class="row2">
+        <button id="lowCancel" class="wide">Close</button>
+        <button id="lowSend" class="primary wide">Send</button>
+      </div>
+      <div id="lowMsg" class="msg"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+  function fmt(n, d) { return Number(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }); }
+  function errText(e) { return (e && e.message ? e.message : 'Something went wrong. Try again.').replace(/^Error:\s*/, ''); }
+  function noop() {}
+
+  /* ---- login state; every server request goes through api() with the login token ---- */
+  var A = { token: null, name: '', level: 0, roles: [], idleMinutes: 30 };
+  var LOGIN_ERR = /log in again|timed out/i;
+  function srv(name, args, ok, fail) {
+    google.script.run.withSuccessHandler(ok || noop).withFailureHandler(function (e) {
+      if (LOGIN_ERR.test(errText(e))) { logout(errText(e)); return; }
+      (fail || noop)(e);
+    }).api(A.token, name, args || []);
+  }
+
+  /* ---- remember which sections are open ---- */
+  ['secWaste', 'secInk'].forEach(function (id) {
+    var el = $(id), saved = store(id);
+    if (saved === 'closed') el.removeAttribute('open');
+    el.addEventListener('toggle', function () { store(id, el.open ? 'open' : 'closed'); });
+  });
+
+  /* =====================================================================
+     WASTE ROLL CALCULATOR
+     ===================================================================== */
+  var W_FIELDS = ['rollNumber','packageLength','startCounter','endCounter','pallet1','pallet2','pallet3'];
+
+  function wRead() {
+    var o = {};
+    W_FIELDS.forEach(function (f) { o[f] = $('w_' + f).value; });
+    o.press = S.press || '';
+    return o;
+  }
+  function wMsg(text, kind) { var m = $('w_msg'); m.textContent = text || ''; m.className = 'msg' + (kind ? ' ' + kind : ''); }
+  function wBusy(on) { $('w_calcBtn').disabled = on; $('w_saveBtn').disabled = on; }
+  function wError(e) { wBusy(false); wMsg(errText(e), 'err'); }
+
+  function wShowResult(r, saved) {
+    $('w_resultCard').classList.remove('hidden');
+    $('w_resultTitle').textContent = (saved ? 'Saved: ' : 'Preview: ') + r.rollNumber;
+    $('w_bigWaste').textContent = fmt(r.wastePct * 100, 2) + '% waste';
+    $('w_oStart').textContent = fmt(r.startingFootage, 2) + ' ft';
+    $('w_oMachine').textContent = fmt(r.machineCount, 0);
+    $('w_oFinished').textContent = fmt(r.finishedProduct, 2) + ' ft';
+    $('w_oWaste').textContent = fmt(r.wasteFt, 2) + ' ft';
+    $('w_oPct').textContent = fmt(r.wastePct * 100, 2) + '%';
+  }
+
+  function wShowRecent(list) {
+    var ul = $('w_recent');
+    ul.innerHTML = '';
+    if (!list || !list.length) {
+      ul.innerHTML = '<li><span class="when">No rolls saved yet.</span></li>';
+      return;
+    }
+    list.forEach(function (r) {
+      var li = document.createElement('li');
+      var left = document.createElement('span');
+      left.innerHTML = '<strong></strong><br><span class="when"></span>';
+      left.querySelector('strong').textContent = r.rollNumber;
+      left.querySelector('.when').textContent = r.savedAt + (r.press ? ' · ' + r.press : '') + (r.operator ? ' · ' + r.operator : '');
+      var right = document.createElement('span');
+      right.textContent = fmt(r.wasteFt, 2) + ' ft · ' + fmt(r.wastePct * 100, 2) + '%';
+      li.appendChild(left); li.appendChild(right);
+      ul.appendChild(li);
+    });
+  }
+
+  $('w_calcBtn').addEventListener('click', function () {
+    wMsg('Calculating…'); wBusy(true);
+    srv('wasteCalculate', [wRead()], function (r) { wBusy(false); wMsg(''); wShowResult(r, false); }, wError);
+  });
+
+  $('w_saveBtn').addEventListener('click', function () {
+    if (!S.press) { wMsg('Pick your press first (Press buttons at the top).', 'err'); return; }
+    wMsg('Saving…'); wBusy(true);
+    srv('wasteSave', [wRead()], function (res) {
+      wBusy(false);
+      wShowResult(res.saved, true);
+      wShowRecent(res.recent);
+      wMsg('Roll ' + res.saved.rollNumber + ' saved.', 'ok');
+    }, wError);
+  });
+
+  $('w_clearBtn').addEventListener('click', function () {
+    W_FIELDS.forEach(function (f) { $('w_' + f).value = ''; });
+    $('w_resultCard').classList.add('hidden');
+    wMsg('');
+    $('w_rollNumber').focus();
+  });
+
+  function wLoadRecent() {
+    srv('wasteRecent', [], wShowRecent);
+  }
+  setInterval(function () { if (V.current === 'operator') wLoadRecent(); }, 30000);
+
+  /* =====================================================================
+     INK TRACKER
+     ===================================================================== */
+  var S = { press: null, presses: [], jobs: [], run: null, addSide: 'Front', leftovers: {} };
+  var LEFT = [[0, 'Empty'], [0.25, '1/4'], [0.5, '1/2'], [0.75, '3/4']];
+
+  function show(id, on) { $(id).classList.toggle('hidden', !on); }
+  function msg(text, kind) { var m = $('msg'); m.textContent = text || ''; m.className = 'msg' + (kind ? ' ' + kind : ''); }
+  function frac(v) { for (var i = 0; i < LEFT.length; i++) if (LEFT[i][0] === v) return LEFT[i][1]; return v; }
+
+  function call(fn, args, ok) {
+    srv(fn, args, ok, function (e) { setBusy(false); msg(errText(e), 'err'); });
+  }
+  function setBusy(on) {
+    ['startBtn', 'addSave', 'endSave', 'nextBtn', 'partialSave'].forEach(function (id) { $(id).disabled = on; });
+  }
+
+  /* ----- press ----- */
+  function renderPresses() {
+    $('pressSeg').innerHTML = S.presses.map(function (p) {
+      return '<button data-p="' + esc(p) + '" class="' + (p === S.press ? 'on' : '') + '">' + esc(p) + '</button>';
+    }).join('');
+  }
+  $('pressSeg').addEventListener('click', function (e) {
+    var p = e.target.getAttribute('data-p');
+    if (!p || p === S.press) return;
+    S.press = p; store('inkPress', p); renderPresses(); load();
+  });
+
+  /* ----- load ----- */
+  function load() {
+    msg('Loading…');
+    call('inkLoad', [S.press], function (d) {
+      msg('');
+      S.presses = d.presses; S.jobs = d.jobs; S.goalRuns = d.goalRuns; S.run = withPending(d.run); S.assigned = d.assigned;
+      if (!S.press) {
+        var saved = store('inkPress');
+        if (saved && S.presses.indexOf(saved) !== -1) { S.press = saved; renderPresses(); load(); return; }
+      }
+      renderPresses();
+      route();
+      renderAssign();
+    });
+  }
+
+  /* ----- job assignment for this press (set by management) ----- */
+  function renderAssign() {
+    var a = S.assigned;
+    show('assignCard', !!(S.press && a));
+    if (!S.press || !a) return;
+    $('assignTitle').textContent = 'Job assignment · ' + S.press;
+    function line(x) { return fmt(x.slips, 0) + ' slips' + (x.due ? ' · due ' + esc(x.due) : ''); }
+    if (!a.current) {
+      $('assignNow').innerHTML = '<p class="muted" style="margin:0">No job assigned to ' + esc(S.press) + ' right now.</p>';
+      $('assignNext').innerHTML = '';
+      return;
+    }
+    var c = a.current;
+    var canPick = !S.run && S.jobs.some(function (j) { return j.key === c.jobKey; });
+    $('assignNow').innerHTML = '<div class="muted">Now</div><div class="now">' + esc(c.job) + '</div>' +
+      '<div class="nowsub">' + esc(c.state) + ' · ' + line(c) + '</div>' +
+      (canPick ? '<button id="assignPick" class="wide">Pick this job below</button>' : '');
+    $('assignNext').innerHTML = a.next ? '<div class="next">Next: <b>' + esc(a.next.job) + '</b> <span class="muted">· ' +
+      esc(a.next.state) + ' · ' + line(a.next) + (a.more ? ' · +' + a.more + ' more' : '') + '</span></div>'
+      : '<div class="next muted">Nothing assigned after this job.</div>';
+  }
+  $('assignNow').addEventListener('click', function (e) {
+    if (e.target.id !== 'assignPick') return;
+    var c = S.assigned.current;
+    $('stateSel').value = c.state; store('inkState', c.state); renderJobs();
+    $('jobSel').value = c.jobKey; renderPreview();
+    $('setupView').scrollIntoView({ behavior: 'smooth' });
+  });
+
+  function route() {
+    show('endView', false); show('doneView', false);
+    if (!S.press) { show('setupView', false); show('runView', false); msg('Pick your press to begin.'); return; }
+    if (S.run) { show('setupView', false); show('runView', true); renderRun(); }
+    else { show('runView', false); show('setupView', true); renderSetup(); }
+  }
+
+  /* ----- setup ----- */
+  function renderSetup() {
+    var states = [];
+    S.jobs.forEach(function (j) { if (states.indexOf(j.state) === -1) states.push(j.state); });
+    var keep = store('inkState');
+    $('stateSel').innerHTML = '<option value="">Choose a state…</option>' + states.map(function (s) {
+      return '<option' + (s === keep ? ' selected' : '') + '>' + esc(s) + '</option>';
+    }).join('');
+    renderJobs();
+  }
+  function renderJobs() {
+    var st = $('stateSel').value;
+    var rank = { red: 0, yellow: 1, green: 2 };
+    var list = S.jobs.filter(function (j) { return j.state === st; }).sort(function (a, b) {
+      return (b.queued - a.queued) || (rank[a.flag] - rank[b.flag]) || a.job.localeCompare(b.job);
+    });
+    var dot = { red: '🔴', yellow: '🟡', green: '🟢' };
+    $('jobSel').innerHTML = '<option value="">' + (st ? 'Choose a job…' : 'Choose a state first') + '</option>' +
+      list.map(function (j) {
+        return '<option value="' + esc(j.key) + '">' + (dot[j.flag] || '') + ' ' + esc(j.job) + (j.queued ? '  · in queue' : '') + '</option>';
+      }).join('');
+    renderPreview();
+  }
+  function renderPreview() {
+    var j = S.jobs.filter(function (x) { return x.key === $('jobSel').value; })[0];
+    $('startBtn').disabled = !j;
+    if (!j) { $('jobPreview').innerHTML = ''; return; }
+    var goal = S.goalRuns || 5;
+    var html = '<h3>' + (j.verified ? '<span class="badge ok">Verified</span>' : '<span class="badge unv">Not verified yet</span>') +
+      ' <span class="badge ' + j.flag + '">' + (j.runs ? 'Tracked ' + j.runs + ' of ' + goal : 'Never tracked') + '</span></h3>';
+    if (j.flag === 'red') html += '<div class="push red">This job has never been tracked. Please track it this run.</div>';
+    else if (j.flag === 'yellow') html += '<div class="push yellow">Tracked ' + j.runs + ' of ' + goal + ' times. Please keep tracking it.</div>';
+    ['Front', 'Back'].forEach(function (side) {
+      var inks = j.inks.filter(function (k) { return k.side === side; });
+      if (!inks.length) return;
+      html += '<div class="muted"><b>' + side + '</b></div><ol class="preview">' + inks.map(function (k) {
+        return '<li>' + esc(k.ink) + (k.color ? ' <span class="muted">· ' + esc(k.color) + '</span>' : '') +
+          (k.anilox ? ' <span class="muted">· ' + esc(k.anilox) + '</span>' : '') + '</li>';
+      }).join('') + '</ol>';
+    });
+    $('jobPreview').innerHTML = html;
+  }
+  $('stateSel').addEventListener('change', function () { store('inkState', this.value); renderJobs(); });
+  $('jobSel').addEventListener('change', renderPreview);
+  $('startBtn').addEventListener('click', function () {
+    var key = $('jobSel').value;
+    if (!key) return;
+    setBusy(true); msg('Starting run…');
+    call('inkStartRun', [S.press, key], function (run) {
+      setBusy(false); msg('Run started. Startup bottles logged.', 'ok');
+      S.run = run; route();
+    });
+  });
+
+  /* ----- run ----- */
+  function renderRun() {
+    var r = S.run;
+    $('runTitle').textContent = r.job;
+    $('runMeta').innerHTML = esc(r.press) + ' · started ' + esc(r.started) + ' &nbsp;' +
+      (r.verified ? '<span class="badge ok">Verified</span>' : '<span class="badge unv">Not verified yet</span>');
+
+    var stale = r.openHours >= r.staleHours;
+    show('staleNote', stale);
+    if (stale) {
+      var age = r.openHours >= 48 ? Math.floor(r.openHours / 24) + ' days' : Math.floor(r.openHours) + ' hours';
+      $('staleNote').textContent = 'Open since ' + r.started + ' (' + age + '). If this job is done, tap End Run, or Cancel if it was started by mistake.';
+    }
+
+    // pallets (don't overwrite the partial box while someone is typing in it)
+    $('palCount').textContent = r.pallets;
+    $('palSlips').textContent = fmt(r.pallets * (r.palletSlips || 100000) + (r.partial || 0), 0);
+    $('palMinus').disabled = !(r.pallets > 0);
+    if (document.activeElement !== $('partialIn')) $('partialIn').value = r.partial ? r.partial : '';
+
+    var html = '';
+    ['Front', 'Back'].forEach(function (side) {
+      var inks = r.inks.filter(function (k) { return k.side === side; });
+      if (!inks.length) return;
+      html += '<h3>' + side + '</h3>';
+      inks.forEach(function (k) {
+        var sub = [k.color, k.anilox].filter(Boolean).map(esc).join(' · ');
+        html += '<div class="ink"><div>' +
+          '<div class="name">' + esc(k.ink) + '</div>' +
+          (sub ? '<div class="sub">' + sub + '</div>' : '') +
+          '<div class="count">Bottles opened: <b>' + k.opened + '</b> <span class="muted">+ startup</span></div>' +
+          '</div><div class="acts">' +
+          '<button class="minus" data-k="' + esc(k.key) + '" data-q="-1" aria-label="Take back one bottle of ' + esc(k.ink) + '"' + (k.opened > 0 ? '' : ' disabled') + '>−</button>' +
+          '<button class="plus" data-k="' + esc(k.key) + '" data-q="1">+1 Bottle</button>' +
+          '</div></div>';
+      });
+    });
+    $('runInks').innerHTML = html;
+  }
+
+  /* pallets */
+  function palTap(q) {
+    var r = S.run;
+    if (q === -1) {
+      if (r.pallets <= 0) return;
+      if (!confirm('Take back one pallet?')) return;
+    }
+    r.pallets += q; renderRun();           // show it right away
+    queueTap({ fn: 'inkPallet', runId: r.runId, qty: q, label: 'pallet ' + (q === 1 ? '+1' : '−1') });
+  }
+  $('palPlus').addEventListener('click', function () { palTap(1); });
+  $('palMinus').addEventListener('click', function () { palTap(-1); });
+  $('partialSave').addEventListener('click', function () {
+    setBusy(true); msg('Saving partial pallet…');
+    call('inkSetPartial', [S.run.runId, $('partialIn').value], function (run) {
+      setBusy(false); S.run = withPending(run); $('partialIn').blur(); renderRun();
+      msg(run.partial ? 'Partial pallet saved: ' + fmt(run.partial, 0) + ' slips.' : 'Partial pallet cleared.', 'ok');
+    });
+  });
+
+  /* bottles */
+  $('runInks').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-k]');
+    if (!b) return;
+    var key = b.getAttribute('data-k'), q = Number(b.getAttribute('data-q'));
+    var k = S.run.inks.filter(function (x) { return x.key === key; })[0];
+    if (!k) return;
+    if (q === -1 && !confirm('Take back one bottle of ' + k.ink + '?')) return;
+    if (q === -1 && k.opened <= 0) return;
+    k.opened += q; renderRun();            // show it right away
+    queueTap({ fn: 'inkBottle', runId: S.run.runId, side: k.side, ink: k.ink, key: k.key, qty: q,
+      label: k.ink + (q === 1 ? ' +1' : ' −1') });
+  });
+
+  /* ----- tap queue: bottle and pallet taps are kept on this device until the server has them ----- */
+  var Q = { items: [], sending: false, failed: false, timer: null };
+  try { Q.items = JSON.parse(store('inkQueue') || '[]') || []; } catch (e) { Q.items = []; }
+
+  function saveQueue() { store('inkQueue', JSON.stringify(Q.items)); }
+  function newTapId() { return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8); }
+
+  function queueTap(t) {
+    t.tapId = newTapId();
+    Q.items.push(t); saveQueue();
+    if (!Q.failed) msg('Saving…');
+    renderQueue(); flush();
+  }
+
+  /** Server state plus the taps this device hasn't saved yet, so counts never jump backwards. */
+  function withPending(run) {
+    if (!run) return run;
+    Q.items.forEach(function (t) {
+      if (t.runId !== run.runId) return;
+      if (t.fn === 'inkPallet') run.pallets += t.qty;
+      else run.inks.forEach(function (k) { if (k.key === t.key) k.opened += t.qty; });
+    });
+    return run;
+  }
+
+  // Errors the server gives on purpose (run ended elsewhere, nothing to take back…): retrying won't help.
+  var REJECTED = /already (closed|cancelled)|Nothing to take back|No pallets to take back|not on this run|could not be found|Bad (bottle|pallet) count/i;
+
+  function flush() {
+    if (Q.sending || !Q.items.length || !A.token) return;
+    clearTimeout(Q.timer);
+    Q.sending = true;
+    var t = Q.items[0];
+    var args = t.fn === 'inkPallet' ? [t.runId, t.qty, t.tapId] : [t.runId, t.side, t.ink, t.qty, t.tapId];
+    google.script.run.withSuccessHandler(function (run) {
+      Q.sending = false; Q.failed = false;
+      Q.items.shift(); saveQueue();
+      if (S.run && run.runId === S.run.runId) { S.run = withPending(run); renderRun(); }
+      if (!Q.items.length) msg('Saved: ' + t.label, 'ok');
+      renderQueue(); flush();
+    }).withFailureHandler(function (e) {
+      Q.sending = false;
+      var text = errText(e);
+      if (LOGIN_ERR.test(text)) { logout(text); return; }   // taps stay saved on this device until someone logs in
+      if (REJECTED.test(text)) {
+        Q.items.shift(); saveQueue();
+        msg(text, 'err'); renderQueue(); refreshRun(); flush();
+        return;
+      }
+      Q.failed = true; renderQueue();
+      Q.timer = setTimeout(flush, 10000);
+    }).api(A.token, t.fn, args);
+  }
+
+  function renderQueue() {
+    var n = Q.items.length;
+    show('queueBanner', n > 0 && Q.failed);
+    $('queueBanner').textContent = n + (n === 1 ? ' tap' : ' taps') + ' not saved yet. Retrying… Keep this page open.';
+    if (n > 0 && Q.failed) msg('');
+  }
+
+  function waitForQueue() {
+    if (!Q.items.length) return false;
+    msg('Wait: ' + Q.items.length + (Q.items.length === 1 ? ' tap is' : ' taps are') + ' still saving.', 'err');
+    flush();
+    return true;
+  }
+
+  window.addEventListener('online', flush);
+
+  /* add ink */
+  $('addToggle').addEventListener('click', function () { show('addForm', true); show('addToggle', false); $('addInk').focus(); });
+  $('addCancel').addEventListener('click', function () { show('addForm', false); show('addToggle', true); $('addInk').value = ''; });
+  $('addSide').addEventListener('click', function (e) {
+    var v = e.target.getAttribute('data-v'); if (!v) return;
+    S.addSide = v;
+    Array.prototype.forEach.call(this.children, function (b) { b.classList.toggle('on', b.getAttribute('data-v') === v); });
+  });
+  $('addSave').addEventListener('click', function () {
+    var name = $('addInk').value.trim();
+    if (!name) { msg('Type the ink name or number.', 'err'); return; }
+    setBusy(true); msg('Adding ' + name + '…');
+    call('inkAddInk', [S.run.runId, S.addSide, name], function (run) {
+      setBusy(false); S.run = withPending(run); renderRun();
+      $('addInk').value = ''; show('addForm', false); show('addToggle', true);
+      msg(name + ' added with a startup bottle.', 'ok');
+    });
+  });
+
+  /* cancel */
+  $('cancelRun').addEventListener('click', function () {
+    if (waitForQueue()) return;
+    if (!confirm('Cancel this run? Use this only if it was started by mistake.')) return;
+    msg('Cancelling…');
+    call('inkCancelRun', [S.run.runId], function () { S.run = null; msg('Run cancelled.', 'ok'); route(); });
+  });
+
+  /* ----- end ----- */
+  $('endToggle').addEventListener('click', function () {
+    if (waitForQueue()) return;
+    S.leftovers = {};
+    var inks = S.run.inks.filter(function (k) { return k.opened > 0; });
+    $('endInks').innerHTML = inks.length ? inks.map(function (k) {
+      return '<div class="end-ink"><div class="name">' + esc(k.ink) + ' <span class="muted">· ' + k.side + '</span></div>' +
+        '<div class="seg" data-k="' + esc(k.key) + '">' + LEFT.map(function (l) {
+          return '<button data-v="' + l[0] + '">' + l[1] + '</button>';
+        }).join('') + '</div></div>';
+    }).join('') : '<p class="muted">No extra bottles were opened, so there are no leftovers to enter.</p>';
+    var fromPallets = S.run.slipsFromPallets || (S.run.pallets * (S.run.palletSlips || 100000) + (S.run.partial || 0));
+    $('slips').value = fromPallets > 0 ? fromPallets : '';
+    $('slipsHint').textContent = fromPallets > 0
+      ? 'Filled in from the pallets entered (' + S.run.pallets + ' full + ' + fmt(S.run.partial || 0, 0) + ' partial). Change it if the real count is different.'
+      : 'No pallets were entered. You can type the count now or add it on the Runs tab later.';
+    show('runView', false); show('endView', true); msg('');
+    $('endView').scrollIntoView();
+  });
+  $('endInks').addEventListener('click', function (e) {
+    var v = e.target.getAttribute('data-v'); if (v === null) return;
+    var seg = e.target.parentNode, key = seg.getAttribute('data-k');
+    S.leftovers[key] = Number(v);
+    Array.prototype.forEach.call(seg.children, function (b) { b.classList.toggle('on', b === e.target); });
+  });
+  $('endBack').addEventListener('click', function () { show('endView', false); show('runView', true); });
+  $('endSave').addEventListener('click', function () {
+    if (waitForQueue()) return;
+    var need = S.run.inks.filter(function (k) { return k.opened > 0 && !(k.key in S.leftovers); });
+    if (need.length) { msg('Pick the leftover for: ' + need.map(function (k) { return k.ink; }).join(', '), 'err'); return; }
+    setBusy(true); msg('Finishing run…');
+    call('inkEndRun', [S.run.runId, $('slips').value, S.leftovers], function (res) {
+      setBusy(false); msg('');
+      S.run = null; renderDone(res);
+    });
+  });
+
+  function renderDone(res) {
+    show('endView', false); show('runView', false); show('setupView', false); show('doneView', true);
+    $('doneTitle').textContent = 'Run finished: ' + res.job;
+    $('doneMeta').textContent = res.press + (res.slips !== '' ? ' · ' + fmt(res.slips, 0) + ' slips' : ' · slips not entered yet (add them on the Runs tab)');
+    var hasPer = res.slips !== '' && res.slips > 0;
+    $('doneTable').innerHTML = '<table><tr><th>Ink</th><th class="n">Opened</th><th class="n">Left</th><th class="n">Used</th>' +
+      (hasPer ? '<th class="n">For 500K</th>' : '') + '</tr>' + res.summary.map(function (s) {
+        return '<tr><td>' + esc(s.ink) + ' <span class="muted">' + s.side.charAt(0) + '</span></td><td class="n">' + s.opened +
+          '</td><td class="n">' + (s.opened ? frac(s.leftover) : '—') + '</td><td class="n">' + fmt(s.totalUsed, 2) + '</td>' +
+          (hasPer ? '<td class="n">' + fmt(s.order500, 0) + '</td>' : '') + '</tr>';
+      }).join('') + '</table>' +
+      (hasPer ? '<p class="muted">"For 500K" = the startup bottle once, plus running use scaled to 500,000 slips, rounded up to whole bottles.</p>' : '');
+    $('doneView').scrollIntoView();
+  }
+  $('nextBtn').addEventListener('click', function () { show('doneView', false); load(); });
+
+  /* ----- live refresh: picks up taps from the other device on the same press ----- */
+  function refreshRun() {
+    if (V.current !== 'operator' || !S.run || Q.sending || $('runView').classList.contains('hidden')) return;
+    srv('inkGetRun', [S.run.runId], function (run) {
+      if (Q.sending || !S.run || run.runId !== S.run.runId) return;
+      if (run.status !== 'Open') { S.run = null; msg('This run was ended on another device.', 'ok'); load(); return; }
+      S.run = withPending(run); renderRun();
+    });
+  }
+  setInterval(refreshRun, 15000);
+
+  /* =====================================================================
+     SMALL HELPERS FOR THE NEW SCREENS
+     ===================================================================== */
+  function setMsg(id, text, kind) { var m = $(id); m.textContent = text || ''; m.className = 'msg' + (kind ? ' ' + kind : ''); }
+  function opt(value, label, selected) {
+    return '<option value="' + esc(value) + '"' + (selected ? ' selected' : '') + '>' + esc(label == null ? value : label) + '</option>';
+  }
+  function segPick(id, cb) {
+    $(id).addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-v]'); if (!b) return;
+      Array.prototype.forEach.call(this.children, function (x) { x.classList.toggle('on', x === b); });
+      cb(b.getAttribute('data-v'));
+    });
+  }
+  function badge(kind, text) { return '<span class="badge ' + kind + '">' + esc(text) + '</span>'; }
+  var STOCK_BADGE = { Out: 'red', Low: 'yellow', OK: 'green' };
+  var FLAG_TEXT = { red: 'Never tracked', yellow: 'Tracking', green: 'Well tracked' };
+
+  /* =====================================================================
+     LOGIN, ROLES AND SCREENS
+     ===================================================================== */
+  var V = { current: 'login' };
+  var VIEWS = { login: 'loginView', roles: 'roleView', operator: 'operatorView', inventory: 'inventoryView',
+    management: 'manageView', admin: 'adminView' };
+  var TITLES = { roles: 'Press Tools', operator: 'Operator', inventory: 'Ink Inventory', management: 'Management', admin: 'Admin' };
+  var ROLE_HINT = { operator: 'Waste Calculator and Ink Tracker', inventory: 'Receive ink and count the shelf',
+    management: 'Job queue, reports, ink stock and states', admin: 'People, PINs and backups' };
+
+  function deviceId() {
+    var d = store('pt_device');
+    if (!d) { d = Date.now().toString(36) + Math.random().toString(36).slice(2, 10); store('pt_device', d); }
+    return d || 'no-storage';
+  }
+  function allowed(role) { return A.roles.some(function (r) { return r.key === role; }); }
+
+  function go(view) {
+    V.current = view;
+    Object.keys(VIEWS).forEach(function (k) { show(VIEWS[k], k === view); });
+    var inApp = view !== 'login';
+    show('topBar', inApp); show('lowBtn', inApp);
+    $('viewTitle').textContent = TITLES[view] || 'Press Tools';
+    show('rolesBtn', inApp && view !== 'roles' && A.roles.length > 1);
+    if (inApp) store('pt_view', view);
+    window.scrollTo(0, 0);
+    if (view === 'operator') { load(); wLoadRecent(); flush(); }
+    if (view === 'inventory') invLoad();
+    if (view === 'management') mOpen(M.tab);
+    if (view === 'admin') aLoad();
+  }
+
+  function startSession(sess, reopened) {
+    A.token = sess.token || A.token; A.name = sess.name; A.level = sess.level;
+    A.roles = sess.roles || []; A.idleMinutes = sess.idleMinutes || 30;
+    store('pt_token', A.token);
+    $('whoName').textContent = A.name;
+    $('helloName').textContent = 'Hello, ' + A.name;
+    $('roleBtns').innerHTML = A.roles.map(function (r) {
+      return '<button data-role="' + r.key + '">' + esc(r.label) + '<small>' + esc(ROLE_HINT[r.key]) + '</small></button>';
+    }).join('');
+    touch();
+    var last = store('pt_view');
+    if (reopened && last && allowed(last)) go(last);
+    else if (A.roles.length === 1) go(A.roles[0].key);
+    else go('roles');
+  }
+
+  function logout(why) {
+    A.token = null; A.name = ''; A.level = 0; A.roles = [];
+    store('pt_token', ''); store('pt_view', '');
+    PIN.value = ''; drawPin();
+    show('lowSheet', false);
+    go('login');
+    setMsg('loginMsg', why || '', why ? 'err' : '');
+  }
+
+  $('roleBtns').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-role]'); if (b) go(b.getAttribute('data-role'));
+  });
+  $('rolesBtn').addEventListener('click', function () { go('roles'); });
+  $('switchBtn').addEventListener('click', function () { logout(''); });
+
+  /* ----- PIN pad ----- */
+  var PIN = { value: '' };
+  function drawPin() {
+    var n = Math.max(4, PIN.value.length), html = '';
+    for (var i = 0; i < n; i++) html += '<span' + (i < PIN.value.length ? ' class="on"' : '') + '></span>';
+    $('pinDots').innerHTML = html;
+  }
+  function pinKey(k) {
+    if (k === 'back') PIN.value = PIN.value.slice(0, -1);
+    else if (k === 'ok') { doLogin(); return; }
+    else if (/^\d$/.test(k) && PIN.value.length < 8) PIN.value += k;
+    setMsg('loginMsg', ''); drawPin();
+  }
+  $('keypad').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-k]'); if (b) pinKey(b.getAttribute('data-k'));
+  });
+  document.addEventListener('keydown', function (e) {
+    if (V.current !== 'login') return;
+    if (/^\d$/.test(e.key)) pinKey(e.key);
+    else if (e.key === 'Backspace') pinKey('back');
+    else if (e.key === 'Enter') pinKey('ok');
+  });
+  function doLogin() {
+    if (PIN.value.length < 4) { setMsg('loginMsg', 'Enter your PIN.', 'err'); return; }
+    $('pinOk').disabled = true; setMsg('loginMsg', 'Checking…');
+    var tried = PIN.value;
+    PIN.value = ''; drawPin();
+    google.script.run.withSuccessHandler(function (sess) {
+      $('pinOk').disabled = false; setMsg('loginMsg', '');
+      startSession(sess, false);
+    }).withFailureHandler(function (e) {
+      $('pinOk').disabled = false; setMsg('loginMsg', errText(e), 'err');
+    }).login(tried, deviceId());
+  }
+
+  /* ----- log out after a while with no use (shared tablets) ----- */
+  var IDLE = { last: Date.now() };
+  function touch() { IDLE.last = Date.now(); }
+  ['click', 'keydown', 'touchstart', 'input'].forEach(function (ev) { document.addEventListener(ev, touch, true); });
+  setInterval(function () {
+    if (A.token && Date.now() - IDLE.last > A.idleMinutes * 60000) logout('Logged out after ' + A.idleMinutes + ' minutes with no use.');
+  }, 20000);
+
+  /* =====================================================================
+     REPORT LOW SUPPLY (every screen)
+     ===================================================================== */
+  var LOW = { level: 'Low' };
+  $('lowBtn').addEventListener('click', function () {
+    setMsg('lowMsg', ''); $('lowItem').value = ''; $('lowNote').value = '';
+    show('lowSheet', true);
+    srv('supplyItems', [], function (d) {
+      $('lowItems').innerHTML = d.items.map(function (x) { return opt(x.name, x.category); }).join('');
+    });
+  });
+  segPick('lowLevel', function (v) { LOW.level = v; });
+  $('lowCancel').addEventListener('click', function () { show('lowSheet', false); });
+  $('lowSheet').addEventListener('click', function (e) { if (e.target === this) show('lowSheet', false); });
+  $('lowSend').addEventListener('click', function () {
+    var item = $('lowItem').value.trim();
+    if (!item) { setMsg('lowMsg', 'Pick or type the item that is low.', 'err'); return; }
+    $('lowSend').disabled = true; setMsg('lowMsg', 'Sending…');
+    srv('supplyReport', [item, LOW.level, $('lowNote').value, S.press || ''], function (r) {
+      $('lowSend').disabled = false;
+      setMsg('lowMsg', r.message, r.duplicate ? '' : 'ok');
+      if (!r.duplicate) { $('lowItem').value = ''; $('lowNote').value = ''; }
+    }, function (e) { $('lowSend').disabled = false; setMsg('lowMsg', errText(e), 'err'); });
+  });
+
+  /* =====================================================================
+     INK INVENTORY
+     ===================================================================== */
+  var INV = { scope: 'active', counting: false, inks: [] };
+  var FRACS = [[0, '+ none'], [0.25, '+ 1/4'], [0.5, '+ 1/2'], [0.75, '+ 3/4']];
+
+  function invLoad() { setMsg('invMsg', 'Loading…'); srv('invStock', [], invShow, function (e) { setMsg('invMsg', errText(e), 'err'); }); }
+  function invShow(d) {
+    setMsg('invMsg', '');
+    INV.inks = d.inks;
+    var keep = $('recvInk').value;
+    $('recvInk').innerHTML = opt('', 'Choose ink…') + d.inks.map(function (x) {
+      return opt(x.ink, x.ink + (x.color ? ' · ' + x.color : ''), x.ink === keep);
+    }).join('');
+    invRender();
+  }
+  function invRender() {
+    var list = INV.inks.filter(function (x) { return INV.scope === 'all' || x.activeState; });
+    show('countBar', INV.counting); show('countToggle', !INV.counting);
+    $('invHint').textContent = INV.scope === 'all' ? 'Every ink in the catalog.'
+      : 'Only inks used by active states. Switch to "All inks" to count everything in the building.';
+    if (!list.length) { $('invList').innerHTML = '<p class="muted">No inks to show.</p>'; return; }
+    $('invList').innerHTML = list.map(function (x) {
+      var left = '<div><div class="t">' + esc(x.ink) + (x.color ? ' <span class="muted">· ' + esc(x.color) + '</span>' : '') + '</div>' +
+        '<div class="s">On hand ' + fmt(x.onHand, x.onHand % 1 ? 2 : 0) + (x.min ? ' · keep ' + x.min : '') + '</div></div>';
+      if (!INV.counting) return '<div class="item">' + left + '<div>' + badge(STOCK_BADGE[x.status], x.status) + '</div></div>';
+      return '<div class="item">' + left + '<div><div class="count-in">' +
+        '<input data-full="' + esc(x.ink) + '" inputmode="numeric" placeholder="Full" aria-label="Full bottles of ' + esc(x.ink) + '">' +
+        '<select data-part="' + esc(x.ink) + '" aria-label="Partial bottle of ' + esc(x.ink) + '">' +
+        FRACS.map(function (f) { return opt(f[0], f[1]); }).join('') + '</select></div>' +
+        '<div class="s" data-var="' + esc(x.ink) + '" style="text-align:right"></div></div></div>';
+    }).join('');
+  }
+  function invCounted(ink) {
+    var full = document.querySelector('[data-full="' + CSS.escape(ink) + '"]');
+    if (!full || full.value.trim() === '') return null;
+    var part = document.querySelector('[data-part="' + CSS.escape(ink) + '"]');
+    return Number(full.value) + Number(part.value);
+  }
+  $('invList').addEventListener('input', function (e) {
+    var ink = e.target.getAttribute('data-full') || e.target.getAttribute('data-part');
+    if (!ink) return;
+    var x = INV.inks.filter(function (i) { return i.ink === ink; })[0], n = invCounted(ink);
+    var out = document.querySelector('[data-var="' + CSS.escape(ink) + '"]');
+    if (!out || !x) return;
+    if (n === null || isNaN(n)) { out.textContent = ''; return; }
+    var d = Math.round((n - x.onHand) * 100) / 100;
+    out.textContent = d === 0 ? 'matches' : (d > 0 ? '+' : '') + d + ' vs log';
+  });
+  segPick('invScope', function (v) { INV.scope = v; invRender(); });
+  $('countToggle').addEventListener('click', function () { INV.counting = true; invRender(); });
+  $('countCancel').addEventListener('click', function () { INV.counting = false; invRender(); });
+  $('countSave').addEventListener('click', function () {
+    var counts = [];
+    INV.inks.forEach(function (x) { var n = invCounted(x.ink); if (n !== null && !isNaN(n)) counts.push({ ink: x.ink, count: n }); });
+    if (!counts.length) { setMsg('invMsg', 'Type at least one count (full bottles).', 'err'); return; }
+    $('countSave').disabled = true; setMsg('invMsg', 'Saving counts…');
+    srv('invCount', [counts], function (d) {
+      $('countSave').disabled = false; INV.counting = false; invShow(d);
+      var ch = d.changes.filter(function (c) { return c.adjust !== 0; });
+      setMsg('invMsg', 'Saved ' + d.changes.length + ' count' + (d.changes.length === 1 ? '' : 's') + '. ' +
+        (ch.length ? 'Fixed: ' + ch.map(function (c) { return c.ink + ' ' + (c.adjust > 0 ? '+' : '') + c.adjust; }).join(', ') + '.' : 'All matched the log.'), 'ok');
+    }, function (e) { $('countSave').disabled = false; setMsg('invMsg', errText(e), 'err'); });
+  });
+  $('recvSave').addEventListener('click', function () {
+    var ink = $('recvInk').value, qty = $('recvQty').value;
+    if (!ink) { setMsg('invMsg', 'Choose the ink.', 'err'); return; }
+    $('recvSave').disabled = true; setMsg('invMsg', 'Saving…');
+    srv('invReceive', [ink, qty, $('recvNote').value], function (d) {
+      $('recvSave').disabled = false; $('recvQty').value = ''; $('recvNote').value = '';
+      invShow(d); setMsg('invMsg', 'Added ' + qty + ' bottle' + (Number(qty) === 1 ? '' : 's') + ' of ' + ink + '.', 'ok');
+    }, function (e) { $('recvSave').disabled = false; setMsg('invMsg', errText(e), 'err'); });
+  });
+
+  /* =====================================================================
+     MANAGEMENT
+     ===================================================================== */
+  var M = { tab: 'queue', jobs: [], period: 'week' };
+  function mErr(e) { setMsg('mMsg', errText(e), 'err'); }
+  var M_LOAD = {
+    queue: function () { srv('queueList', [$('qShowShipped').checked], qShow, mErr); },
+    needed: function () { srv('inkNeeded', [], needShow, mErr); },
+    waste: function () { wReport(); },
+    supplies: function () { srv('supplyRequests', [$('supShowAll').checked], supShow, mErr); },
+    stock: function () { srv('invStock', [], minShow, mErr); },
+    states: function () { srv('statesList', [], statesShow, mErr); }
+  };
+  function mOpen(t) {
+    M.tab = t; setMsg('mMsg', '');
+    Array.prototype.forEach.call($('mTabs').children, function (b) { b.classList.toggle('on', b.getAttribute('data-t') === t); });
+    Object.keys(M_LOAD).forEach(function (k) { show('m_' + k, k === t); });
+    M_LOAD[t]();
+  }
+  $('mTabs').addEventListener('click', function (e) { var b = e.target.closest('button[data-t]'); if (b) mOpen(b.getAttribute('data-t')); });
+
+  /* queue */
+  function qShow(d) {
+    M.jobs = d.jobs;
+    var states = [];
+    d.jobs.forEach(function (j) { if (states.indexOf(j.state) === -1) states.push(j.state); });
+    var keep = $('qState').value || 'New York';
+    $('qState').innerHTML = states.map(function (s) { return opt(s, s, s === keep); }).join('');
+    qJobs();
+    if (!d.queue.length) { $('qList').innerHTML = '<p class="muted">No jobs in the queue.</p>'; return; }
+    $('qList').innerHTML = d.queue.map(function (q) {
+      var shipped = q.status === 'Shipped';
+      var press = shipped ? '' : '<div class="qpress"><select data-assign="' + esc(q.id) + '" aria-label="Press for ' + esc(q.job) + '">' +
+        opt('', 'No press', !q.press) + d.presses.map(function (p) { return opt(p, p, p === q.press); }).join('') + '</select>' +
+        (q.press ? '<span class="muted">#' + q.pressOrder + ' in line</span>' +
+          '<button data-move="' + esc(q.id) + '" data-dir="-1" aria-label="Move up">▲</button>' +
+          '<button data-move="' + esc(q.id) + '" data-dir="1" aria-label="Move down">▼</button>' : '') + '</div>';
+      return '<div class="item"><div><div class="t">' + esc(q.job) + ' <span class="muted">· ' + esc(q.state) + '</span></div>' +
+        '<div class="s">' + fmt(q.slips, 0) + ' slips' + (q.due ? ' · due ' + esc(q.due) : '') +
+        (shipped ? ' · shipped ' + esc(q.shipped) : '') + '</div>' +
+        '<div>' + badge(q.flag, FLAG_TEXT[q.flag] + (q.runs ? ' (' + q.runs + ')' : '')) + '</div>' + press + '</div>' +
+        '<div class="acts">' + (shipped ? '<button data-unship="' + esc(q.id) + '">Undo</button>'
+          : '<button class="primary" data-ship="' + esc(q.id) + '">Shipped</button>') + '</div></div>';
+    }).join('');
+  }
+  function qJobs() {
+    var st = $('qState').value;
+    $('qJob').innerHTML = opt('', 'Choose a job…') + M.jobs.filter(function (j) { return j.state === st; })
+      .map(function (j) { return opt(j.key, j.job); }).join('');
+  }
+  $('qState').addEventListener('change', qJobs);
+  $('qShowShipped').addEventListener('change', function () { M_LOAD.queue(); });
+  $('qAdd').addEventListener('click', function () {
+    if (!$('qJob').value) { setMsg('mMsg', 'Choose a job.', 'err'); return; }
+    $('qAdd').disabled = true;
+    srv('queueAdd', [$('qJob').value, $('qSlips').value, $('qDue').value], function (d) {
+      $('qAdd').disabled = false; $('qSlips').value = ''; $('qDue').value = '';
+      qShow(d); setMsg('mMsg', 'Added to the queue.', 'ok');
+    }, function (e) { $('qAdd').disabled = false; mErr(e); });
+  });
+  $('qList').addEventListener('change', function (e) {
+    var id = e.target.getAttribute('data-assign'); if (!id) return;
+    var press = e.target.value;
+    srv('queueAssign', [id, press], function (d) { qShow(d); setMsg('mMsg', press ? 'Assigned to ' + press + '.' : 'Taken off the press.', 'ok'); }, mErr);
+  });
+  $('qList').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    if (b.getAttribute('data-move')) {
+      b.disabled = true;
+      srv('queueMove', [b.getAttribute('data-move'), b.getAttribute('data-dir')], qShow, mErr);
+      return;
+    }
+    var ship = b.getAttribute('data-ship'), unship = b.getAttribute('data-unship');
+    if (!ship && !unship) return;
+    b.disabled = true;
+    srv('queueShip', [ship || unship, !!unship], function () { M_LOAD.queue(); setMsg('mMsg', ship ? 'Marked shipped.' : 'Back in the queue.', 'ok'); }, mErr);
+  });
+
+  /* ink needed */
+  function needShow(d) {
+    if (!d.jobs.length) {
+      $('needList').innerHTML = '<p class="muted">No unshipped jobs in active states. Add jobs on the Job queue tab.</p>'; return;
+    }
+    var notes = false;
+    $('needList').innerHTML = '<table class="rep"><tr><th>Ink</th><th class="n">Need</th><th class="n">On hand</th><th class="n">Keep</th><th class="n">Order</th></tr>' +
+      d.inks.map(function (x) {
+        var mark = x.noData ? ' *' : x.estimated ? ' ~' : '';
+        if (mark) notes = true;
+        return '<tr><td>' + esc(x.ink) + mark + (x.color ? ' <span class="muted">' + esc(x.color) + '</span>' : '') + '</td><td class="n">' + fmt(x.need, 1) +
+          '</td><td class="n">' + fmt(x.onHand, x.onHand % 1 ? 2 : 0) + '</td><td class="n">' + x.min + '</td><td class="n"><b>' + x.toOrder + '</b></td></tr>';
+      }).join('') + '</table>' +
+      (notes ? '<p class="muted">* no tracked runs yet for this ink: only the startup bottle is counted. ~ estimated from this ink on other jobs.</p>' : '') +
+      '<h3>Jobs included</h3>' + d.jobs.map(function (j) {
+        return '<div class="s">' + esc(j.jobKey) + ' · ' + fmt(j.slips, 0) + ' slips ' + badge(j.flag, FLAG_TEXT[j.flag]) + '</div>';
+      }).join('');
+  }
+
+  /* waste report */
+  segPick('wPeriod', function (v) { M.period = v; wReport(); });
+  $('wOp').addEventListener('change', wReport);
+  function wReport() {
+    srv('wasteReport', [$('wOp').value, M.period], function (d) {
+      var keep = $('wOp').value;
+      $('wOp').innerHTML = opt('all', 'Everyone', keep === 'all') + d.operators.map(function (o) { return opt(o, o, o === keep); }).join('');
+      if (!d.rows.length) { $('wReport').innerHTML = '<p class="muted">No rolls saved yet.</p>'; return; }
+      function row(r, bold) {
+        var b = bold ? ['<b>', '</b>'] : ['', ''];
+        return '<tr><td>' + b[0] + esc(r.label) + b[1] + '</td><td class="n">' + r.rolls + '</td><td class="n">' + fmt(r.waste, 0) +
+          '</td><td class="n">' + b[0] + fmt(r.wastePct * 100, 2) + '%' + b[1] + '</td></tr>';
+      }
+      $('wReport').innerHTML = '<table class="rep"><tr><th>Period</th><th class="n">Rolls</th><th class="n">Waste ft</th><th class="n">Waste %</th></tr>' +
+        d.rows.map(function (r) { return row(r); }).join('') + row(d.total, true) + '</table>';
+    }, mErr);
+  }
+  $('archBtn').addEventListener('click', function () {
+    var d = $('archBefore').value;
+    if (!d) { setMsg('mMsg', 'Pick a date first.', 'err'); return; }
+    if (!confirm('Move every roll saved before ' + d + ' to the archive?')) return;
+    srv('wasteArchive', [d], function (r) { setMsg('mMsg', r.moved + ' rolls moved to the archive.', 'ok'); wReport(); }, mErr);
+  });
+
+  /* low supplies */
+  $('supShowAll').addEventListener('change', function () { M_LOAD.supplies(); });
+  function supShow(d) {
+    if (!d.requests.length) { $('supList').innerHTML = '<p class="muted">Nothing reported.</p>'; return; }
+    var kind = { Open: 'red', Ordered: 'yellow', Received: 'green' };
+    $('supList').innerHTML = d.requests.map(function (x) {
+      var acts = x.status === 'Open' ? '<button data-sid="' + esc(x.id) + '" data-st="Ordered">Ordered</button><button data-sid="' + esc(x.id) + '" data-st="Received">Received</button>'
+        : x.status === 'Ordered' ? '<button class="primary" data-sid="' + esc(x.id) + '" data-st="Received">Received</button>' : '';
+      return '<div class="item"><div><div class="t">' + esc(x.item) + ' ' + badge(x.level === 'Out' ? 'red' : 'yellow', x.level) + '</div>' +
+        '<div class="s">' + esc(x.by || '') + (x.press ? ' · ' + esc(x.press) : '') + ' · ' + esc(x.time) + '</div>' +
+        (x.note ? '<div class="s">“' + esc(x.note) + '”</div>' : '') + '<div>' + badge(kind[x.status], x.status) + '</div></div>' +
+        '<div class="acts">' + acts + '</div></div>';
+    }).join('');
+  }
+  $('supList').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-sid]'); if (!b) return;
+    b.disabled = true;
+    srv('supplySetStatus', [b.getAttribute('data-sid'), b.getAttribute('data-st')], function () { M_LOAD.supplies(); }, mErr);
+  });
+
+  /* ink stock + minimums */
+  function minShow(d) {
+    $('minList').innerHTML = d.inks.map(function (x) {
+      return '<div class="item"><div><div class="t">' + esc(x.ink) + (x.color ? ' <span class="muted">· ' + esc(x.color) + '</span>' : '') +
+        (x.activeState ? ' ' + badge('ok', 'Active state') : '') + '</div>' +
+        '<div class="s">On hand ' + fmt(x.onHand, x.onHand % 1 ? 2 : 0) + ' ' + badge(STOCK_BADGE[x.status], x.status) + '</div></div>' +
+        '<div class="acts"><input data-min="' + esc(x.ink) + '" value="' + x.min + '" inputmode="decimal" style="width:70px" aria-label="Keep at least, ' + esc(x.ink) + '">' +
+        '<button data-minsave="' + esc(x.ink) + '">Save</button></div></div>';
+    }).join('');
+  }
+  $('minList').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-minsave]'); if (!b) return;
+    var ink = b.getAttribute('data-minsave');
+    var v = document.querySelector('[data-min="' + CSS.escape(ink) + '"]').value;
+    b.disabled = true;
+    srv('inkSetMin', [ink, v], function (d) { minShow(d); setMsg('mMsg', ink + ': keep at least ' + v + '.', 'ok'); }, function (e) { b.disabled = false; mErr(e); });
+  });
+
+  /* active states */
+  function statesShow(d) {
+    $('stateList').innerHTML = d.states.map(function (x) {
+      return '<div class="item"><div class="t">' + esc(x.state) + '</div><div class="acts">' +
+        '<button data-state="' + esc(x.state) + '" data-on="' + (x.active ? '0' : '1') + '" class="' + (x.active ? 'primary' : '') + '">' +
+        (x.active ? 'Active' : 'Off') + '</button></div></div>';
+    }).join('');
+  }
+  $('stateList').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-state]'); if (!b) return;
+    b.disabled = true;
+    srv('stateSet', [b.getAttribute('data-state'), b.getAttribute('data-on') === '1'], statesShow, mErr);
+  });
+
+  /* =====================================================================
+     ADMIN
+     ===================================================================== */
+  var ADM = { users: [] };
+  function aErr(e) { setMsg('aMsg', errText(e), 'err'); }
+  function aLoad() { srv('usersList', [], userShow, aErr); }
+  function userShow(list) {
+    ADM.users = list;
+    $('userList').innerHTML = list.map(function (u) {
+      return '<div class="item"><div><div class="t">' + esc(u.name) + ' ' + (u.active ? '' : badge('gray', 'Off')) + '</div>' +
+        '<div class="s">PIN ' + esc(u.pin) + ' · Level ' + u.level + '</div></div>' +
+        '<div class="acts"><button data-urow="' + u.row + '">Edit</button></div></div>';
+    }).join('') || '<p class="muted">No one yet.</p>';
+  }
+  function userForm(u) {
+    show('userForm', true);
+    $('uRow').value = u ? u.row : ''; $('uName').value = u ? u.name : ''; $('uPin').value = u ? u.pin : '';
+    $('uLevel').value = u ? u.level : 1; $('uActive').checked = u ? u.active : true;
+    $('uName').focus();
+  }
+  $('userNew').addEventListener('click', function () { userForm(null); });
+  $('uCancel').addEventListener('click', function () { show('userForm', false); });
+  $('userList').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-urow]'); if (!b) return;
+    userForm(ADM.users.filter(function (u) { return String(u.row) === b.getAttribute('data-urow'); })[0]);
+  });
+  $('uSave').addEventListener('click', function () {
+    var u = { row: $('uRow').value, name: $('uName').value, pin: $('uPin').value, level: $('uLevel').value, active: $('uActive').checked };
+    $('uSave').disabled = true;
+    srv('userSave', [u], function (list) {
+      $('uSave').disabled = false; show('userForm', false); userShow(list); setMsg('aMsg', 'Saved ' + u.name + '.', 'ok');
+    }, function (e) { $('uSave').disabled = false; aErr(e); });
+  });
+  $('backupBtn').addEventListener('click', function () {
+    $('backupBtn').disabled = true; setMsg('aMsg', 'Turning on backups…');
+    srv('backupInstall', [], function (r) { $('backupBtn').disabled = false; setMsg('aMsg', r.message, 'ok'); },
+      function (e) { $('backupBtn').disabled = false; aErr(e); });
+  });
+  $('purgeBtn').addEventListener('click', function () {
+    var d = $('purgeBefore').value;
+    if (!d) { setMsg('aMsg', 'Pick a date first.', 'err'); return; }
+    if (!confirm('Permanently delete archived rolls saved before ' + d + '? This cannot be undone.')) return;
+    srv('archivePurge', [d], function (r) { setMsg('aMsg', r.deleted + ' archived rolls deleted.', 'ok'); }, aErr);
+  });
+  $('auditLoad').addEventListener('click', function () {
+    srv('auditList', [], function (d) {
+      $('auditList').innerHTML = d.entries.length ? d.entries.map(function (x) {
+        return '<div class="item"><div><div class="t">' + esc(x.action) + '</div><div class="s">' + esc(x.details) + '</div>' +
+          '<div class="s">' + esc(x.who) + ' · ' + esc(x.time) + '</div></div><div></div></div>';
+      }).join('') : '<p class="muted">No changes logged yet.</p>';
+    }, aErr);
+  });
+  $('toManage').addEventListener('click', function () { go('management'); });
+
+  /* =====================================================================
+     START
+     ===================================================================== */
+  var LOGO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMsAAAAtCAIAAACPhAj7AAAyyklEQVR42u18eZwVxbX/91RVd997Z2VmYIZhF2TfBkFR2RREBBGMqMSYJ2qea0xMTEJi0OjzaRY17or61LivEFwxLmDQsAiyKATZt5FhgGH2u3R31fn9UXfa6+h7n/h+n5/mk8+vPzj27a6qrjp16uznEDPj/1////p/dolv5jMRHhtj2j3UWtuf9ib6yczRfW7H3CMRhmG7wZnZ/rR/ba/ccXK727fRk3aHzQ6eO892q8j9kL2JntgG0Qjtmtm3xpjoJppkNEh0n/uVL5ODdpNvB9LoW//6GEZEYRgysxDCrt8YYx9KKcMwtDdaayKyYCUiKWUQBBZGQgj+0qWUCsPQdtFaCyGIyI5PRMYY20sIEQE6ahAEgRAiCIJoj20X28z3faVU9JyZpZREZLdNCGGf5/YiIntvb+ycI9S0g9jZ2ud2ttEko+VHyBGNHwEwmnyEPXaETCYTNbNDRVOy3/oWL/pmuKSFY7ufYRgqpXIplv1pgduuS7vGFqBaawtN2zK6iXY02rCosf0boZHjOO3Qwm5h1NKOGd1HzYIgUEoFQeC6bu7ko2lEX283Gfs2CAIpZe5soxNi5xDdR8TpK3ElFyzR8YiGtQ0cx/nXxzB7ZTIZz/NysWTNmjUvv/zy5s2bGxoaEolEp06d+vfvP3v27K5du9oDvW/fvldffVVr7fu+53mO43To0KF37959+/YtKCjIBWV1dfXixYtTqZTd+FgsZj+UTqcbGxunT59eVVVlj7Xv+5YgCSHS6fSqVauWLFmyZcuW+vp6IuratWtVVdVpp5121FFHGWOWLFmyfPny4uLiadOm9e7d2xijtW63Z++8887mzZtbW1s7dOhw3nnnFRQUWJLcDrE++OCD5cuXSylPOeWU4cOHR+fBom9dXd3zzz/f0tJSWloahmEqlXJd1y7EgqKpqSkIgqFDhw4cOPCdd945dOiQEOL4448fN26cpfe5rLO5uXnBggV1dXWpVOrSSy/t1KnTt4Zi/E1dlktalsHMDQ0N11xzTceOHSPmZckJgFtuuUVrbYWqJ5980jbIhWAsFhs0aND111+/f/9+rbUd85FHHrEEJrdl1HfKlCmRlGavpqame++999hjj7UNLCWwE1BKnXHGGbbZCSecYB/eeeed0eSjFRljtmzZUl5eHvV94IEHoma+79sbO8mZM2fa+cybN88u0F62zV/+8pd2ckUuj7M3UsrKysqVK1dedNFFdp6dOnX65JNP7CB2TCtXzJ0713YcNmzY4cOH+du71DeGx5Hwwcytra0XX3zxggULLChPOeWUIUOG+L6/e/fujRs3lpWV2WYAksmkpQTGmP79+5eWlu7Zs6e6uvrTTz+96aabFi9e/OCDD1ZVVVnIMrPjOPagl5aWaq1d181kMqlUauLEiZF4R0Q7duy46KKLli1bZjGyZ8+eo0ePrqysNMbs37//vffei8fjtrHjOFGviOdaEmVR+YEHHqitrY2EnjvvvHPmzJmlpaW2r21sWV4mk7HMN5VKRRgZce3OnTufdNJJVv5TSu3du3fbtm1W1uzXr1/Hjh2VUi0tLT179hw1alT37t3feuut6urqQ4cOXXPNNW+88YbluZZZL1iw4Pe//71SqqSk5NFHH+3QocO3KYh9M4hsj7U9skEQLFy40MLXcZwbb7wxmUzaBlrr6urqlpaWiAw8+OCDlroMGDBg+fLlR44cWb9+/fXXX5+fn2/nP2vWLDvsY489Zp9UVlZu3LhRa93S0tLa2ppKpZqamizJscPW1NQcc8wxFiHi8fhvfvObnTt32ulZNN2xY8fOnTvDMAyCYOzYsXbY++67L6IT0boOHjxoyXBRUVFJSUluy3ZkLJVKWRompfzVr36VS72Y2X43lUo1NjZmMpkwDP/85z+7rmuXs3z58iAIwjBMp9N2wDAMFy1aZEUOx3GeeOKJiJZv2bKloqJCKUVEDz/8MH/b1zeEYblknJlvuukme4iLioqqq6stfO3bXE5kjPnTn/5kt23QoEF79+6NXl199dX2+VFHHVVdXc3MDz30kBV9evbs2dTUFO1fO+aotb7yyittX6XU888/H33UtoxwwrL1cePG2anec8899knusA8//LAd6uKLL164cGFFRQWAo48++rPPPmvHJY0xp59+uiVXP/vZz3I/YYfK/au1Xrt2rSWB3bt337FjR+4JiVZ0/fXX23OSn5//0UcfMXNLS8uUKVPs6T3//POjc/stYtg3Z62w1gH7s6SkxKpgra2tt99+e0NDQzsNKNKMIv0oYi62gRXkrRpod8KaJJg5nU43NTVF8nWuOsnMu3btevrpp237uXPnnn322ZYL5wphkfRmCUNkTYisAJZvHjly5I477hBCeJ536aWXzpgxo3PnzkKIbdu2WfHRcRxrErNza/ehXEtEtB/RtFtaWux9GIa+79v5RFYSO41rr7125syZxpjW1tarr766rq7u6aeffvPNNy2W33TTTZFk8i0yyW9ODrN4YIE4Y8aM22+/fe/evWEY3nHHHUuWLJk+ffro0aNPPvnkeDxuRZNI4bc7bXlWGIaHDh167bXXnnnmGft86NChVlGyhBBAfX39TTfd1LVr16amJsdxUqlUt27dvv/97xcXFyulVq9ebRG6sLBwzpw5drcsabEImmv+sNMwxiil7DZHZhEp5YIFCzZv3my1gcGDBwshxo8fv27dOgALFiz44Q9/mJeXZ0fOFRLssJFsZ79l7y2hsnJYhI7/3YllZs/z7rnnno8//nj37t3vv//+WWedtX//fiKKx+P33HNPz549cy07//q6ZC65DoJg8+bNp556au4hI6Ljjz9+/vz5VkezLS0bUkrFYrGJEyfOmjVr9OjRkSWiX79+69evty0jOQyAlWDs7tr9e/PNN22z2267zVKpQYMG1dTU5HLGdozV9/0gCE466SQ75gMPPJDL2hobG4cPH05EsVhswYIFttf69et79epld/SZZ56JFmtp4YwZM+wyf/KTn2QymS+rpblzWLJkiRWzKisrLR63kzqMMXbazz//vAVRZEL74x//aNvksvV/cV0yUrntuRRC9OnT589//vPbb7/97LPPrlixYu/evQBWrFixatWqTZs23Xbbba7r5prpwzBcunSp5TVSyvLy8tGjR//ud7/r16+fJRLJZNJSNdd1p06dOnTo0Lq6OusVKC4urqqqsqc5Pz/fcq7GxsaITzmOE+l0EVu0WmQum7YH0jZ77bXX1q9fD+C4446bOXOmHXzYsGFTp0697777hBDz58+fNWuW4zhWOrR4FtFFewaCILBf+bKF5R+hYZYtnHPOOYsXL37yySftVM8888yrrrrKtrH0+CvH/1fjkrlW9UixV0pNnTr1jDPOqKmpeeONN+68886NGzcaY+6///5hw4ZdfPHFuZJZeXn5+eef37t3b8dxioqKhg4d2q9fv0gqklJ6nmctkxUVFQ8++GDHjh1zRbFIpunQoYNFoAMHDmzdurW8vNxq+FHjiGPaXtZ8YEe2CKG1DoLg/vvvt+hSW1t7ww03WGMy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oaQiYTi8+ILzFzz/3OqVH06ffuaPr758xLDhSngb1q39w62/2/Lp1q5dut/8HzeyNgYQwpaBwe23396abF6w4MWbbrl1zbqPZ82aPXz48FjMbW5uXrt27fr16+fNm2dFokg2sMCxNWksIRdCWJK2devWxx577OSTT+7Ro4cxZunSpTfffPPhw4e7des2YcKE3OT4q666ipkrKiosVB966CHLXiZNmjRmzJhdu3Z17tzZdd3i4uJsxqFhDpgbDS/f1zri4lt7zJq3YEPtEWZfs2FOMdcw/2bRhqPO/48BF/z6uuferGWuY/5M8zMfbp127W1nXHf7XQvfeXfj9g937V6+c+fLH62/6o/3Tb7i2kv/+NiaJl3N3GyyWS6pwPzsml8CIhv4B0FwgGyphcsvv9wyuHPPPTeqPRGlRNs28+fP/+8SWl544QUA06ZNy615ESWvRhm5zz33HBH16NEjmUxGpQntq9NPPx3AmDFjWltbc1Ne77333ng8busz2npjETGYOHHivn37cstDhEZffuUVWYWXPs8VtXg8dOjQFSs/NMzMPrNvDPsBG+bQaMN68dtv5RWXyVghoBzH89x8giul06lTp78uXRalNNl8IdsxMPzzX15HbhykAAfK87y4rVcAYOnSpXZitkZGEARz5swBcPPNN0cULir/ZAv1EFFeXp4dwebWv/baa7kpzbkQs2PaaglWPvnKLGiyvoqk5iTo6TfWpTL+9JNH9iiReQyCThPSkPsa8fJbfztUVzu0b9czx45MOKRBLcDHu+pXrPqQUi09K8uKCmJh6Nc3J5O+6dy5x8hRA+MSMSAfkAY2XH/JkvfXrFldVBr3U2mdYaVcpYR0VHNz83HHHXfiiScCWLZs2bp162KxWDqdFkLEYjErsSaTyUmTJo0aNeoradjWrVvfeOONwYMHW+E0tz5AbjDJ9u3bX3rppa5du86ePdty0kiKX7NmzVtvvVVSUjJnzhyL3FHFhw8++GDTpk0tLS2e57mum06nmbm8vPzUU08tLi62H7JJvES0fOWKVatWJRIJIoJhW3yvoKCgvLx8zNjxxSXFtqItmAS52ZB80kxgyI/WffK395fHlDBaMySTSSTiI6qGVVUNs9HbJLI5IFFWaqCxZMnSDRs2OI6jw0D7GYKJxWIFBQWnn356eXl5bp2EpUuXrl27dsKECSNHjowEfAuBzZs3L1myJKowb2W4kSNHjhgx4suFm3MLNbSrWdyumRCCmDVgDJsQbooAwANcaGGLvAvpQ/hAyDCAIuQzFHQIGQBpyoYFC4YkED5Pc5CAgnGgJSuygh5FgfVBW2S5yD3r/2DIUW79rW/9+sraSbn53F9OdTYAIyRAQlnjKCibYgOI9hZzwn+X4QwY/pIPh/5HuH1lLv43kPNto620gp+AS4DiAKwBCZISiAGKs1GKkqGgidhhLUkoJmM9/l/M9VZZ0V4TMxBa12NblLfBv9D1lTv05ULruRggAP0FaEWnMvovB5+yUes5cGOBbDR5lKVtPbdWeRX/dCAyrAHDMJRNmQVYgyTYQVs0CX/hiIRtnglrFxYaYIZiGMAQQFCGsxCxfg+KvNdRdrxqN+j/Dc34J7vMlwMLvvi2LT2fDWDa/HwyCkbibLqaojYMs1lv9DnOffErNuTic1fHPxeSqbbzxFm9msj6E9oVsTBfeNT2lGG1Tps2JkCfO6PtcSXLFNgGe4EMwAzHIhZ9/dyVf3r0+keDWXK8q9TGIrOA0zlEzFoDDQxsOl7bgeQ2p9k/gNPf8vV/AN3b1m6JakbdAAAAAElFTkSuQmCC';
+  $('logoImg').src = LOGO; $('logoSm').src = LOGO;
+  drawPin();
+  (function () {
+    var t = store('pt_token');
+    if (!t) { go('login'); return; }
+    A.token = t;
+    setMsg('loginMsg', 'Loading…');
+    srv('me', [], function (me) { setMsg('loginMsg', ''); startSession(me, true); }, function () { logout(''); });
+  })();
+</script>
+</body>
+</html>
