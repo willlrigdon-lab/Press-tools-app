@@ -164,6 +164,8 @@
     .push.yellow { background: #fff4c2; color: #6b4e00; }
     button.danger { border-color: var(--bad); color: var(--bad); }
     .chip.low { border-color: var(--warn); color: var(--warn); }
+    .countbar { position: sticky; bottom: 0; z-index: 4; background: var(--card); margin: 10px -16px -16px; padding: 12px 16px 16px;
+      border-top: 1px solid var(--line); box-shadow: 0 -6px 14px rgba(0,0,0,.08); border-radius: 0 0 14px 14px; }
     .setup-head { margin-top: 14px; font-weight: 700; font-size: 16px; }
     table.setup { table-layout: fixed; }
     table.setup td, table.setup th { padding: 7px 4px; vertical-align: top; overflow-wrap: anywhere; }
@@ -407,7 +409,9 @@
 
   <!-- ===================== INK INVENTORY ===================== -->
   <section id="inventoryView" class="view hidden">
-    <div class="card">
+    <div id="invMsg" class="msg" style="margin:0 0 10px"></div>
+    <div id="countNote" class="card push yellow hidden" style="margin-bottom:14px">Counting the shelf. Finish or cancel the count to receive ink.</div>
+    <div class="card" id="recvCard">
       <h2>Receive ink</h2>
       <label for="recvInk">Ink</label>
       <select id="recvInk"></select>
@@ -416,7 +420,6 @@
         <div><label for="recvNote">Note (optional)</label><input id="recvNote" placeholder="PO, supplier…"></div>
       </div>
       <button id="recvSave" class="primary wide">Add to stock</button>
-      <div id="invMsg" class="msg"></div>
     </div>
     <div class="card">
       <button id="newInkToggle" class="wide" style="margin-top:0">+ Add an ink that's not on the list</button>
@@ -446,9 +449,12 @@
       <p class="muted" id="invHint" style="margin-top:4px">Only inks used by active states. Switch to "All inks" to count everything in the building.</p>
       <button id="countToggle" class="wide" style="margin-top:6px">Count the shelf</button>
       <div id="invList"></div>
-      <div id="countBar" class="hidden">
-        <button id="countSave" class="primary wide">Save counts</button>
-        <button id="countCancel" class="wide">Cancel count</button>
+      <div id="countBar" class="countbar hidden">
+        <div id="countMsg" class="msg" style="margin:0 0 8px"></div>
+        <div class="row2">
+          <button id="countCancel" class="wide" style="margin-top:0">Cancel count</button>
+          <button id="countSave" class="primary wide" style="margin-top:0">Save counts</button>
+        </div>
       </div>
     </div>
   </section>
@@ -1268,7 +1274,7 @@
   /* =====================================================================
      INK INVENTORY
      ===================================================================== */
-  var INV = { scope: 'active', counting: false, inks: [] };
+  var INV = { scope: 'active', counting: false, inks: [], counts: {} };   // counts: {ink: {full, part}} typed so far
   var FRACS = [[0, '+ none'], [0.25, '+ 1/4'], [0.5, '+ 1/2'], [0.75, '+ 3/4']];
 
   function invLoad() { setMsg('invMsg', 'Loading…'); srv('invStock', [], invShow, function (e) { setMsg('invMsg', errText(e), 'err'); }); }
@@ -1291,43 +1297,73 @@
       var left = '<div><div class="t">' + esc(x.ink) + (x.color ? ' <span class="muted">· ' + esc(x.color) + '</span>' : '') + '</div>' +
         '<div class="s">On hand ' + fmt(x.onHand, x.onHand % 1 ? 2 : 0) + (x.min ? ' · keep ' + x.min : '') + '</div></div>';
       if (!INV.counting) return '<div class="item">' + left + '<div>' + badge(STOCK_BADGE[x.status], x.status) + '</div></div>';
+      var c = INV.counts[x.ink] || { full: '', part: '0' };
       return '<div class="item">' + left + '<div><div class="count-in">' +
-        '<input data-full="' + esc(x.ink) + '" inputmode="numeric" placeholder="Full" aria-label="Full bottles of ' + esc(x.ink) + '">' +
+        '<input data-full="' + esc(x.ink) + '" inputmode="numeric" placeholder="Full" value="' + esc(c.full) + '" aria-label="Full bottles of ' + esc(x.ink) + '">' +
         '<select data-part="' + esc(x.ink) + '" aria-label="Partial bottle of ' + esc(x.ink) + '">' +
-        FRACS.map(function (f) { return opt(f[0], f[1]); }).join('') + '</select></div>' +
+        FRACS.map(function (f) { return opt(f[0], f[1], String(f[0]) === String(c.part)); }).join('') + '</select></div>' +
         '<div class="s" data-var="' + esc(x.ink) + '" style="text-align:right"></div></div></div>';
     }).join('');
+    if (INV.counting) list.forEach(function (x) { invVar(x.ink); });
+    invCountLabel();
   }
-  function invCounted(ink) {
-    var full = document.querySelector('[data-full="' + CSS.escape(ink) + '"]');
-    if (!full || full.value.trim() === '') return null;
-    var part = document.querySelector('[data-part="' + CSS.escape(ink) + '"]');
-    return Number(full.value) + Number(part.value);
+  function invCountMode(on) {
+    INV.counting = on;
+    if (!on) INV.counts = {};
+    show('recvCard', !on); show('countNote', on);
+    setMsg('countMsg', '');
+    invRender();
+  }
+  function invCountLabel() {
+    var n = invCountList().length;
+    $('countSave').textContent = n ? 'Save counts (' + n + ')' : 'Save counts';
+  }
+  /** [{ink, count}] for every ink with full bottles typed, from INV.counts (survives redraws). */
+  function invCountList() {
+    var out = [];
+    INV.inks.forEach(function (x) {
+      var c = INV.counts[x.ink];
+      if (!c || String(c.full).trim() === '') return;
+      var n = Number(c.full) + Number(c.part || 0);
+      if (!isNaN(n)) out.push({ ink: x.ink, count: n });
+    });
+    return out;
+  }
+  function invVar(ink) {
+    var x = INV.inks.filter(function (i) { return i.ink === ink; })[0];
+    var out = document.querySelector('[data-var="' + CSS.escape(ink) + '"]');
+    if (!out || !x) return;
+    var c = INV.counts[ink];
+    var n = c && String(c.full).trim() !== '' ? Number(c.full) + Number(c.part || 0) : null;
+    if (n === null || isNaN(n)) { out.textContent = ''; return; }
+    var d = Math.round((n - x.onHand) * 100) / 100;
+    out.textContent = d === 0 ? 'matches' : (d > 0 ? '+' : '') + d + ' vs log';
   }
   $('invList').addEventListener('input', function (e) {
     var ink = e.target.getAttribute('data-full') || e.target.getAttribute('data-part');
     if (!ink) return;
-    var x = INV.inks.filter(function (i) { return i.ink === ink; })[0], n = invCounted(ink);
-    var out = document.querySelector('[data-var="' + CSS.escape(ink) + '"]');
-    if (!out || !x) return;
-    if (n === null || isNaN(n)) { out.textContent = ''; return; }
-    var d = Math.round((n - x.onHand) * 100) / 100;
-    out.textContent = d === 0 ? 'matches' : (d > 0 ? '+' : '') + d + ' vs log';
+    var c = INV.counts[ink] = INV.counts[ink] || { full: '', part: '0' };
+    if (e.target.getAttribute('data-full')) c.full = e.target.value; else c.part = e.target.value;
+    invVar(ink); invCountLabel(); setMsg('countMsg', '');
   });
   segPick('invScope', function (v) { INV.scope = v; invRender(); });
-  $('countToggle').addEventListener('click', function () { INV.counting = true; invRender(); });
-  $('countCancel').addEventListener('click', function () { INV.counting = false; invRender(); });
+  $('countToggle').addEventListener('click', function () { invCountMode(true); });
+  $('countCancel').addEventListener('click', function () {
+    if (invCountList().length && !confirm('Throw away the counts you typed?')) return;
+    invCountMode(false);
+  });
   $('countSave').addEventListener('click', function () {
-    var counts = [];
-    INV.inks.forEach(function (x) { var n = invCounted(x.ink); if (n !== null && !isNaN(n)) counts.push({ ink: x.ink, count: n }); });
-    if (!counts.length) { setMsg('invMsg', 'Type at least one count (full bottles).', 'err'); return; }
-    $('countSave').disabled = true; setMsg('invMsg', 'Saving counts…');
+    var counts = invCountList();
+    if (!counts.length) { setMsg('countMsg', 'Type the full bottles for at least one ink.', 'err'); return; }
+    $('countSave').disabled = true; setMsg('countMsg', 'Saving counts…');
     srv('invCount', [counts], function (d) {
-      $('countSave').disabled = false; INV.counting = false; invShow(d);
+      $('countSave').disabled = false;
+      INV.inks = d.inks; invCountMode(false); invShow(d);
       var ch = d.changes.filter(function (c) { return c.adjust !== 0; });
       setMsg('invMsg', 'Saved ' + d.changes.length + ' count' + (d.changes.length === 1 ? '' : 's') + '. ' +
         (ch.length ? 'Fixed: ' + ch.map(function (c) { return c.ink + ' ' + (c.adjust > 0 ? '+' : '') + c.adjust; }).join(', ') + '.' : 'All matched the log.'), 'ok');
-    }, function (e) { $('countSave').disabled = false; setMsg('invMsg', errText(e), 'err'); });
+      window.scrollTo(0, 0);
+    }, function (e) { $('countSave').disabled = false; setMsg('countMsg', errText(e), 'err'); });
   });
   /* add an ink that isn't on any job */
   function niReset() { ['niInk', 'niColor', 'niCount'].forEach(function (id) { $(id).value = ''; }); $('niMixing').checked = true; }
