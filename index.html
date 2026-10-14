@@ -411,6 +411,12 @@
   <section id="inventoryView" class="view hidden">
     <div id="invMsg" class="msg" style="margin:0 0 10px"></div>
     <div id="countNote" class="card push yellow hidden" style="margin-bottom:14px">Counting the shelf. Finish or cancel the count to receive ink.</div>
+    <div id="countResult" class="card hidden">
+      <h2>Shelf count</h2>
+      <div id="countResultMeta" class="muted"></div>
+      <div id="countResultBody"></div>
+      <button id="countResultDone" class="primary wide">Done</button>
+    </div>
     <div class="card" id="recvCard">
       <h2>Receive ink</h2>
       <label for="recvInk">Ink</label>
@@ -447,7 +453,10 @@
         </div>
       </div>
       <p class="muted" id="invHint" style="margin-top:4px">Only inks used by active states. Switch to "All inks" to count everything in the building.</p>
-      <button id="countToggle" class="wide" style="margin-top:6px">Count the shelf</button>
+      <div class="row2" id="countBtns">
+        <button id="countToggle" class="primary wide" style="margin-top:6px">Count the shelf</button>
+        <button id="lastCountBtn" class="wide" style="margin-top:6px">Last shelf count</button>
+      </div>
       <div id="invList"></div>
       <div id="countBar" class="countbar hidden">
         <div id="countMsg" class="msg" style="margin:0 0 8px"></div>
@@ -1289,13 +1298,14 @@
   }
   function invRender() {
     var list = INV.inks.filter(function (x) { return INV.scope === 'all' || x.activeState; });
-    show('countBar', INV.counting); show('countToggle', !INV.counting);
+    show('countBar', INV.counting); show('countBtns', !INV.counting);
     $('invHint').textContent = INV.scope === 'all' ? 'Every ink in the catalog.'
       : 'Only inks used by active states. Switch to "All inks" to count everything in the building.';
     if (!list.length) { $('invList').innerHTML = '<p class="muted">No inks to show.</p>'; return; }
     $('invList').innerHTML = list.map(function (x) {
       var left = '<div><div class="t">' + esc(x.ink) + (x.color ? ' <span class="muted">· ' + esc(x.color) + '</span>' : '') + '</div>' +
-        '<div class="s">On hand ' + fmt(x.onHand, x.onHand % 1 ? 2 : 0) + (x.min ? ' · keep ' + x.min : '') + '</div></div>';
+        '<div class="s">On hand ' + fmt(x.onHand, x.onHand % 1 ? 2 : 0) + (x.min ? ' · keep ' + x.min : '') +
+        (INV.counting ? '' : ' · ' + (x.lastCounted ? 'counted ' + esc(x.lastCounted) : '<b>never counted</b>')) + '</div></div>';
       if (!INV.counting) return '<div class="item">' + left + '<div>' + badge(STOCK_BADGE[x.status], x.status) + '</div></div>';
       var c = INV.counts[x.ink] || { full: '', part: '0' };
       return '<div class="item">' + left + '<div><div class="count-in">' +
@@ -1309,6 +1319,7 @@
   }
   function invCountMode(on) {
     INV.counting = on;
+    if (on) show('countResult', false);
     if (!on) INV.counts = {};
     show('recvCard', !on); show('countNote', on);
     setMsg('countMsg', '');
@@ -1362,9 +1373,32 @@
       var ch = d.changes.filter(function (c) { return c.adjust !== 0; });
       setMsg('invMsg', 'Saved ' + d.changes.length + ' count' + (d.changes.length === 1 ? '' : 's') + '. ' +
         (ch.length ? 'Fixed: ' + ch.map(function (c) { return c.ink + ' ' + (c.adjust > 0 ? '+' : '') + c.adjust; }).join(', ') + '.' : 'All matched the log.'), 'ok');
+      countResultShow(d.count);
       window.scrollTo(0, 0);
     }, function (e) { $('countSave').disabled = false; setMsg('countMsg', errText(e), 'err'); });
   });
+  /* review a saved shelf count: every ink counted, what the log said, and the change */
+  function countResultShow(c) {
+    if (!c) { setMsg('invMsg', 'No shelf count has been saved yet.', ''); return; }
+    var changed = c.inks.filter(function (x) { return x.adjust !== 0; }).length;
+    $('countResultMeta').textContent = c.time + (c.by ? ' · by ' + c.by : '') + ' · ' + c.inks.length + ' ink' + (c.inks.length === 1 ? '' : 's') +
+      ' counted · ' + (changed ? changed + ' changed' : 'all matched');
+    function n(v) { return fmt(v, v % 1 ? 2 : 0); }
+    $('countResultBody').innerHTML = '<table class="rep"><tr><th>Ink</th><th class="n">Counted</th><th class="n">Log said</th><th class="n">Change</th></tr>' +
+      c.inks.map(function (x) {
+        return '<tr><td>' + esc(x.ink) + '</td><td class="n"><b>' + n(x.counted) + '</b></td><td class="n">' + n(x.expected) + '</td><td class="n">' +
+          (x.adjust === 0 ? '<span class="muted">—</span>' : '<b style="color:' + (x.adjust > 0 ? 'var(--good)' : 'var(--bad)') + '">' +
+            (x.adjust > 0 ? '+' : '') + n(x.adjust) + '</b>') + '</td></tr>';
+      }).join('') + '</table>';
+    show('countResult', true);
+  }
+  $('countResultDone').addEventListener('click', function () { show('countResult', false); setMsg('invMsg', ''); });
+  $('lastCountBtn').addEventListener('click', function () {
+    setMsg('invMsg', 'Loading…');
+    srv('invLastCount', [], function (c) { setMsg('invMsg', ''); countResultShow(c); if (c) $('countResult').scrollIntoView(); },
+      function (e) { setMsg('invMsg', errText(e), 'err'); });
+  });
+
   /* add an ink that isn't on any job */
   function niReset() { ['niInk', 'niColor', 'niCount'].forEach(function (id) { $(id).value = ''; }); $('niMixing').checked = true; }
   $('newInkToggle').addEventListener('click', function () { show('newInkForm', true); show('newInkToggle', false); $('niInk').focus(); });
