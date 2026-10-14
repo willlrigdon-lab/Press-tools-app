@@ -1582,6 +1582,14 @@
     var row = document.querySelector('[data-rm="' + CSS.escape(ink) + '"]').closest('.item');
     var old = document.querySelector('.rmpanel'); if (old) old.remove();
     var have = x.onHand ? fmt(x.onHand, x.onHand % 1 ? 2 : 0) : '0';
+    var others = M.stock.filter(function (i) { return i.ink !== ink; });
+    if (x.jobs) {
+      row.insertAdjacentHTML('beforeend', '<div class="rmpanel"><b>' + esc(ink) + ' is on ' + x.jobs + ' job' + (x.jobs === 1 ? '' : 's') + '.</b>' +
+        '<div class="s">Replace it with another ink on every job and in all history. Its bottles on hand move over too, then ' + esc(ink) + ' comes off the list.</div>' +
+        '<select data-rpto>' + opt('', 'Replace it with…') + others.map(function (i) { return opt(i.ink, i.ink + (i.color ? ' · ' + i.color : '')); }).join('') + '</select>' +
+        '<div class="row2"><button data-rmcancel="1">Cancel</button><button class="primary" data-rpgo="' + esc(ink) + '">Replace everywhere</button></div></div>');
+      return;
+    }
     row.insertAdjacentHTML('beforeend', '<div class="rmpanel"><b>Remove ' + esc(ink) + ' from the list?</b>' +
       (x.onHand ? '<div class="s">It has ' + have + ' bottle' + (x.onHand === 1 ? '' : 's') + ' on hand. If it\'s the same ink under another name, move them:</div>' +
         '<select data-rmto>' + opt('', 'Don\'t move them (write them off)') + M.stock.filter(function (i) { return i.ink !== ink; })
@@ -1592,6 +1600,16 @@
     var rm = e.target.closest('button[data-rm]');
     if (rm) { rmPanel(rm.getAttribute('data-rm')); return; }
     if (e.target.closest('button[data-rmcancel]')) { e.target.closest('.rmpanel').remove(); return; }
+    var rp = e.target.closest('button[data-rpgo]');
+    if (rp) {
+      var to = rp.closest('.rmpanel').querySelector('[data-rpto]').value, from = rp.getAttribute('data-rpgo');
+      if (!to) { setMsg('mMsg', 'Pick the ink to replace ' + from + ' with.', 'err'); return; }
+      if (!confirm('Replace ' + from + ' with ' + to + ' on every job and in all history? This can\'t be undone from the page.')) return;
+      rp.disabled = true; setMsg('mMsg', 'Replacing ' + from + '…');
+      srv('invReplaceInk', [from, to], function (d) { minShow(d); setMsg('mMsg', d.message, 'ok'); },
+        function (e) { rp.disabled = false; mErr(e); });
+      return;
+    }
     var go = e.target.closest('button[data-rmgo]');
     if (go) {
       var sel = go.closest('.rmpanel').querySelector('[data-rmto]');
