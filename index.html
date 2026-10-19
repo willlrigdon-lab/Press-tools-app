@@ -741,8 +741,22 @@
     }, wError);
   });
 
+  /* Typed entries are kept on this device until "Clear for next roll", so a reload doesn't lose them. */
+  try {
+    var wDraft = JSON.parse(store('wasteDraft') || '{}') || {};
+    W_FIELDS.forEach(function (f) { if (wDraft[f]) $('w_' + f).value = wDraft[f]; });
+  } catch (e) { /* no saved entries */ }
+  W_FIELDS.forEach(function (f) {
+    $('w_' + f).addEventListener('input', function () {
+      var o = {};
+      W_FIELDS.forEach(function (g) { o[g] = $('w_' + g).value; });
+      store('wasteDraft', JSON.stringify(o));
+    });
+  });
+
   $('w_clearBtn').addEventListener('click', function () {
     W_FIELDS.forEach(function (f) { $('w_' + f).value = ''; });
+    store('wasteDraft', '{}');
     $('w_resultCard').classList.add('hidden');
     wMsg('');
     $('w_rollNumber').focus();
