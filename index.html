@@ -741,22 +741,51 @@
     }, wError);
   });
 
-  /* Typed entries are kept on this device until "Clear for next roll", so a reload doesn't lose them. */
+  /* Typed entries are kept until "Clear for next roll": in the Sheet for the press (survives time-outs,
+     reloads and other devices) and on this device as a backup. */
+  var WD = { timer: null, sent: '' };
+  function wFields() { var o = {}; W_FIELDS.forEach(function (f) { o[f] = $('w_' + f).value; }); return o; }
+  function wHasEntries(o) { return W_FIELDS.some(function (f) { return String(o[f] || '').trim(); }); }
+  function wFill(o) { W_FIELDS.forEach(function (f) { $('w_' + f).value = o[f] || ''; }); store('wasteDraft', JSON.stringify(o)); }
+  function wDraftSend() {
+    clearTimeout(WD.timer); WD.timer = null;
+    if (!S.press || !A.token) return;
+    var o = wFields(), json = JSON.stringify(o);
+    if (json === WD.sent) return;
+    WD.sent = json;
+    srv('wasteDraftSave', [S.press, o], noop, function () { WD.sent = ''; });   // try again on the next change
+  }
+  /** After the press is known: bring back that press's entries, or send up what's on screen. */
+  function wDraftLoad(switched) {
+    if (!S.press) return;
+    var press = S.press;
+    srv('wasteDraft', [press], function (d) {
+      if (press !== S.press) return;
+      if (wHasEntries(d.fields)) {
+        wFill(d.fields); WD.sent = JSON.stringify(wFields());
+        wMsg('Entries restored for ' + press + (d.savedAt ? ' (typed ' + d.savedAt + (d.by ? ' by ' + d.by : '') + ')' : '') + '.');
+      } else if (switched) {
+        wFill({}); WD.sent = JSON.stringify(wFields());   // the other press keeps its own entries
+      } else if (wHasEntries(wFields())) wDraftSend();
+    });
+  }
   try {
     var wDraft = JSON.parse(store('wasteDraft') || '{}') || {};
     W_FIELDS.forEach(function (f) { if (wDraft[f]) $('w_' + f).value = wDraft[f]; });
   } catch (e) { /* no saved entries */ }
   W_FIELDS.forEach(function (f) {
     $('w_' + f).addEventListener('input', function () {
-      var o = {};
-      W_FIELDS.forEach(function (g) { o[g] = $('w_' + g).value; });
-      store('wasteDraft', JSON.stringify(o));
+      store('wasteDraft', JSON.stringify(wFields()));
+      clearTimeout(WD.timer); WD.timer = setTimeout(wDraftSend, 1500);
     });
+    $('w_' + f).addEventListener('change', wDraftSend);
   });
+  window.addEventListener('pagehide', function () { if (WD.timer) wDraftSend(); });
 
   $('w_clearBtn').addEventListener('click', function () {
     W_FIELDS.forEach(function (f) { $('w_' + f).value = ''; });
     store('wasteDraft', '{}');
+    wDraftSend();
     $('w_resultCard').classList.add('hidden');
     wMsg('');
     $('w_rollNumber').focus();
@@ -816,6 +845,7 @@
       renderPresses();
       route();
       renderAssign();
+      if (S.press !== WD.press) { var switched = !!WD.press; WD.press = S.press; wDraftLoad(switched); }
     });
   }
 
@@ -1244,6 +1274,8 @@
   }
 
   function logout(why) {
+    if (WD.timer) wDraftSend();
+    WD.press = null;              // load this press's entries again after the next login
     A.token = null; A.name = ''; A.level = 0; A.roles = [];
     store('pt_token', ''); store('pt_view', '');
     PIN.value = ''; drawPin();
