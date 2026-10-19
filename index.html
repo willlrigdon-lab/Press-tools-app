@@ -158,6 +158,10 @@
     .item .acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
     .item .acts button { padding: 9px 12px; font-size: 15px; }
     .item input, .item select { font-size: 17px; padding: 9px; }
+    .item.stock { grid-template-columns: 1fr; }
+    .item.stock .acts { justify-content: flex-start; align-items: flex-end; }
+    .item.stock .acts label { margin: 0; font-size: 13px; color: var(--muted); }
+    .item.stock .acts label input { display: block; margin-top: 2px; }
     .count-in { display: grid; grid-template-columns: 74px 92px; gap: 6px; }
     .badge.red { background: #fde7e7; color: var(--bad); }
     .badge.yellow { background: #fff4c2; color: #6b4e00; }
@@ -544,7 +548,7 @@
     <div id="m_stock" class="mpane hidden">
       <div class="card">
         <h2>Ink stock and minimums</h2>
-        <p class="muted" style="margin-top:0">Change "Keep at least" and tap Save on that line. Inks used by active states are marked.</p>
+        <p class="muted" style="margin-top:0">Change "Item #" or "Keep at least" and tap Save on that line. Inks used by active states are marked.</p>
         <div id="minList"></div>
       </div>
     </div>
@@ -1383,7 +1387,8 @@
     $('invList').innerHTML = list.map(function (x) {
       var left = '<div><div class="t">' + esc(x.ink) + (x.color ? ' <span class="muted">· ' + esc(x.color) + '</span>' : '') + '</div>' +
         '<div class="s">On hand ' + fmt(x.onHand, x.onHand % 1 ? 2 : 0) + (x.min ? ' · keep ' + x.min : '') +
-        (INV.counting ? '' : ' · ' + (x.lastCounted ? 'counted ' + esc(x.lastCounted) : '<b>never counted</b>')) + '</div></div>';
+        (INV.counting ? '' : ' · ' + (x.lastCounted ? 'counted ' + esc(x.lastCounted) : '<b>never counted</b>')) +
+        (!INV.counting && x.item ? ' · Item # ' + esc(x.item) : '') + '</div></div>';
       if (!INV.counting) return '<div class="item">' + left + '<div>' + badge(STOCK_BADGE[x.status], x.status) + '</div></div>';
       var c = INV.counts[x.ink] || { full: '', part: '0' };
       return '<div class="item">' + left + '<div><div class="count-in">' +
@@ -1647,10 +1652,12 @@
   /* ink stock + minimums */
   function minShow(d) {
     $('minList').innerHTML = d.inks.map(function (x) {
-      return '<div class="item"><div><div class="t">' + esc(x.ink) + (x.color ? ' <span class="muted">· ' + esc(x.color) + '</span>' : '') +
+      return '<div class="item stock"><div><div class="t">' + esc(x.ink) + (x.color ? ' <span class="muted">· ' + esc(x.color) + '</span>' : '') +
         (x.activeState ? ' ' + badge('ok', 'Active state') : '') + '</div>' +
-        '<div class="s">On hand ' + fmt(x.onHand, x.onHand % 1 ? 2 : 0) + ' ' + badge(STOCK_BADGE[x.status], x.status) + '</div></div>' +
-        '<div class="acts"><input data-min="' + esc(x.ink) + '" value="' + x.min + '" inputmode="decimal" style="width:70px" aria-label="Keep at least, ' + esc(x.ink) + '">' +
+        '<div class="s">On hand ' + fmt(x.onHand, x.onHand % 1 ? 2 : 0) + ' ' + badge(STOCK_BADGE[x.status], x.status) +
+        ' · ' + (x.item ? 'Item # <b>' + esc(x.item) + '</b>' : 'No item #') + '</div></div>' +
+        '<div class="acts"><label>Item #<input data-item="' + esc(x.ink) + '" value="' + esc(x.item || '') + '" style="width:120px" aria-label="Item number, ' + esc(x.ink) + '"></label>' +
+        '<label>Keep at least<input data-min="' + esc(x.ink) + '" value="' + x.min + '" inputmode="decimal" style="width:90px" aria-label="Keep at least, ' + esc(x.ink) + '"></label>' +
         '<button data-minsave="' + esc(x.ink) + '">Save</button><button class="danger" data-rm="' + esc(x.ink) + '">Remove</button></div></div>';
     }).join('');
     M.stock = d.inks;
@@ -1699,8 +1706,12 @@
     var b = e.target.closest('button[data-minsave]'); if (!b) return;
     var ink = b.getAttribute('data-minsave');
     var v = document.querySelector('[data-min="' + CSS.escape(ink) + '"]').value;
+    var item = document.querySelector('[data-item="' + CSS.escape(ink) + '"]').value.trim();
     b.disabled = true;
-    srv('inkSetMin', [ink, v], function (d) { minShow(d); setMsg('mMsg', ink + ': keep at least ' + v + '.', 'ok'); }, function (e) { b.disabled = false; mErr(e); });
+    srv('inkSetMin', [ink, v, item], function (d) {
+      minShow(d);
+      setMsg('mMsg', ink + ': keep at least ' + v + (item ? ', item # ' + item : ', no item #') + '.', 'ok');
+    }, function (e) { b.disabled = false; mErr(e); });
   });
 
   /* job editor */
