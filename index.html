@@ -167,6 +167,7 @@
     .countbar { position: sticky; bottom: 0; z-index: 4; background: var(--card); margin: 10px -16px -16px; padding: 12px 16px 16px;
       border-top: 1px solid var(--line); box-shadow: 0 -6px 14px rgba(0,0,0,.08); border-radius: 0 0 14px 14px; }
     .setup-head { margin-top: 14px; font-weight: 700; font-size: 16px; }
+    .pack { margin: 6px 0 0; font-size: 17px; }
     table.setup { table-layout: fixed; }
     table.setup td, table.setup th { padding: 7px 4px; vertical-align: top; overflow-wrap: anywhere; }
     table.setup th:nth-child(1) { width: 44px; }
@@ -870,6 +871,7 @@
     var html = '<div class="setup-head">Setup sheet ' + (j.verified ? '<span class="badge ok">Approved</span>'
       : '<span class="badge unv">Not verified yet</span>') + '</div>';
     if (!j.verified) html += '<p class="muted" style="margin:4px 0 0">Management hasn\'t checked this setup yet. Tell them if something is wrong.</p>';
+    if (j.slipsPerPack) html += '<p class="pack">Pack: <b>' + Number(j.slipsPerPack).toLocaleString() + '</b> slips per stack</p>';
     ['Front', 'Back'].forEach(function (side) {
       var inks = j.inks.filter(function (k) { return k.side === side; });
       if (!inks.length) return;
