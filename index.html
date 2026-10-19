@@ -76,6 +76,10 @@
     .ink .acts { display: flex; gap: 8px; align-items: center; }
     .ink .plus { font-size: 18px; padding: 14px 16px; background: var(--accent); color: #fff; min-width: 116px; }
     .ink .minus { padding: 14px 12px; border-color: var(--line); color: var(--muted); }
+    .ink .acts2 { display: grid; grid-template-columns: auto 1fr; gap: 8px; }
+    .ink .part { grid-column: 1 / -1; padding: 10px 12px; font-size: 15px; }
+    .ink .parts { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .ink .parts button { font-size: 18px; padding: 12px 0; }
     .end-ink { padding: 12px 0; border-top: 1px solid var(--line); }
     .end-ink:first-of-type { border-top: 0; }
     .end-ink .name { font-weight: 700; margin-bottom: 8px; }
@@ -758,6 +762,13 @@
   function show(id, on) { $(id).classList.toggle('hidden', !on); }
   function msg(text, kind) { var m = $('msg'); m.textContent = text || ''; m.className = 'msg' + (kind ? ' ' + kind : ''); }
   function frac(v) { for (var i = 0; i < LEFT.length; i++) if (LEFT[i][0] === v) return LEFT[i][1]; return v; }
+  var PART = { 0.25: '¼', 0.5: '½', 0.75: '¾' };
+  /** Bottle counts with fractions: 2.5 → 2½, 0.75 → ¾, 1 → 1. */
+  function bottles(v) {
+    v = Math.round(Number(v) * 4) / 4;
+    var whole = Math.floor(v), part = PART[v - whole] || '';
+    return (whole || !part ? String(whole) : '') + part;
+  }
 
   function call(fn, args, ok) {
     srv(fn, args, ok, function (e) { setBusy(false); msg(errText(e), 'err'); });
@@ -925,13 +936,18 @@
       html += '<h3>' + side + '</h3>';
       inks.forEach(function (k) {
         var sub = [k.color, k.anilox].filter(Boolean).map(esc).join(' · ');
+        var adds = k.adds || [], last = adds[adds.length - 1], open = S.partialOpen === k.key;
         html += '<div class="ink"><div>' +
           '<div class="name">' + esc(k.ink) + '</div>' +
           (sub ? '<div class="sub">' + sub + '</div>' : '') +
-          '<div class="count">Bottles opened: <b>' + k.opened + '</b> <span class="muted">+ startup</span></div>' +
-          '</div><div class="acts">' +
-          '<button class="minus" data-k="' + esc(k.key) + '" data-q="-1" aria-label="Take back one bottle of ' + esc(k.ink) + '"' + (k.opened > 0 ? '' : ' disabled') + '>−</button>' +
+          '<div class="count">Bottles opened: <b>' + bottles(k.opened) + '</b> <span class="muted">+ startup</span></div>' +
+          '</div><div class="acts2">' +
+          '<button class="minus" data-k="' + esc(k.key) + '" data-q="' + (last ? -last : 0) + '" aria-label="Take back ' + (last ? bottles(last) : '') + ' bottle of ' + esc(k.ink) + '"' + (last ? '' : ' disabled') + '>−' + (last && last !== 1 ? bottles(last) : '') + '</button>' +
           '<button class="plus" data-k="' + esc(k.key) + '" data-q="1">+1 Bottle</button>' +
+          '<button class="part" data-part="' + esc(k.key) + '">' + (open ? 'Close' : '+ Partial bottle') + '</button>' +
+          (open ? '<div class="parts">' + [0.25, 0.5, 0.75].map(function (q) {
+            return '<button class="plus" data-k="' + esc(k.key) + '" data-q="' + q + '">+' + PART[q] + '</button>';
+          }).join('') + '</div>' : '') +
           '</div></div>';
       });
     });
@@ -960,17 +976,28 @@
 
   /* bottles */
   $('runInks').addEventListener('click', function (e) {
+    var p = e.target.closest('button[data-part]');
+    if (p) {
+      S.partialOpen = S.partialOpen === p.getAttribute('data-part') ? null : p.getAttribute('data-part');
+      renderRun(); return;
+    }
     var b = e.target.closest('button[data-k]');
     if (!b) return;
     var key = b.getAttribute('data-k'), q = Number(b.getAttribute('data-q'));
     var k = S.run.inks.filter(function (x) { return x.key === key; })[0];
-    if (!k) return;
-    if (q === -1 && !confirm('Take back one bottle of ' + k.ink + '?')) return;
-    if (q === -1 && k.opened <= 0) return;
-    k.opened += q; renderRun();            // show it right away
+    if (!k || !q) return;
+    if (q < 0 && !confirm('Take back ' + bottles(-q) + ' bottle of ' + k.ink + '?')) return;
+    S.partialOpen = null;
+    addBottle(k, q); renderRun();          // show it right away
     queueTap({ fn: 'inkBottle', runId: S.run.runId, side: k.side, ink: k.ink, key: k.key, qty: q,
-      label: k.ink + (q === 1 ? ' +1' : ' −1') });
+      label: k.ink + (q > 0 ? ' +' : ' −') + bottles(Math.abs(q)) });
   });
+  /** Count a bottle tap on screen: adds go on k.adds, a take-back removes the last one. */
+  function addBottle(k, q) {
+    k.adds = k.adds || [];
+    k.opened = Math.round((k.opened + q) * 100) / 100;
+    if (q > 0) k.adds.push(q); else k.adds.pop();
+  }
 
   /* ----- tap queue: bottle and pallet taps are kept on this device until the server has them ----- */
   var Q = { items: [], sending: false, failed: false, timer: null };
@@ -992,7 +1019,7 @@
     Q.items.forEach(function (t) {
       if (t.runId !== run.runId) return;
       if (t.fn === 'inkPallet') run.pallets += t.qty;
-      else run.inks.forEach(function (k) { if (k.key === t.key) k.opened += t.qty; });
+      else run.inks.forEach(function (k) { if (k.key === t.key) addBottle(k, t.qty); });
     });
     return run;
   }
@@ -1076,7 +1103,10 @@
     var inks = S.run.inks.filter(function (k) { return k.opened > 0; });
     $('endInks').innerHTML = inks.length ? inks.map(function (k) {
       return '<div class="end-ink"><div class="name">' + esc(k.ink) + ' <span class="muted">· ' + k.side + '</span></div>' +
-        '<div class="seg" data-k="' + esc(k.key) + '">' + LEFT.map(function (l) {
+        '<div class="seg" data-k="' + esc(k.key) + '">' + LEFT.filter(function (l) {
+          var last = (k.adds || [])[(k.adds || []).length - 1] || 1;
+          return l[0] <= last;                  // a ½ bottle can't have ¾ left
+        }).map(function (l) {
           return '<button data-v="' + l[0] + '">' + l[1] + '</button>';
         }).join('') + '</div></div>';
     }).join('') : '<p class="muted">No extra bottles were opened, so there are no leftovers to enter.</p>';
@@ -1113,7 +1143,7 @@
     var hasPer = res.slips !== '' && res.slips > 0;
     $('doneTable').innerHTML = '<table><tr><th>Ink</th><th class="n">Opened</th><th class="n">Left</th><th class="n">Used</th>' +
       (hasPer ? '<th class="n">For 500K</th>' : '') + '</tr>' + res.summary.map(function (s) {
-        return '<tr><td>' + esc(s.ink) + ' <span class="muted">' + s.side.charAt(0) + '</span></td><td class="n">' + s.opened +
+        return '<tr><td>' + esc(s.ink) + ' <span class="muted">' + s.side.charAt(0) + '</span></td><td class="n">' + bottles(s.opened) +
           '</td><td class="n">' + (s.opened ? frac(s.leftover) : '—') + '</td><td class="n">' + fmt(s.totalUsed, 2) + '</td>' +
           (hasPer ? '<td class="n">' + fmt(s.order500, 0) + '</td>' : '') + '</tr>';
       }).join('') + '</table>' +
