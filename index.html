@@ -159,6 +159,14 @@
     .item .acts button { padding: 9px 12px; font-size: 15px; }
     .item input, .item select { font-size: 17px; padding: 9px; }
     .item.stock { grid-template-columns: 1fr; }
+    table.order td { vertical-align: top; }
+    table.order .badge { white-space: nowrap; }
+    @media print {
+      body.printing-order * { visibility: hidden; }
+      body.printing-order #orderCard, body.printing-order #orderCard * { visibility: visible; }
+      body.printing-order #orderCard { position: absolute; left: 0; top: 0; width: 100%; box-shadow: none; border: 0; }
+      body.printing-order .noprint { display: none; }
+    }
     .item.stock .acts { justify-content: flex-start; align-items: flex-end; }
     .item.stock .acts label { margin: 0; font-size: 13px; color: var(--muted); }
     .item.stock .acts label input { display: block; margin-top: 2px; }
@@ -485,6 +493,7 @@
       <button data-t="waste">Waste</button>
       <button data-t="supplies">Low supplies</button>
       <button data-t="stock">Ink stock</button>
+      <button data-t="order">Order list</button>
       <button data-t="jobs">Jobs</button>
       <button data-t="states">States</button>
     </div>
@@ -550,6 +559,14 @@
         <h2>Ink stock and minimums</h2>
         <p class="muted" style="margin-top:0">Change "Item #" or "Keep at least" and tap Save on that line. Inks used by active states are marked.</p>
         <div id="minList"></div>
+      </div>
+    </div>
+
+    <div id="m_order" class="mpane hidden">
+      <div class="card" id="orderCard">
+        <div class="cardhead"><h2>Ink order list</h2><button id="orderPrint" class="noprint">Print</button></div>
+        <p class="muted" id="orderHint" style="margin-top:0"></p>
+        <div id="orderList"></div>
       </div>
     </div>
 
@@ -1518,6 +1535,7 @@
     waste: function () { wReport(); },
     supplies: function () { srv('supplyRequests', [$('supShowAll').checked], supShow, mErr); },
     stock: function () { srv('invStock', [], minShow, mErr); },
+    order: function () { $('orderList').innerHTML = '<p class="muted">Loading…</p>'; srv('invStock', [], orderShow, mErr); },
     states: function () { srv('statesList', [], statesShow, mErr); },
     jobs: function () { srv('jobGet', [''], jbLists, mErr); }
   };
@@ -1648,6 +1666,31 @@
     b.disabled = true;
     srv('supplySetStatus', [b.getAttribute('data-sid'), b.getAttribute('data-st')], function () { M_LOAD.supplies(); }, mErr);
   });
+
+  /* order list: inks that are out, below keep-at-least, or under the "Order list: under" setting (4) */
+  function orderShow(d) {
+    var under = Number(d.orderBelow) || 4, RANK = { Out: 0, Low: 1, Under: 2 };
+    var rows = d.inks.map(function (x) {
+      var why = x.onHand <= 0 ? 'Out' : x.min && x.onHand < x.min ? 'Low' : x.onHand < under ? 'Under' : '';
+      return why ? { x: x, why: why } : null;
+    }).filter(Boolean).sort(function (a, b) {
+      return RANK[a.why] - RANK[b.why] || a.x.ink.localeCompare(b.x.ink, undefined, { numeric: true });
+    });
+    $('orderHint').textContent = 'Inks that are out, below "keep at least", or under ' + under + ' bottles. ' +
+      rows.length + ' ink' + (rows.length === 1 ? '' : 's') + ' · ' + new Date().toLocaleDateString();
+    if (!rows.length) { $('orderList').innerHTML = '<p class="muted">Nothing to order. Every ink has enough.</p>'; return; }
+    var LABEL = { Out: 'Out', Low: 'Low', Under: 'Under ' + under }, KIND = { Out: 'red', Low: 'yellow', Under: 'yellow' };
+    $('orderList').innerHTML = '<table class="order"><tr><th>Ink · Item #</th><th class="n">Have</th><th class="n">Keep</th><th></th></tr>' +
+      rows.map(function (r) {
+        var x = r.x;
+        return '<tr><td><b>' + esc(x.ink) + '</b>' + (x.item ? ' · ' + esc(x.item) : ' <span class="muted">· no item #</span>') +
+          (x.lastCounted ? '' : '<div class="muted" style="font-size:13px">never counted</div>') + '</td>' +
+          '<td class="n">' + fmt(x.onHand, x.onHand % 1 ? 2 : 0) + '</td><td class="n">' + (x.min ? fmt(x.min, x.min % 1 ? 2 : 0) : '—') + '</td>' +
+          '<td>' + badge(KIND[r.why], LABEL[r.why]) + '</td></tr>';
+      }).join('') + '</table>';
+  }
+  $('orderPrint').addEventListener('click', function () { document.body.classList.add('printing-order'); window.print(); });
+  window.addEventListener('afterprint', function () { document.body.classList.remove('printing-order'); });
 
   /* ink stock + minimums */
   function minShow(d) {
