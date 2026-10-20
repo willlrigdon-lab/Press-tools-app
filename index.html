@@ -146,7 +146,7 @@
     .cardhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
     .cardhead h2 { margin: 0; }
     .seg.small button { padding: 7px 10px; font-size: 14px; }
-    .tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 8px; -webkit-overflow-scrolling: touch; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 6px; margin-bottom: 8px; }
     .tabs button { flex: 0 0 auto; padding: 10px 14px; font-size: 15px; border-color: var(--line); color: var(--text); font-weight: 600; }
     .tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
     .check { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 15px; margin: 0; }
@@ -1670,13 +1670,13 @@
   /* order list: inks that are out, below keep-at-least, or under the "Order list: under" setting (4) */
   function orderShow(d) {
     var under = Number(d.orderBelow) || 4, RANK = { Out: 0, Low: 1, Under: 2 };
-    var rows = d.inks.map(function (x) {
+    var rows = d.inks.filter(function (x) { return x.activeState; }).map(function (x) {   // active states (and mixing inks) only
       var why = x.onHand <= 0 ? 'Out' : x.min && x.onHand < x.min ? 'Low' : x.onHand < under ? 'Under' : '';
       return why ? { x: x, why: why } : null;
     }).filter(Boolean).sort(function (a, b) {
       return RANK[a.why] - RANK[b.why] || a.x.ink.localeCompare(b.x.ink, undefined, { numeric: true });
     });
-    $('orderHint').textContent = 'Inks that are out, below "keep at least", or under ' + under + ' bottles. ' +
+    $('orderHint').textContent = 'Inks for active states that are out, below "keep at least", or under ' + under + ' bottles. ' +
       rows.length + ' ink' + (rows.length === 1 ? '' : 's') + ' · ' + new Date().toLocaleDateString();
     if (!rows.length) { $('orderList').innerHTML = '<p class="muted">Nothing to order. Every ink has enough.</p>'; return; }
     var LABEL = { Out: 'Out', Low: 'Low', Under: 'Under ' + under }, KIND = { Out: 'red', Low: 'yellow', Under: 'yellow' };
