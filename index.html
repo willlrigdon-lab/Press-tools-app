@@ -969,17 +969,25 @@
     if (!S.press || !a || !a.current) return;
     $('assignTitle').textContent = 'Job assignment · ' + S.press;
     var c = a.current;
-    var canPick = !S.run && c.jobKey && S.jobs.some(function (j) { return j.key === c.jobKey; });
+    var cj = c.jobKey ? S.jobs.filter(function (j) { return j.key === c.jobKey; })[0] : null;
+    var canPick = !S.run && !!cj;
     var sub = [c.job ? esc(c.state) : '', qLine(c)].filter(Boolean).join(' · ');
     $('assignNow').innerHTML = '<div class="muted">Now</div><div class="now">' + esc(c.job || c.note) + '</div>' +
       (sub ? '<div class="nowsub">' + sub + '</div>' : '') +
       (c.job && c.note ? '<div class="nowsub" style="color:var(--text)">' + esc(c.note) + '</div>' : '') +
-      (canPick ? '<button id="assignPick" class="wide">Pick this job below</button>' : '');
+      (canPick ? '<button id="assignPick" class="wide">Pick this job below</button>' : '') +
+      (cj ? '<details class="setupbox" id="assignSetup"' + (store('assignSetupOpen') === '1' ? ' open' : '') + '>' +
+        '<summary>Setup sheet: position, ink, anilox</summary>' + setupHtml(cj) + '</details>' : '');
     var n = a.next;
     $('assignNext').innerHTML = n ? '<div class="next">Next: <b>' + esc(n.job || n.note) + '</b> <span class="muted">· ' +
       [n.job ? esc(n.state) : '', qLine(n)].filter(Boolean).join(' · ') + (a.more ? ' · +' + a.more + ' more' : '') + '</span></div>'
       : '<div class="next muted">Nothing assigned after this.</div>';
   }
+  /** Job key of this press's current assignment ('' if none). */
+  function assignedKey() { var a = S.assigned; return a && a.current && a.current.jobKey || ''; }
+  $('assignNow').addEventListener('toggle', function (e) {
+    if (e.target.id === 'assignSetup') store('assignSetupOpen', e.target.open ? '1' : '0');
+  }, true);
   $('assignNow').addEventListener('click', function (e) {
     if (e.target.id !== 'assignPick') return;
     var c = S.assigned.current;
@@ -1027,7 +1035,8 @@
     var html = '<h3><span class="badge ' + j.flag + '">' + (j.runs ? 'Tracked ' + j.runs + ' of ' + goal : 'Never tracked') + '</span></h3>';
     if (j.flag === 'red') html += '<div class="push red">This job has never been tracked. Please track it this run.</div>';
     else if (j.flag === 'yellow') html += '<div class="push yellow">Tracked ' + j.runs + ' of ' + goal + ' times. Please keep tracking it.</div>';
-    html += setupHtml(j);
+    html += assignedKey() === j.key ? '<p class="muted" style="margin:12px 0 0">The setup sheet for this job is on the Job assignment card above.</p>'
+      : setupHtml(j);
     $('jobPreview').innerHTML = html;
   }
 
@@ -1069,6 +1078,7 @@
     $('runMeta').innerHTML = esc(r.press) + ' · started ' + esc(r.started) + ' &nbsp;' +
       (r.verified ? '<span class="badge ok">Verified</span>' : '<span class="badge unv">Not verified yet</span>');
 
+    show('runSetup', assignedKey() !== r.jobKey);   // the assigned job's setup sheet is on the assignment card
     $('runSetupBody').innerHTML = setupHtml(S.jobs.filter(function (j) { return j.key === r.jobKey; })[0]);
 
     // stale: no taps or rolls for N work hours, or left open over the weekend. Any update clears it.
