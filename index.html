@@ -541,20 +541,26 @@
 
     <div id="m_queue" class="mpane">
       <div class="card">
-        <h2>Add a job to the queue</h2>
+        <h2>Add to the queue</h2>
+        <div class="seg" id="qType">
+          <button data-v="Order" class="on">Order</button><button data-v="Stock">For stock</button><button data-v="Note">Note</button>
+        </div>
+        <p class="muted" id="qTypeHint" style="margin:6px 0 0"></p>
         <div class="row2">
           <div><label for="qState">State</label><select id="qState"></select></div>
           <div><label for="qJob">Job</label><select id="qJob"></select></div>
         </div>
         <div class="row2">
-          <div><label for="qSlips">Slips ordered</label><input id="qSlips" inputmode="numeric" placeholder="500000"></div>
-          <div><label for="qDue">Due date</label><input id="qDue" type="date"></div>
+          <div id="qSlipsBox"><label for="qSlips" id="qSlipsLabel">Slips ordered</label><input id="qSlips" inputmode="numeric" placeholder="500000"></div>
+          <div><label for="qDue" id="qDueLabel">Due date</label><input id="qDue" type="date"></div>
         </div>
+        <label for="qNote" id="qNoteLabel">Note (optional)</label>
+        <input id="qNote" maxlength="300" autocomplete="off" placeholder="e.g. Set up and test when plates arrive">
         <button id="qAdd" class="primary wide">Add to queue</button>
       </div>
       <div class="card">
-        <div class="cardhead"><h2>Not shipped yet</h2>
-          <label class="check"><input type="checkbox" id="qShowShipped"> Show shipped</label></div>
+        <div class="cardhead"><h2>Open</h2>
+          <label class="check"><input type="checkbox" id="qShowShipped"> Show shipped / done</label></div>
         <div id="qList"></div>
       </div>
     </div>
@@ -602,7 +608,7 @@
       </div>
       <div class="card">
         <h2>Needed for queued jobs</h2>
-        <p class="muted" style="margin-top:0">Unshipped jobs in active states: 1 startup bottle per ink plus the job's average use for the slips ordered, compared with the shelf and the minimum.</p>
+        <p class="muted" style="margin-top:0">Open orders and stock runs in active states: 1 startup bottle per ink plus the job's average use for the slips, compared with the shelf and the minimum. An open-ended stock run counts as 1,000,000 slips (a setting).</p>
         <div id="needList"></div>
       </div>
     </div>
@@ -936,15 +942,17 @@
     show('assignCard', !!(S.press && a && a.current));   // nothing assigned: no card
     if (!S.press || !a || !a.current) return;
     $('assignTitle').textContent = 'Job assignment · ' + S.press;
-    function line(x) { return fmt(x.slips, 0) + ' slips' + (x.due ? ' · due ' + esc(x.due) : ''); }
     var c = a.current;
-    var canPick = !S.run && S.jobs.some(function (j) { return j.key === c.jobKey; });
-    $('assignNow').innerHTML = '<div class="muted">Now</div><div class="now">' + esc(c.job) + '</div>' +
-      '<div class="nowsub">' + esc(c.state) + ' · ' + line(c) + '</div>' +
+    var canPick = !S.run && c.jobKey && S.jobs.some(function (j) { return j.key === c.jobKey; });
+    var sub = [c.job ? esc(c.state) : '', qLine(c)].filter(Boolean).join(' · ');
+    $('assignNow').innerHTML = '<div class="muted">Now</div><div class="now">' + esc(c.job || c.note) + '</div>' +
+      (sub ? '<div class="nowsub">' + sub + '</div>' : '') +
+      (c.job && c.note ? '<div class="nowsub" style="color:var(--text)">' + esc(c.note) + '</div>' : '') +
       (canPick ? '<button id="assignPick" class="wide">Pick this job below</button>' : '');
-    $('assignNext').innerHTML = a.next ? '<div class="next">Next: <b>' + esc(a.next.job) + '</b> <span class="muted">· ' +
-      esc(a.next.state) + ' · ' + line(a.next) + (a.more ? ' · +' + a.more + ' more' : '') + '</span></div>'
-      : '<div class="next muted">Nothing assigned after this job.</div>';
+    var n = a.next;
+    $('assignNext').innerHTML = n ? '<div class="next">Next: <b>' + esc(n.job || n.note) + '</b> <span class="muted">· ' +
+      [n.job ? esc(n.state) : '', qLine(n)].filter(Boolean).join(' · ') + (a.more ? ' · +' + a.more + ' more' : '') + '</span></div>'
+      : '<div class="next muted">Nothing assigned after this.</div>';
   }
   $('assignNow').addEventListener('click', function (e) {
     if (e.target.id !== 'assignPick') return;
@@ -1653,6 +1661,27 @@
   $('mTabs').addEventListener('click', function (e) { var b = e.target.closest('button[data-t]'); if (b) mOpen(b.getAttribute('data-t')); });
 
   /* queue */
+  var Q_TYPE = 'Order';
+  var Q_HINT = { Order: 'An order: slips and due date.', Stock: 'Run a job for stock. Slips and date are optional; leave slips blank to run until changed.',
+    Note: 'Anything else for a press, like "Set up and test Quick Draw plates when they arrive". Job and date are optional.' };
+  function qTypeShow() {
+    $('qTypeHint').textContent = Q_HINT[Q_TYPE];
+    show('qSlipsBox', Q_TYPE !== 'Note');
+    $('qSlipsLabel').textContent = Q_TYPE === 'Order' ? 'Slips ordered' : 'Target slips (optional)';
+    $('qSlips').placeholder = Q_TYPE === 'Order' ? '500000' : 'open-ended';
+    $('qDueLabel').textContent = Q_TYPE === 'Order' ? 'Due date' : 'Date (optional)';
+    $('qNoteLabel').textContent = Q_TYPE === 'Note' ? 'What should the press do?' : 'Note (optional)';
+    var first = $('qJob').options[0];
+    if (first) first.textContent = Q_TYPE === 'Note' ? 'No job' : 'Choose a job…';
+  }
+  segPick('qType', function (v) { Q_TYPE = v; qTypeShow(); });
+  /** Short description of a queue line or assignment: slips/stock and date. */
+  function qLine(q) {
+    var amt = q.type === 'Note' ? '' : q.type === 'Stock' ? 'For stock' + (q.slips ? ' · ' + fmt(q.slips, 0) + ' slips' : ' · open-ended')
+      : fmt(q.slips, 0) + ' slips';
+    var when = q.due ? (q.type === 'Order' ? 'due ' : '') + esc(q.due) : '';
+    return [amt, when].filter(Boolean).join(' · ');
+  }
   function qShow(d) {
     M.jobs = d.jobs; mCounts();
     var states = [];
@@ -1660,34 +1689,39 @@
     var keep = $('qState').value || 'New York';
     $('qState').innerHTML = states.map(function (s) { return opt(s, s, s === keep); }).join('');
     qJobs();
-    if (!d.queue.length) { $('qList').innerHTML = '<p class="muted">No jobs in the queue.</p>'; return; }
+    qTypeShow();
+    if (!d.queue.length) { $('qList').innerHTML = '<p class="muted">Nothing in the queue.</p>'; return; }
     $('qList').innerHTML = d.queue.map(function (q) {
-      var shipped = q.status === 'Shipped';
-      var press = shipped ? '' : '<div class="qpress"><select data-assign="' + esc(q.id) + '" aria-label="Press for ' + esc(q.job) + '">' +
+      var shipped = q.closed;
+      var press = shipped ? '' : '<div class="qpress"><select data-assign="' + esc(q.id) + '" aria-label="Press for ' + esc(q.job || q.note) + '">' +
         opt('', 'No press', !q.press) + d.presses.map(function (p) { return opt(p, p, p === q.press); }).join('') + '</select>' +
         (q.press ? '<span class="muted">#' + q.pressOrder + ' in line</span>' +
           '<button data-move="' + esc(q.id) + '" data-dir="-1" aria-label="Move up">▲</button>' +
           '<button data-move="' + esc(q.id) + '" data-dir="1" aria-label="Move down">▼</button>' : '') + '</div>';
-      return '<div class="item"><div><div class="t">' + esc(q.job) + ' <span class="muted">· ' + esc(q.state) + '</span></div>' +
-        '<div class="s">' + fmt(q.slips, 0) + ' slips' + (q.due ? ' · due ' + esc(q.due) : '') +
-        (shipped ? ' · shipped ' + esc(q.shipped) : '') + '</div>' +
-        '<div>' + badge(q.flag, FLAG_TEXT[q.flag] + (q.runs ? ' (' + q.runs + ')' : '')) + '</div></div>' +
+      var title = q.job ? esc(q.job) + ' <span class="muted">· ' + esc(q.state) + '</span>' : esc(q.note);
+      var typeBadge = q.type === 'Stock' ? badge('gray', 'For stock') + ' ' : q.type === 'Note' ? badge('gray', 'Note') + ' ' : '';
+      var info = qLine(q) + (shipped ? (qLine(q) ? ' · ' : '') + (q.status === 'Shipped' ? 'shipped ' : 'done ') + esc(q.shipped) : '');
+      return '<div class="item"><div><div class="t">' + title + '</div>' +
+        (info ? '<div class="s">' + info + '</div>' : '') +
+        (q.job && q.note ? '<div class="s">“' + esc(q.note) + '”</div>' : '') +
+        '<div>' + typeBadge + (q.job ? badge(q.flag, FLAG_TEXT[q.flag] + (q.runs ? ' (' + q.runs + ')' : '')) : '') + '</div></div>' +
         '<div class="acts">' + (shipped ? '<button data-unship="' + esc(q.id) + '">Undo</button>'
-          : '<button class="primary" data-ship="' + esc(q.id) + '">Shipped</button>') + '</div>' + press + '</div>';
+          : '<button class="primary" data-ship="' + esc(q.id) + '">' + (q.type === 'Order' ? 'Shipped' : 'Done') + '</button>') + '</div>' + press + '</div>';
     }).join('');
   }
   function qJobs() {
     var st = $('qState').value;
-    $('qJob').innerHTML = opt('', 'Choose a job…') + M.jobs.filter(function (j) { return j.state === st; })
+    $('qJob').innerHTML = opt('', Q_TYPE === 'Note' ? 'No job' : 'Choose a job…') + M.jobs.filter(function (j) { return j.state === st; })
       .map(function (j) { return opt(j.key, j.job); }).join('');
   }
   $('qState').addEventListener('change', qJobs);
   $('qShowShipped').addEventListener('change', function () { M_LOAD.queue(); });
   $('qAdd').addEventListener('click', function () {
-    if (!$('qJob').value) { setMsg('mMsg', 'Choose a job.', 'err'); return; }
+    if (!$('qJob').value && Q_TYPE !== 'Note') { setMsg('mMsg', 'Choose a job.', 'err'); return; }
+    if (Q_TYPE === 'Note' && !$('qNote').value.trim()) { setMsg('mMsg', 'Type what the press should do.', 'err'); return; }
     $('qAdd').disabled = true;
-    srv('queueAdd', [$('qJob').value, $('qSlips').value, $('qDue').value], function (d) {
-      $('qAdd').disabled = false; $('qSlips').value = ''; $('qDue').value = '';
+    srv('queueAdd', [$('qJob').value, Q_TYPE === 'Note' ? '' : $('qSlips').value, $('qDue').value, Q_TYPE, $('qNote').value], function (d) {
+      $('qAdd').disabled = false; $('qSlips').value = ''; $('qDue').value = ''; $('qNote').value = '';
       qShow(d); setMsg('mMsg', 'Added to the queue.', 'ok');
     }, function (e) { $('qAdd').disabled = false; mErr(e); });
   });
@@ -1706,7 +1740,10 @@
     var ship = b.getAttribute('data-ship'), unship = b.getAttribute('data-unship');
     if (!ship && !unship) return;
     b.disabled = true;
-    srv('queueShip', [ship || unship, !!unship], function () { M_LOAD.queue(); setMsg('mMsg', ship ? 'Marked shipped.' : 'Back in the queue.', 'ok'); }, mErr);
+    var label = b.textContent;
+    srv('queueShip', [ship || unship, !!unship], function () {
+      M_LOAD.queue(); setMsg('mMsg', ship ? (label === 'Done' ? 'Marked done.' : 'Marked shipped.') : 'Back in the queue.', 'ok');
+    }, mErr);
   });
 
   /* ink needed */
@@ -1724,7 +1761,8 @@
       }).join('') + '</table>' +
       (notes ? '<p class="muted">* no tracked runs yet for this ink: only the startup bottle is counted. ~ estimated from this ink on other jobs.</p>' : '') +
       '<h3>Jobs included</h3>' + d.jobs.map(function (j) {
-        return '<div class="s">' + esc(j.jobKey) + ' · ' + fmt(j.slips, 0) + ' slips ' + badge(j.flag, FLAG_TEXT[j.flag]) + '</div>';
+        return '<div class="s">' + esc(j.jobKey) + ' · ' + (j.type === 'Stock' ? 'for stock · ' : '') + fmt(j.slips, 0) + ' slips' +
+          (j.openEnded ? ' (open-ended, estimated)' : '') + ' ' + badge(j.flag, FLAG_TEXT[j.flag]) + '</div>';
       }).join('');
   }
 
