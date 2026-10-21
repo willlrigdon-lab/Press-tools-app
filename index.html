@@ -99,6 +99,8 @@
       background: var(--warn-soft); color: var(--warn); }
     .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .row2 > *, .row3 > * { min-width: 0; }
+    input[type="date"] { min-width: 0; -webkit-appearance: none; appearance: none; min-height: 50px; }
     .hint { color: var(--muted); font-size: 13px; margin-top: 4px; }
 
 
@@ -154,6 +156,19 @@
     .item input, .item select { font-size: 17px; padding: 9px; }
     .item.stock { grid-template-columns: 1fr; }
     table.order td { vertical-align: top; }
+    .tscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table.rolls { font-size: 13px; white-space: nowrap; }
+    table.rolls th, table.rolls td { padding: 6px 6px; }
+    table.rolls tr.tot td { font-weight: 700; border-top: 2px solid var(--text); }
+    @media print {
+      body.printing-waste * { visibility: hidden; }
+      body.printing-waste #wasteCard, body.printing-waste #wasteCard * { visibility: visible; }
+      body.printing-waste #wasteCard { position: absolute; left: 0; top: 0; width: 100%; border: 0; padding: 0; }
+      body.printing-waste .noprint { display: none !important; }
+      body.printing-waste .tscroll { overflow: visible; }
+      body.printing-waste table.rolls { font-size: 10px; }
+      body.printing-waste table.rolls th, body.printing-waste table.rolls td { padding: 3px 4px; }
+    }
     table.order .badge { white-space: nowrap; }
     @media print {
       body.printing-order * { visibility: hidden; }
@@ -566,15 +581,26 @@
     </div>
 
     <div id="m_waste" class="mpane hidden">
-      <div class="card">
-        <h2>Waste report</h2>
-        <label for="wOp">Operator</label>
-        <select id="wOp"><option value="all">Everyone</option></select>
-        <label>Group by</label>
-        <div class="seg" id="wPeriod">
-          <button data-v="day">Day</button><button data-v="week" class="on">Week</button><button data-v="month">Month</button><button data-v="year">Year</button>
+      <div class="card" id="wasteCard">
+        <div class="cardhead"><h2>Waste report</h2><button id="wPrint" class="noprint">Print / PDF</button></div>
+        <div class="noprint">
+          <div class="row2">
+            <div><label for="wOp">Operator</label><select id="wOp"><option value="all">Everyone</option></select></div>
+            <div><label for="wPress">Press</label><select id="wPress"><option value="all">All presses</option></select></div>
+          </div>
+          <div class="row2">
+            <div><label for="wFrom">From</label><input id="wFrom" type="date"></div>
+            <div><label for="wTo">To</label><input id="wTo" type="date"></div>
+          </div>
+          <label>Group totals by</label>
+          <div class="seg" id="wPeriod">
+            <button data-v="day">Day</button><button data-v="week" class="on">Week</button><button data-v="month">Month</button><button data-v="year">Year</button>
+          </div>
         </div>
+        <p class="muted" id="wFilters" style="margin:10px 0 0"></p>
         <div id="wReport"></div>
+        <h3>All rolls</h3>
+        <div class="tscroll"><div id="wRolls"></div></div>
       </div>
       <div class="card">
         <h2>Clear old waste data</h2>
@@ -1768,12 +1794,21 @@
 
   /* waste report */
   segPick('wPeriod', function (v) { M.period = v; wReport(); });
-  $('wOp').addEventListener('change', wReport);
+  ['wOp', 'wPress', 'wFrom', 'wTo'].forEach(function (id) { $(id).addEventListener('change', wReport); });
+  (function () {   // default: the last 7 days
+    function ymd(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+    var now = new Date(); $('wTo').value = ymd(now); $('wFrom').value = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6));
+  })();
   function wReport() {
-    srv('wasteReport', [$('wOp').value, M.period], function (d) {
-      var keep = $('wOp').value;
+    srv('wasteReport', [$('wOp').value, M.period, $('wPress').value, $('wFrom').value, $('wTo').value], function (d) {
+      var keep = $('wOp').value, keepP = $('wPress').value;
       $('wOp').innerHTML = opt('all', 'Everyone', keep === 'all') + d.operators.map(function (o) { return opt(o, o, o === keep); }).join('');
-      if (!d.rows.length) { $('wReport').innerHTML = '<p class="muted">No rolls saved yet.</p>'; return; }
+      $('wPress').innerHTML = opt('all', 'All presses', keepP === 'all') + d.presses.map(function (p) { return opt(p, p, p === keepP); }).join('');
+      function md(v) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || ''); return m ? Number(m[2]) + '/' + Number(m[3]) + '/' + m[1] : ''; }
+      $('wFilters').textContent = (d.operator === 'all' ? 'Everyone' : d.operator) + ' · ' + (d.press === 'all' ? 'all presses' : d.press) + ' · ' +
+        (d.from || d.to ? (md(d.from) || 'start') + ' to ' + (md(d.to) || 'today') : 'all dates') + ' · ' + d.total.rolls + ' roll' + (d.total.rolls === 1 ? '' : 's');
+      wRolls(d.rolls, d.total);
+      if (!d.rows.length) { $('wReport').innerHTML = '<p class="muted">No rolls for these filters.</p>'; return; }
       function row(r, bold) {
         var b = bold ? ['<b>', '</b>'] : ['', ''];
         return '<tr><td>' + b[0] + esc(r.label) + b[1] + '</td><td class="n">' + r.rolls + '</td><td class="n">' + fmt(r.waste, 0) +
@@ -1783,6 +1818,37 @@
         d.rows.map(function (r) { return row(r); }).join('') + row(d.total, true) + '</table>';
     }, mErr);
   }
+  /** Every roll with all the calculator fields, plus a totals line. */
+  function wRolls(rolls, total) {
+    if (!rolls.length) { $('wRolls').innerHTML = '<p class="muted">No rolls.</p>'; return; }
+    function n(v, d) { return fmt(v, d || 0); }
+    var sum = { p: 0, mc: 0 };
+    rolls.forEach(function (r) { sum.p += r.p1 + r.p2 + r.p3; sum.mc += r.machineCount; });
+    $('wRolls').innerHTML = '<table class="rolls rep"><tr><th>Saved</th><th>Press</th><th>Operator</th><th>Roll #</th>' +
+      '<th class="n">Package length</th><th class="n">Start counter</th><th class="n">End counter</th>' +
+      '<th class="n">Pallet 1</th><th class="n">Pallet 2</th><th class="n">Pallet 3</th>' +
+      '<th class="n">Starting footage</th><th class="n">Machine count</th><th class="n">Finished product</th><th class="n">Waste ft</th><th class="n">Waste %</th></tr>' +
+      rolls.map(function (r) {
+        return '<tr><td>' + esc(r.saved) + '</td><td>' + esc(r.press) + '</td><td>' + esc(r.operator) + '</td><td>' + esc(r.roll) + '</td>' +
+          '<td class="n">' + n(r.packageLength) + '</td><td class="n">' + n(r.startCounter) + '</td><td class="n">' + n(r.endCounter) + '</td>' +
+          '<td class="n">' + n(r.p1) + '</td><td class="n">' + n(r.p2) + '</td><td class="n">' + n(r.p3) + '</td>' +
+          '<td class="n">' + n(r.startingFootage, 2) + '</td><td class="n">' + n(r.machineCount) + '</td><td class="n">' + n(r.finished, 2) + '</td>' +
+          '<td class="n">' + n(r.wasteFt, 2) + '</td><td class="n">' + n(r.wastePct * 100, 2) + '%</td></tr>';
+      }).join('') +
+      '<tr class="tot"><td colspan="4">Total · ' + total.rolls + ' roll' + (total.rolls === 1 ? '' : 's') + '</td><td></td><td></td><td></td>' +
+      '<td class="n" colspan="3">' + n(sum.p) + ' slips</td><td class="n">' + n(total.start, 2) + '</td><td class="n">' + n(sum.mc) + '</td>' +
+      '<td class="n">' + n(total.finished, 2) + '</td><td class="n">' + n(total.waste, 2) + '</td><td class="n">' + n(total.wastePct * 100, 2) + '%</td></tr></table>';
+  }
+  $('wPrint').addEventListener('click', function () {
+    var st = document.createElement('style'); st.id = 'landscape'; st.textContent = '@page { size: landscape; margin: 10mm; }';
+    document.head.appendChild(st);
+    document.body.classList.add('printing-waste'); window.print();
+  });
+  window.addEventListener('afterprint', function () {
+    document.body.classList.remove('printing-waste');
+    var st = $('landscape'); if (st) st.parentNode.removeChild(st);
+  });
+
   $('archBtn').addEventListener('click', function () {
     var d = $('archBefore').value;
     if (!d) { setMsg('mMsg', 'Pick a date first.', 'err'); return; }
