@@ -759,6 +759,7 @@
       wShowResult(res.saved, true);
       wShowRecent(res.recent);
       wMsg('Roll ' + res.saved.rollNumber + ' saved.', 'ok');
+      if (S.run && S.run.press === S.press && S.run.stale) { S.run.stale = null; show('staleNote', false); }   // a roll counts as an update
     }, wError);
   });
 
@@ -981,11 +982,15 @@
 
     $('runSetupBody').innerHTML = setupHtml(S.jobs.filter(function (j) { return j.key === r.jobKey; })[0]);
 
-    var stale = r.openHours >= r.staleHours;
-    show('staleNote', stale);
-    if (stale) {
-      var age = r.openHours >= 48 ? Math.floor(r.openHours / 24) + ' days' : Math.floor(r.openHours) + ' hours';
-      $('staleNote').textContent = 'Open since ' + r.started + ' (' + age + '). If this job is done, tap End Run, or Cancel if it was started by mistake.';
+    // stale: no taps or rolls for N work hours, or left open over the weekend. Any update clears it.
+    var st = r.stale;
+    show('staleNote', !!st);
+    if (st) {
+      $('staleNote').textContent = st.kind === 'weekend'
+        ? 'This run was left open over the weekend (last update ' + st.last + '). Jobs are normally shut down Thursday. ' +
+          'If it\'s done, tap End Run. If it\'s still running, any tap clears this.'
+        : 'No updates on this run for ' + st.limit + '+ work hours (last update ' + st.last + '). Still running? ' +
+          'Any tap clears this. If the job is done, tap End Run.';
     }
 
     // pallets (don't overwrite the partial box while someone is typing in it)
@@ -1072,6 +1077,7 @@
   function newTapId() { return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8); }
 
   function queueTap(t) {
+    if (S.run && S.run.runId === t.runId && S.run.stale) { S.run.stale = null; show('staleNote', false); }   // an update clears the warning
     t.tapId = newTapId();
     Q.items.push(t); saveQueue();
     if (!Q.failed) msg('Saving…');
