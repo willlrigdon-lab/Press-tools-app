@@ -1691,10 +1691,11 @@
       rows.length + ' ink' + (rows.length === 1 ? '' : 's') + ' · ' + new Date().toLocaleDateString();
     if (!rows.length) { $('orderList').innerHTML = '<p class="muted">Nothing to order. Every ink has enough.</p>'; return; }
     var LABEL = { Out: 'Out', Low: 'Low', Under: 'Under ' + under }, KIND = { Out: 'red', Low: 'yellow', Under: 'yellow' };
-    $('orderList').innerHTML = '<table class="order"><tr><th>Ink · Item #</th><th class="n">Have</th><th class="n">Keep</th><th></th></tr>' +
+    $('orderList').innerHTML = '<table class="order"><tr><th>Ink · Color · Item #</th><th class="n">Have</th><th class="n">Keep</th><th></th></tr>' +
       rows.map(function (r) {
         var x = r.x;
-        return '<tr><td><b>' + esc(x.ink) + '</b>' + (x.item ? ' · ' + esc(x.item) : ' <span class="muted">· no item #</span>') +
+        return '<tr><td><b>' + esc(x.ink) + '</b>' + (x.color ? ' · ' + esc(x.color) : '') +
+          (x.item ? ' · ' + esc(x.item) : ' <span class="muted">· no item #</span>') +
           (x.lastCounted ? '' : '<div class="muted" style="font-size:13px">never counted</div>') + '</td>' +
           '<td class="n">' + fmt(x.onHand, x.onHand % 1 ? 2 : 0) + '</td><td class="n">' + (x.min ? fmt(x.min, x.min % 1 ? 2 : 0) : '—') + '</td>' +
           '<td>' + badge(KIND[r.why], LABEL[r.why]) + '</td></tr>';
