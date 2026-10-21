@@ -101,14 +101,6 @@
     .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
     .hint { color: var(--muted); font-size: 13px; margin-top: 4px; }
 
-    details.sec { margin-bottom: 16px; }
-    details.sec > summary { list-style: none; cursor: pointer; background: var(--card); border: 1px solid var(--line);
-      border-radius: 14px; padding: 14px 16px; font-size: 19px; font-weight: 800; display: flex; justify-content: space-between; align-items: center; }
-    details.sec > summary::-webkit-details-marker { display: none; }
-    details.sec > summary::after { content: '\25BE'; color: var(--muted); }
-    details.sec:not([open]) > summary::after { content: '\25B8'; }
-    details.sec[open] > summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-    details.sec > .body { border: 1px solid var(--line); border-top: 0; border-radius: 0 0 14px 14px; padding: 12px; background: var(--bg); }
 
     .wbtns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
     .wbtns button { padding: 14px; font-size: 18px; }
@@ -145,9 +137,6 @@
     .keypad button { font-size: 26px; padding: 16px 0; border-color: var(--line); color: var(--text); }
     .keypad button.primary { font-size: 18px; color: #fff; border-color: var(--accent); }
     .keypad button.soft { color: var(--muted); }
-    .rolebtns { display: grid; gap: 10px; }
-    .rolebtns button { font-size: 20px; padding: 18px; text-align: left; }
-    .rolebtns button small { display: block; font-size: 14px; font-weight: 500; color: var(--muted); margin-top: 2px; }
     .cardhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
     .cardhead h2 { margin: 0; }
     .seg.small button { padding: 7px 10px; font-size: 14px; }
@@ -218,6 +207,49 @@
     .sheet { position: fixed; inset: 0; z-index: 10; background: rgba(15, 20, 30, .45); display: flex; align-items: flex-end; justify-content: center; }
     .sheet-card { background: var(--card); width: 100%; max-width: 560px; border-radius: 18px 18px 0 0; padding: 18px 16px 24px; max-height: 92vh; overflow-y: auto; }
     table.rep td, table.rep th { padding: 7px 4px; }
+
+    /* ---- layout: bottom bar, pop-up messages, tabs (v24) ---- */
+    :root { --navh: 62px; }
+    .wrap { padding-bottom: calc(var(--navh) + 90px); }
+    .navbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 8; background: var(--card); border-top: 1px solid var(--line);
+      box-shadow: 0 -4px 14px rgba(0,0,0,.06); padding-bottom: env(safe-area-inset-bottom); }
+    .navin { max-width: 560px; margin: 0 auto; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
+    .navin button { border: 0; border-radius: 0; background: none; color: var(--muted); font-size: 15px; font-weight: 700;
+      height: var(--navh); padding: 0 4px; border-top: 4px solid transparent; }
+    .navin button.on { color: var(--accent); border-top-color: var(--accent); background: var(--accent-soft); }
+    #toasts { position: fixed; left: 12px; right: 12px; bottom: calc(var(--navh) + 12px + env(safe-area-inset-bottom)); z-index: 9;
+      max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+    #toasts .msg { margin: 0; padding: 12px 14px; border-radius: 12px; background: #2b3242; color: #fff; font-size: 16px;
+      box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+    #toasts .msg.ok { background: var(--good); color: #fff; }
+    #toasts .msg.err { background: var(--bad); color: #fff; }
+    #toasts .msg:empty { display: none; }
+    body.counting #toasts { bottom: calc(var(--navh) + 110px + env(safe-area-inset-bottom)); }   /* stay above "Save counts" */
+    .optabs { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 6px 0 8px; margin: 0 0 6px; }
+    .optabs button { font-size: 17px; padding: 12px 4px; }
+    .optabs .cnt { margin-left: 4px; }
+    .offpane { display: none !important; }
+    .pressline { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .pressline .pn { font-size: 15px; color: var(--muted); font-weight: 600; }
+    .pressline .pn b { font-size: 22px; color: var(--text); margin-left: 4px; }
+    .colhead { display: none; }
+    .cnt { display: inline-block; min-width: 22px; padding: 1px 7px; border-radius: 99px; font-size: 13px; line-height: 18px;
+      background: var(--bad); color: #fff; margin-left: 6px; text-align: center; }
+    .cnt.soft { background: #e3e7ee; color: var(--text); }
+    .cnt:empty { display: none; }
+    .mgroups { margin-bottom: 8px; }
+    .mgroups button { font-size: 17px; padding: 12px 4px; }
+    .item > .qpress { grid-column: 1 / -1; margin-top: 0; }
+    .countbar { bottom: var(--navh); }
+    @media (min-width: 760px) {
+      .wrap { max-width: 1100px; }
+      .view:not(#operatorView) { max-width: 560px; margin-left: auto; margin-right: auto; }
+      #operatorView .optabs { display: none; }
+      #operatorView .opcol.offpane { display: block !important; }
+      .opcols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+      .colhead { display: block; font-size: 19px; margin: 4px 2px 10px; }
+    }
+    @media print { .navbar, #toasts { display: none !important; } }
   </style>
 </head>
 <body>
@@ -227,7 +259,6 @@
     <div class="brand"><img id="logoSm" class="logo-sm" alt="Specialty Roll Products"><span id="viewTitle">Press Tools</span></div>
     <div class="who"><span id="whoName"></span>
       <button id="lowBtn" class="chip low hidden">Low supply</button>
-      <button id="rolesBtn" class="chip">Menu</button>
       <button id="switchBtn" class="chip">Switch user</button>
     </div>
   </header>
@@ -250,20 +281,17 @@
     </div>
   </section>
 
-  <!-- ===================== ROLE CHOOSER ===================== -->
-  <section id="roleView" class="view hidden">
-    <div class="card">
-      <h2 id="helloName">Hello</h2>
-      <p class="muted" style="margin-top:0">What are you doing?</p>
-      <div id="roleBtns" class="rolebtns"></div>
-    </div>
-  </section>
-
   <!-- ===================== OPERATOR ===================== -->
   <section id="operatorView" class="view hidden">
   <div class="card">
-    <label style="margin-top:0">Press</label>
-    <div class="seg" id="pressSeg"></div>
+    <div id="pressPick">
+      <label style="margin-top:0">Pick your press</label>
+      <div class="seg" id="pressSeg"></div>
+    </div>
+    <div id="pressShow" class="pressline hidden">
+      <div class="pn">Press<b id="pressName"></b></div>
+      <button id="pressChange" class="chip">Change press</button>
+    </div>
   </div>
 
   <div id="assignCard" class="card assign hidden">
@@ -272,69 +300,17 @@
     <div id="assignNext"></div>
   </div>
 
-  <!-- ===================== WASTE CALCULATOR ===================== -->
-  <details class="sec" id="secWaste" open>
-    <summary>Waste Calculator</summary>
-    <div class="body">
-      <div class="card">
-        <label for="w_rollNumber" style="margin-top:0">Roll Number</label>
-        <input id="w_rollNumber" autocomplete="off" autocapitalize="characters">
-
-        <label for="w_packageLength">Package Length</label>
-        <input id="w_packageLength" inputmode="decimal">
-
-        <div class="row2">
-          <div>
-            <label for="w_startCounter">Starting Counter</label>
-            <input id="w_startCounter" inputmode="decimal">
-          </div>
-          <div>
-            <label for="w_endCounter">Ending Counter</label>
-            <input id="w_endCounter" inputmode="decimal">
-          </div>
-        </div>
-
-        <label>Pallets (slips on each)</label>
-        <div class="row3">
-          <input id="w_pallet1" inputmode="numeric" placeholder="Pallet 1" aria-label="Pallet 1">
-          <input id="w_pallet2" inputmode="numeric" placeholder="Pallet 2" aria-label="Pallet 2">
-          <input id="w_pallet3" inputmode="numeric" placeholder="Pallet 3" aria-label="Pallet 3">
-        </div>
-        <div class="hint">Type the slip count on each pallet, including a partial one. Leave a pallet blank if there isn't one.</div>
-
-        <div class="wbtns">
-          <button id="w_calcBtn">Calculate</button>
-          <button id="w_saveBtn" class="primary">Save Roll</button>
-          <button id="w_clearBtn" class="clear">Clear for next roll</button>
-        </div>
-        <div id="w_msg" class="msg"></div>
-      </div>
-
-      <div id="w_resultCard" class="card hidden">
-        <h2 id="w_resultTitle">Results</h2>
-        <div class="big" id="w_bigWaste"></div>
-        <div class="out">
-          <div>Starting Footage</div><div id="w_oStart"></div>
-          <div>Machine Count</div><div id="w_oMachine"></div>
-          <div>Finished Product</div><div id="w_oFinished"></div>
-          <div>Waste (ft)</div><div id="w_oWaste"></div>
-          <div>Waste %</div><div id="w_oPct"></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>Recently saved</h2>
-        <ul id="w_recent" class="recent"><li><span class="when">Loading…</span></li></ul>
-      </div>
-    </div>
-  </details>
-
+  <!-- phones: one tool at a time; tablets: side by side -->
+  <div class="seg optabs" id="opTabs">
+    <button data-v="ink" class="on">Ink run</button><button data-v="waste">Waste roll</button>
+  </div>
+  <div class="opcols">
   <!-- ===================== INK TRACKER ===================== -->
-  <details class="sec" id="secInk" open>
-    <summary>Ink Tracker</summary>
-    <div class="body">
-      <div id="msg" class="msg"></div>
+  <section class="opcol" id="secInk">
+    <h2 class="colhead">Ink run</h2>
       <div id="queueBanner" class="banner hidden" role="status"></div>
+
+      <div id="noPressNote" class="card muted">Pick your press above to start a run.</div>
 
       <!-- No run open: pick a job -->
       <div id="setupView" class="card hidden">
@@ -425,21 +401,77 @@
         <div id="doneTable"></div>
         <button id="nextBtn" class="primary wide">Start next run</button>
       </div>
-    </div>
-  </details>
+  </section>
+
+  <!-- ===================== WASTE CALCULATOR ===================== -->
+  <section class="opcol offpane" id="secWaste">
+    <h2 class="colhead">Waste roll</h2>
+      <div class="card">
+        <label for="w_rollNumber" style="margin-top:0">Roll Number</label>
+        <input id="w_rollNumber" autocomplete="off" autocapitalize="characters">
+
+        <label for="w_packageLength">Package Length</label>
+        <input id="w_packageLength" inputmode="decimal">
+
+        <div class="row2">
+          <div>
+            <label for="w_startCounter">Starting Counter</label>
+            <input id="w_startCounter" inputmode="decimal">
+          </div>
+          <div>
+            <label for="w_endCounter">Ending Counter</label>
+            <input id="w_endCounter" inputmode="decimal">
+          </div>
+        </div>
+
+        <label>Pallets (slips on each)</label>
+        <div class="row3">
+          <input id="w_pallet1" inputmode="numeric" placeholder="Pallet 1" aria-label="Pallet 1">
+          <input id="w_pallet2" inputmode="numeric" placeholder="Pallet 2" aria-label="Pallet 2">
+          <input id="w_pallet3" inputmode="numeric" placeholder="Pallet 3" aria-label="Pallet 3">
+        </div>
+        <div class="hint">Type the slip count on each pallet, including a partial one. Leave a pallet blank if there isn't one.</div>
+
+        <div class="wbtns">
+          <button id="w_calcBtn">Calculate</button>
+          <button id="w_saveBtn" class="primary">Save Roll</button>
+          <button id="w_clearBtn" class="clear">Clear for next roll</button>
+        </div>
+      </div>
+
+      <div id="w_resultCard" class="card hidden">
+        <h2 id="w_resultTitle">Results</h2>
+        <div class="big" id="w_bigWaste"></div>
+        <div class="out">
+          <div>Starting Footage</div><div id="w_oStart"></div>
+          <div>Machine Count</div><div id="w_oMachine"></div>
+          <div>Finished Product</div><div id="w_oFinished"></div>
+          <div>Waste (ft)</div><div id="w_oWaste"></div>
+          <div>Waste %</div><div id="w_oPct"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Recently saved</h2>
+        <ul id="w_recent" class="recent"><li><span class="when">Loading…</span></li></ul>
+      </div>
+    
+  </section>
+  </div>
   </section>
 
   <!-- ===================== INK INVENTORY ===================== -->
   <section id="inventoryView" class="view hidden">
-    <div id="invMsg" class="msg" style="margin:0 0 10px"></div>
-    <div id="countNote" class="card push yellow hidden" style="margin-bottom:14px">Counting the shelf. Finish or cancel the count to receive ink.</div>
-    <div id="countResult" class="card hidden">
+    <div class="seg optabs" id="invTabs">
+      <button data-v="count">Count<span class="cnt soft" id="countTabN"></span></button><button data-v="receive">Receive</button><button data-v="list" class="on">Stock list</button>
+    </div>
+    <div id="countResult" class="card hidden" data-tab="list">
       <h2>Shelf count</h2>
       <div id="countResultMeta" class="muted"></div>
       <div id="countResultBody"></div>
       <button id="countResultDone" class="primary wide">Done</button>
     </div>
-    <div class="card" id="recvCard">
+    <div class="card" id="recvCard" data-tab="receive">
       <h2>Receive ink</h2>
       <label for="recvInk">Ink</label>
       <select id="recvInk"></select>
@@ -449,7 +481,7 @@
       </div>
       <button id="recvSave" class="primary wide">Add to stock</button>
     </div>
-    <div class="card">
+    <div class="card" id="newInkCard" data-tab="receive">
       <button id="newInkToggle" class="wide" style="margin-top:0">+ Add an ink that's not on the list</button>
       <div id="newInkForm" class="hidden">
         <h2>Add an ink</h2>
@@ -467,9 +499,9 @@
         </div>
       </div>
     </div>
-    <div class="card">
+    <div class="card" id="invListCard" data-tab="count list">
       <div class="cardhead">
-        <h2>Ink on the shelf</h2>
+        <h2 id="invListTitle">Ink on the shelf</h2>
         <div class="seg small" id="invScope">
           <button data-v="active" class="on">Active states</button><button data-v="all">All inks</button>
         </div>
@@ -492,17 +524,20 @@
 
   <!-- ===================== MANAGEMENT ===================== -->
   <section id="manageView" class="view hidden">
-    <div class="tabs" id="mTabs">
-      <button data-t="queue" class="on">Job queue</button>
-      <button data-t="needed">Ink needed</button>
-      <button data-t="waste">Waste</button>
-      <button data-t="supplies">Low supplies</button>
-      <button data-t="stock">Ink stock</button>
-      <button data-t="order">Order list</button>
-      <button data-t="jobs">Jobs</button>
-      <button data-t="states">States</button>
+    <div class="seg mgroups" id="mGroups">
+      <button data-g="jobs" class="on">Jobs</button>
+      <button data-g="ink">Ink<span class="cnt" data-c="order"></span></button>
+      <button data-g="reports">Reports<span class="cnt" data-c="supplies"></span></button>
     </div>
-    <div id="mMsg" class="msg"></div>
+    <div class="tabs" id="mTabs">
+      <button data-t="queue" data-g="jobs" class="on">Queue<span class="cnt soft" data-c="queue"></span></button>
+      <button data-t="jobs" data-g="jobs">Edit jobs</button>
+      <button data-t="states" data-g="jobs">States</button>
+      <button data-t="order" data-g="ink">Ordering<span class="cnt" data-c="order"></span></button>
+      <button data-t="stock" data-g="ink">Stock &amp; minimums</button>
+      <button data-t="waste" data-g="reports">Waste</button>
+      <button data-t="supplies" data-g="reports">Low supplies<span class="cnt" data-c="supplies"></span></button>
+    </div>
 
     <div id="m_queue" class="mpane">
       <div class="card">
@@ -521,14 +556,6 @@
         <div class="cardhead"><h2>Not shipped yet</h2>
           <label class="check"><input type="checkbox" id="qShowShipped"> Show shipped</label></div>
         <div id="qList"></div>
-      </div>
-    </div>
-
-    <div id="m_needed" class="mpane hidden">
-      <div class="card">
-        <h2>Ink needed for the queue</h2>
-        <p class="muted" style="margin-top:0">Unshipped jobs in active states: 1 startup bottle per ink plus the job's average use for the slips ordered, compared with the shelf and the minimum.</p>
-        <div id="needList"></div>
       </div>
     </div>
 
@@ -569,9 +596,14 @@
 
     <div id="m_order" class="mpane hidden">
       <div class="card" id="orderCard">
-        <div class="cardhead"><h2>Ink order list</h2><button id="orderPrint" class="noprint">Print</button></div>
+        <div class="cardhead"><h2>Out or low now</h2><button id="orderPrint" class="noprint">Print</button></div>
         <p class="muted" id="orderHint" style="margin-top:0"></p>
         <div id="orderList"></div>
+      </div>
+      <div class="card">
+        <h2>Needed for queued jobs</h2>
+        <p class="muted" style="margin-top:0">Unshipped jobs in active states: 1 startup bottle per ink plus the job's average use for the slips ordered, compared with the shelf and the minimum.</p>
+        <div id="needList"></div>
       </div>
     </div>
 
@@ -635,7 +667,6 @@
         </div>
       </div>
       <div id="userList"></div>
-      <div id="aMsg" class="msg"></div>
     </div>
     <div class="card">
       <h2>Backups</h2>
@@ -652,7 +683,6 @@
       <div class="cardhead"><h2>Change log</h2><button id="auditLoad" class="chip">Show</button></div>
       <div id="auditList"></div>
     </div>
-    <button id="toManage" class="wide">Open Management screens</button>
   </section>
 
   <!-- ===================== REPORT LOW SUPPLY ===================== -->
@@ -676,6 +706,18 @@
 
 </div>
 
+<!-- pop-up messages, just above the bottom bar -->
+<div id="toasts" aria-live="polite">
+  <div id="msg" class="msg"></div>
+  <div id="w_msg" class="msg"></div>
+  <div id="invMsg" class="msg"></div>
+  <div id="mMsg" class="msg"></div>
+  <div id="aMsg" class="msg"></div>
+</div>
+
+<!-- areas this login can use -->
+<nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
+
 <script>
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -698,12 +740,18 @@
     }).api(A.token, name, args || []);
   }
 
-  /* ---- remember which sections are open ---- */
-  ['secWaste', 'secInk'].forEach(function (id) {
-    var el = $(id), saved = store(id);
-    if (saved === 'closed') el.removeAttribute('open');
-    el.addEventListener('toggle', function () { store(id, el.open ? 'open' : 'closed'); });
+  /* ---- operator: Ink run | Waste roll tabs (phones). Tablets show both side by side. ---- */
+  function opTab(v) {
+    if (v !== 'ink' && v !== 'waste') v = 'ink';
+    store('opTab', v);
+    Array.prototype.forEach.call($('opTabs').children, function (b) { b.classList.toggle('on', b.getAttribute('data-v') === v); });
+    $('secInk').classList.toggle('offpane', v !== 'ink');
+    $('secWaste').classList.toggle('offpane', v !== 'waste');
+  }
+  $('opTabs').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-v]'); if (b) { opTab(b.getAttribute('data-v')); window.scrollTo(0, 0); }
   });
+  opTab(store('opTab') || 'ink');
 
   /* =====================================================================
      WASTE ROLL CALCULATOR
@@ -716,7 +764,7 @@
     o.press = S.press || '';
     return o;
   }
-  function wMsg(text, kind) { var m = $('w_msg'); m.textContent = text || ''; m.className = 'msg' + (kind ? ' ' + kind : ''); }
+  function wMsg(text, kind) { setMsg('w_msg', text, kind); }
   function wBusy(on) { $('w_calcBtn').disabled = on; $('w_saveBtn').disabled = on; }
   function wError(e) { wBusy(false); wMsg(errText(e), 'err'); }
 
@@ -757,7 +805,7 @@
   });
 
   $('w_saveBtn').addEventListener('click', function () {
-    if (!S.press) { wMsg('Pick your press first (Press buttons at the top).', 'err'); return; }
+    if (!S.press) { wMsg('Pick your press first (at the top).', 'err'); return; }
     wMsg('Saving…'); wBusy(true);
     srv('wasteSave', [wRead()], function (res) {
       wBusy(false);
@@ -830,7 +878,7 @@
   var LEFT = [[0, 'Empty'], [0.25, '1/4'], [0.5, '1/2'], [0.75, '3/4']];
 
   function show(id, on) { $(id).classList.toggle('hidden', !on); }
-  function msg(text, kind) { var m = $('msg'); m.textContent = text || ''; m.className = 'msg' + (kind ? ' ' + kind : ''); }
+  function msg(text, kind) { setMsg('msg', text, kind); }
   function frac(v) { for (var i = 0; i < LEFT.length; i++) if (LEFT[i][0] === v) return LEFT[i][1]; return v; }
   var PART = { 0.25: '¼', 0.5: '½', 0.75: '¾' };
   /** Bottle counts with fractions: 2.5 → 2½, 0.75 → ¾, 1 → 1. */
@@ -852,12 +900,18 @@
     $('pressSeg').innerHTML = S.presses.map(function (p) {
       return '<button data-p="' + esc(p) + '" class="' + (p === S.press ? 'on' : '') + '">' + esc(p) + '</button>';
     }).join('');
+    var picking = !S.press || S.pressOpen;
+    show('pressPick', picking); show('pressShow', !picking);
+    $('pressName').textContent = S.press || '';
   }
   $('pressSeg').addEventListener('click', function (e) {
     var p = e.target.getAttribute('data-p');
-    if (!p || p === S.press) return;
+    if (!p) return;
+    S.pressOpen = false;
+    if (p === S.press) { renderPresses(); return; }
     S.press = p; store('inkPress', p); renderPresses(); load();
   });
+  $('pressChange').addEventListener('click', function () { S.pressOpen = true; renderPresses(); });
 
   /* ----- load ----- */
   function load() {
@@ -879,15 +933,10 @@
   /* ----- job assignment for this press (set by management) ----- */
   function renderAssign() {
     var a = S.assigned;
-    show('assignCard', !!(S.press && a));
-    if (!S.press || !a) return;
+    show('assignCard', !!(S.press && a && a.current));   // nothing assigned: no card
+    if (!S.press || !a || !a.current) return;
     $('assignTitle').textContent = 'Job assignment · ' + S.press;
     function line(x) { return fmt(x.slips, 0) + ' slips' + (x.due ? ' · due ' + esc(x.due) : ''); }
-    if (!a.current) {
-      $('assignNow').innerHTML = '<p class="muted" style="margin:0">No job assigned to ' + esc(S.press) + ' right now.</p>';
-      $('assignNext').innerHTML = '';
-      return;
-    }
     var c = a.current;
     var canPick = !S.run && S.jobs.some(function (j) { return j.key === c.jobKey; });
     $('assignNow').innerHTML = '<div class="muted">Now</div><div class="now">' + esc(c.job) + '</div>' +
@@ -902,11 +951,12 @@
     var c = S.assigned.current;
     $('stateSel').value = c.state; store('inkState', c.state); renderJobs();
     $('jobSel').value = c.jobKey; renderPreview();
+    opTab('ink');
     $('setupView').scrollIntoView({ behavior: 'smooth' });
   });
 
   function route() {
-    show('endView', false); show('doneView', false);
+    show('endView', false); show('doneView', false); show('noPressNote', !S.press);
     if (!S.press) { show('setupView', false); show('runView', false); msg('Pick your press to begin.'); return; }
     if (S.run) { show('setupView', false); show('runView', true); renderRun(); }
     else { show('runView', false); show('setupView', true); renderSetup(); }
@@ -1191,7 +1241,7 @@
     $('slipsHint').textContent = fromPallets > 0
       ? 'Filled in from the pallets entered (' + S.run.pallets + ' full + ' + fmt(S.run.partial || 0, 0) + ' partial). Change it if the real count is different.'
       : 'No pallets were entered. You can type the count now or add it on the Runs tab later.';
-    show('runView', false); show('endView', true); msg('');
+    opTab('ink'); show('runView', false); show('endView', true); msg('');
     $('endView').scrollIntoView();
   });
   $('endInks').addEventListener('click', function (e) {
@@ -1242,7 +1292,14 @@
   /* =====================================================================
      SMALL HELPERS FOR THE NEW SCREENS
      ===================================================================== */
-  function setMsg(id, text, kind) { var m = $(id); m.textContent = text || ''; m.className = 'msg' + (kind ? ' ' + kind : ''); }
+  var TOASTS = ['msg', 'w_msg', 'invMsg', 'mMsg', 'aMsg'], TOAST_T = {};
+  function setMsg(id, text, kind) {
+    var m = $(id); m.textContent = text || ''; m.className = 'msg' + (kind ? ' ' + kind : '');
+    if (TOASTS.indexOf(id) === -1) return;
+    clearTimeout(TOAST_T[id]);
+    // pop-ups clear themselves; "Saving…" style messages stay until the answer replaces them
+    if (text && !/…$/.test(text)) TOAST_T[id] = setTimeout(function () { m.textContent = ''; }, kind === 'err' ? 9000 : Math.min(9000, 3500 + text.length * 40));
+  }
   function opt(value, label, selected) {
     return '<option value="' + esc(value) + '"' + (selected ? ' selected' : '') + '>' + esc(label == null ? value : label) + '</option>';
   }
@@ -1261,11 +1318,9 @@
      LOGIN, ROLES AND SCREENS
      ===================================================================== */
   var V = { current: 'login' };
-  var VIEWS = { login: 'loginView', roles: 'roleView', operator: 'operatorView', inventory: 'inventoryView',
-    management: 'manageView', admin: 'adminView' };
-  var TITLES = { roles: 'Press Tools', operator: 'Operator', inventory: 'Ink Inventory', management: 'Management', admin: 'Admin' };
-  var ROLE_HINT = { operator: 'Waste Calculator and Ink Tracker', inventory: 'Receive ink and count the shelf',
-    management: 'Job queue, reports, ink stock and states', admin: 'People, PINs and backups' };
+  var VIEWS = { login: 'loginView', operator: 'operatorView', inventory: 'inventoryView', management: 'manageView', admin: 'adminView' };
+  var TITLES = { operator: 'Operator', inventory: 'Ink Inventory', management: 'Management', admin: 'Admin' };
+  var NAV_LABEL = { operator: 'Operator', inventory: 'Inventory', management: 'Manage', admin: 'Admin' };
 
   function deviceId() {
     var d = store('pt_device');
@@ -1278,9 +1333,11 @@
     V.current = view;
     Object.keys(VIEWS).forEach(function (k) { show(VIEWS[k], k === view); });
     var inApp = view !== 'login';
-    show('topBar', inApp); show('lowBtn', inApp);
+    show('topBar', inApp); show('lowBtn', inApp); show('navBar', inApp);
+    TOASTS.forEach(function (id) { setMsg(id, ''); });
+    document.body.classList.remove('counting');
+    Array.prototype.forEach.call($('navBtns').children, function (b) { b.classList.toggle('on', b.getAttribute('data-role') === view); });
     $('viewTitle').textContent = TITLES[view] || 'Press Tools';
-    show('rolesBtn', inApp && view !== 'roles' && A.roles.length > 1);
     if (inApp) store('pt_view', view);
     window.scrollTo(0, 0);
     if (view === 'operator') { load(); wLoadRecent(); flush(); }
@@ -1294,32 +1351,28 @@
     A.roles = sess.roles || []; A.idleMinutes = sess.idleMinutes || 30;
     store('pt_token', A.token);
     $('whoName').textContent = A.name;
-    $('helloName').textContent = 'Hello, ' + A.name;
-    $('roleBtns').innerHTML = A.roles.map(function (r) {
-      return '<button data-role="' + r.key + '">' + esc(r.label) + '<small>' + esc(ROLE_HINT[r.key]) + '</small></button>';
+    $('navBtns').innerHTML = A.roles.map(function (r) {
+      return '<button data-role="' + r.key + '">' + esc(NAV_LABEL[r.key] || r.label) + '</button>';
     }).join('');
     touch();
-    var last = store('pt_view');
-    if (reopened && last && allowed(last)) go(last);
-    else if (A.roles.length === 1) go(A.roles[0].key);
-    else go('roles');
+    var last = store('pt_view');   // the area last used on this device, if this person may use it
+    go(last && allowed(last) ? last : A.roles[0].key);
   }
 
   function logout(why) {
     if (WD.timer) wDraftSend();
     WD.press = null;              // load this press's entries again after the next login
     A.token = null; A.name = ''; A.level = 0; A.roles = [];
-    store('pt_token', ''); store('pt_view', '');
+    store('pt_token', '');
     PIN.value = ''; drawPin();
     show('lowSheet', false);
     go('login');
     setMsg('loginMsg', why || '', why ? 'err' : '');
   }
 
-  $('roleBtns').addEventListener('click', function (e) {
-    var b = e.target.closest('button[data-role]'); if (b) go(b.getAttribute('data-role'));
+  $('navBtns').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-role]'); if (b && b.getAttribute('data-role') !== V.current) go(b.getAttribute('data-role'));
   });
-  $('rolesBtn').addEventListener('click', function () { go('roles'); });
   $('switchBtn').addEventListener('click', function () { logout(''); });
 
   /* ----- PIN pad ----- */
@@ -1393,10 +1446,31 @@
   /* =====================================================================
      INK INVENTORY
      ===================================================================== */
-  var INV = { scope: 'active', counting: false, inks: [], counts: {} };   // counts: {ink: {full, part}} typed so far
+  var INV = { scope: 'active', counting: false, inks: [], counts: {}, tab: 'list' };   // counts: {ink: {full, part}} typed so far
+
+  /* Count | Receive | Stock list. Typed counts are kept while switching tabs, until saved or cancelled. */
+  function invTab(v) {
+    if (['count', 'receive', 'list'].indexOf(v) === -1) v = 'list';
+    INV.tab = v; store('invTab', v);
+    INV.counting = v === 'count';
+    if (INV.counting) show('countResult', false);
+    Array.prototype.forEach.call($('invTabs').children, function (b) { b.classList.toggle('on', b.getAttribute('data-v') === v); });
+    Array.prototype.forEach.call(document.querySelectorAll('#inventoryView [data-tab]'), function (el) {
+      el.classList.toggle('offpane', el.getAttribute('data-tab').split(' ').indexOf(v) === -1);
+    });
+    $('invListTitle').textContent = INV.counting ? 'Count the shelf' : 'Ink on the shelf';
+    setMsg('countMsg', '');
+    if (INV.inks.length) invRender();
+  }
+  $('invTabs').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-v]'); if (b) { invTab(b.getAttribute('data-v')); window.scrollTo(0, 0); }
+  });
   var FRACS = [[0, '+ none'], [0.25, '+ 1/4'], [0.5, '+ 1/2'], [0.75, '+ 3/4']];
 
-  function invLoad() { setMsg('invMsg', 'Loading…'); srv('invStock', [], invShow, function (e) { setMsg('invMsg', errText(e), 'err'); }); }
+  function invLoad() {
+    invTab(INV.tab === 'count' ? 'count' : store('invTab') || 'list');
+    setMsg('invMsg', 'Loading…'); srv('invStock', [], invShow, function (e) { setMsg('invMsg', errText(e), 'err'); });
+  }
   function invShow(d) {
     setMsg('invMsg', '');
     INV.inks = d.inks;
@@ -1409,6 +1483,7 @@
   function invRender() {
     var list = INV.inks.filter(function (x) { return INV.scope === 'all' || x.activeState; });
     show('countBar', INV.counting); show('countBtns', !INV.counting);
+    document.body.classList.toggle('counting', INV.counting && V.current === 'inventory');
     $('invHint').textContent = INV.scope === 'all' ? 'Every ink in the catalog.'
       : 'Only inks used by active states. Switch to "All inks" to count everything in the building.';
     if (!list.length) { $('invList').innerHTML = '<p class="muted">No inks to show.</p>'; return; }
@@ -1428,17 +1503,12 @@
     if (INV.counting) list.forEach(function (x) { invVar(x.ink); });
     invCountLabel();
   }
-  function invCountMode(on) {
-    INV.counting = on;
-    if (on) show('countResult', false);
-    if (!on) INV.counts = {};
-    show('recvCard', !on); show('countNote', on);
-    setMsg('countMsg', '');
-    invRender();
-  }
+  /** Leave counting: typed counts are thrown away and the Stock list shows. */
+  function invCountDone() { INV.counts = {}; invTab('list'); invCountLabel(); }
   function invCountLabel() {
     var n = invCountList().length;
     $('countSave').textContent = n ? 'Save counts (' + n + ')' : 'Save counts';
+    $('countTabN').textContent = n ? n : '';
   }
   /** [{ink, count}] for every ink with full bottles typed, from INV.counts (survives redraws). */
   function invCountList() {
@@ -1469,10 +1539,10 @@
     invVar(ink); invCountLabel(); setMsg('countMsg', '');
   });
   segPick('invScope', function (v) { INV.scope = v; invRender(); });
-  $('countToggle').addEventListener('click', function () { invCountMode(true); });
+  $('countToggle').addEventListener('click', function () { invTab('count'); window.scrollTo(0, 0); });
   $('countCancel').addEventListener('click', function () {
     if (invCountList().length && !confirm('Throw away the counts you typed?')) return;
-    invCountMode(false);
+    invCountDone();
   });
   $('countSave').addEventListener('click', function () {
     var counts = invCountList();
@@ -1480,7 +1550,7 @@
     $('countSave').disabled = true; setMsg('countMsg', 'Saving counts…');
     srv('invCount', [counts], function (d) {
       $('countSave').disabled = false;
-      INV.inks = d.inks; invCountMode(false); invShow(d);
+      INV.inks = d.inks; invCountDone(); invShow(d);
       var ch = d.changes.filter(function (c) { return c.adjust !== 0; });
       setMsg('invMsg', 'Saved ' + d.changes.length + ' count' + (d.changes.length === 1 ? '' : 's') + '. ' +
         (ch.length ? 'Fixed: ' + ch.map(function (c) { return c.ink + ' ' + (c.adjust > 0 ? '+' : '') + c.adjust; }).join(', ') + '.' : 'All matched the log.'), 'ok');
@@ -1538,29 +1608,53 @@
   /* =====================================================================
      MANAGEMENT
      ===================================================================== */
-  var M = { tab: 'queue', jobs: [], period: 'week' };
+  var M = { tab: 'queue', jobs: [], period: 'week', last: {} };
   function mErr(e) { setMsg('mMsg', errText(e), 'err'); }
   var M_LOAD = {
     queue: function () { srv('queueList', [$('qShowShipped').checked], qShow, mErr); },
-    needed: function () { srv('inkNeeded', [], needShow, mErr); },
     waste: function () { wReport(); },
     supplies: function () { srv('supplyRequests', [$('supShowAll').checked], supShow, mErr); },
     stock: function () { srv('invStock', [], minShow, mErr); },
-    order: function () { $('orderList').innerHTML = '<p class="muted">Loading…</p>'; srv('invStock', [], orderShow, mErr); },
+    order: function () {   // out/low now + needed for queued jobs, on one screen
+      $('orderList').innerHTML = '<p class="muted">Loading…</p>'; $('needList').innerHTML = '';
+      srv('invStock', [], orderShow, mErr); srv('inkNeeded', [], needShow, mErr);
+    },
     states: function () { srv('statesList', [], statesShow, mErr); },
     jobs: function () { srv('jobGet', [''], jbLists, mErr); }
   };
+  /* Jobs (Queue, Edit jobs, States) · Ink (Ordering, Stock & minimums) · Reports (Waste, Low supplies) */
+  function mGroupOf(t) { var b = document.querySelector('#mTabs button[data-t="' + t + '"]'); return b ? b.getAttribute('data-g') : 'jobs'; }
   function mOpen(t) {
-    M.tab = t; setMsg('mMsg', '');
-    Array.prototype.forEach.call($('mTabs').children, function (b) { b.classList.toggle('on', b.getAttribute('data-t') === t); });
+    if (!M_LOAD[t]) t = 'queue';
+    var g = mGroupOf(t);
+    M.tab = t; M.last[g] = t; setMsg('mMsg', '');
+    Array.prototype.forEach.call($('mGroups').children, function (b) { b.classList.toggle('on', b.getAttribute('data-g') === g); });
+    Array.prototype.forEach.call($('mTabs').children, function (b) {
+      b.classList.toggle('on', b.getAttribute('data-t') === t);
+      b.classList.toggle('offpane', b.getAttribute('data-g') !== g);
+    });
     Object.keys(M_LOAD).forEach(function (k) { show('m_' + k, k === t); });
     M_LOAD[t]();
+    if (['queue', 'supplies', 'stock', 'order'].indexOf(t) === -1) mCounts();   // those screens refresh the counts when they draw
   }
+  /** Numbers on the buttons: inks to order, open low-supply reports, unshipped jobs. */
+  function mCounts() {
+    srv('manageCounts', [], function (c) {
+      Array.prototype.forEach.call(document.querySelectorAll('#manageView .cnt[data-c]'), function (el) {
+        var n = c[el.getAttribute('data-c')] || 0; el.textContent = n ? n : '';
+      });
+    });
+  }
+  $('mGroups').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-g]'); if (!b) return;
+    var g = b.getAttribute('data-g');
+    mOpen(M.last[g] || document.querySelector('#mTabs button[data-g="' + g + '"]').getAttribute('data-t'));
+  });
   $('mTabs').addEventListener('click', function (e) { var b = e.target.closest('button[data-t]'); if (b) mOpen(b.getAttribute('data-t')); });
 
   /* queue */
   function qShow(d) {
-    M.jobs = d.jobs;
+    M.jobs = d.jobs; mCounts();
     var states = [];
     d.jobs.forEach(function (j) { if (states.indexOf(j.state) === -1) states.push(j.state); });
     var keep = $('qState').value || 'New York';
@@ -1577,9 +1671,9 @@
       return '<div class="item"><div><div class="t">' + esc(q.job) + ' <span class="muted">· ' + esc(q.state) + '</span></div>' +
         '<div class="s">' + fmt(q.slips, 0) + ' slips' + (q.due ? ' · due ' + esc(q.due) : '') +
         (shipped ? ' · shipped ' + esc(q.shipped) : '') + '</div>' +
-        '<div>' + badge(q.flag, FLAG_TEXT[q.flag] + (q.runs ? ' (' + q.runs + ')' : '')) + '</div>' + press + '</div>' +
+        '<div>' + badge(q.flag, FLAG_TEXT[q.flag] + (q.runs ? ' (' + q.runs + ')' : '')) + '</div></div>' +
         '<div class="acts">' + (shipped ? '<button data-unship="' + esc(q.id) + '">Undo</button>'
-          : '<button class="primary" data-ship="' + esc(q.id) + '">Shipped</button>') + '</div></div>';
+          : '<button class="primary" data-ship="' + esc(q.id) + '">Shipped</button>') + '</div>' + press + '</div>';
     }).join('');
   }
   function qJobs() {
@@ -1618,7 +1712,7 @@
   /* ink needed */
   function needShow(d) {
     if (!d.jobs.length) {
-      $('needList').innerHTML = '<p class="muted">No unshipped jobs in active states. Add jobs on the Job queue tab.</p>'; return;
+      $('needList').innerHTML = '<p class="muted">No unshipped jobs in active states. Add jobs under Jobs → Queue.</p>'; return;
     }
     var notes = false;
     $('needList').innerHTML = '<table class="rep"><tr><th>Ink</th><th class="n">Need</th><th class="n">On hand</th><th class="n">Keep</th><th class="n">Order</th></tr>' +
@@ -1661,6 +1755,7 @@
   /* low supplies */
   $('supShowAll').addEventListener('change', function () { M_LOAD.supplies(); });
   function supShow(d) {
+    mCounts();
     if (!d.requests.length) { $('supList').innerHTML = '<p class="muted">Nothing reported.</p>'; return; }
     var kind = { Open: 'red', Ordered: 'yellow', Received: 'green' };
     $('supList').innerHTML = d.requests.map(function (x) {
@@ -1680,11 +1775,11 @@
 
   /* order list: inks that are out, below keep-at-least, or under the "Order list: under" setting (4) */
   function orderShow(d) {
+    mCounts();
     var under = Number(d.orderBelow) || 4, RANK = { Out: 0, Low: 1, Under: 2 };
-    var rows = d.inks.filter(function (x) { return x.activeState; }).map(function (x) {   // active states (and mixing inks) only
-      var why = x.onHand <= 0 ? 'Out' : x.min && x.onHand < x.min ? 'Low' : x.onHand < under ? 'Under' : '';
-      return why ? { x: x, why: why } : null;
-    }).filter(Boolean).sort(function (a, b) {
+    var rows = d.inks.filter(function (x) { return x.order; }).map(function (x) {   // set on the server: active states only
+      return { x: x, why: x.order };
+    }).sort(function (a, b) {
       return RANK[a.why] - RANK[b.why] || a.x.ink.localeCompare(b.x.ink, undefined, { numeric: true });
     });
     $('orderHint').textContent = 'Inks for active states that are out, below "keep at least", or under ' + under + ' bottles. ' +
@@ -1706,6 +1801,7 @@
 
   /* ink stock + minimums */
   function minShow(d) {
+    mCounts();
     $('minList').innerHTML = d.inks.map(function (x) {
       return '<div class="item stock"><div><div class="t">' + esc(x.ink) + (x.color ? ' <span class="muted">· ' + esc(x.color) + '</span>' : '') +
         (x.activeState ? ' ' + badge('ok', 'Active state') : '') + '</div>' +
@@ -1922,7 +2018,6 @@
       }).join('') : '<p class="muted">No changes logged yet.</p>';
     }, aErr);
   });
-  $('toManage').addEventListener('click', function () { go('management'); });
 
   /* =====================================================================
      START
