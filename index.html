@@ -252,6 +252,10 @@
       background: var(--bad); color: #fff; margin-left: 6px; text-align: center; }
     .cnt.soft { background: #e3e7ee; color: var(--text); }
     .cnt:empty { display: none; }
+    #notices { margin: 0 0 12px; }
+    .notice { background: #fff4c2; color: #4a3700; border: 1px solid #f0d36b; border-left: 6px solid #e0a800; border-radius: 12px;
+      padding: 12px 14px; margin-bottom: 8px; font-size: 17px; font-weight: 700; }
+    .notice .nby { font-size: 13px; font-weight: 600; color: #6b5a1e; margin-top: 4px; }
     .mhead { position: sticky; top: 0; z-index: 5; background: var(--bg); padding-top: 6px; }
     .mgroups { margin-bottom: 8px; }
     .mgroups button { font-size: 17px; padding: 12px 4px; }
@@ -278,6 +282,8 @@
       <button id="switchBtn" class="chip">Switch user</button>
     </div>
   </header>
+  <!-- shop notices from management, shown on every area -->
+  <div id="notices" class="hidden" role="status"></div>
 
   <!-- ===================== LOGIN ===================== -->
   <section id="loginView" class="view">
@@ -551,6 +557,7 @@
       <button data-t="queue" data-g="jobs" class="on">Queue<span class="cnt soft" data-c="queue"></span></button>
       <button data-t="jobs" data-g="jobs">Edit jobs</button>
       <button data-t="states" data-g="jobs">States</button>
+      <button data-t="notices" data-g="jobs">Notices</button>
       <button data-t="order" data-g="ink">Ordering<span class="cnt" data-c="order"></span></button>
       <button data-t="stock" data-g="ink">Stock &amp; minimums</button>
       <button data-t="waste" data-g="reports">Waste</button>
@@ -664,6 +671,23 @@
           <button id="jbCancel" class="wide">Cancel</button>
           <button id="jbSave" class="primary wide">Save job</button>
         </div>
+      </div>
+    </div>
+
+    <div id="m_notices" class="mpane hidden">
+      <div class="card">
+        <h2>Post a notice</h2>
+        <p class="muted" style="margin-top:0">Shows at the top of every screen for everyone, like "All presses shut down at noon tomorrow and clean up for the weekend".</p>
+        <label for="ntText">Notice</label>
+        <input id="ntText" maxlength="300" autocomplete="off" placeholder="e.g. All presses shut down at noon Friday">
+        <label for="ntUntil">Show until (optional)</label>
+        <input id="ntUntil" type="datetime-local">
+        <div class="hint">Leave blank to show it until you remove it.</div>
+        <button id="ntPost" class="primary wide">Post notice</button>
+      </div>
+      <div class="card">
+        <h2>Current notices</h2>
+        <div id="ntList"></div>
       </div>
     </div>
 
@@ -1407,6 +1431,7 @@
     Object.keys(VIEWS).forEach(function (k) { show(VIEWS[k], k === view); });
     var inApp = view !== 'login';
     show('topBar', inApp); show('lowBtn', inApp); show('navBar', inApp);
+    if (inApp) noticesLoad(); else show('notices', false);
     TOASTS.forEach(function (id) { setMsg(id, ''); });
     document.body.classList.remove('counting');
     Array.prototype.forEach.call($('navBtns').children, function (b) { b.classList.toggle('on', b.getAttribute('data-role') === view); });
@@ -1693,6 +1718,7 @@
       srv('invStock', [], orderShow, mErr); srv('inkNeeded', [], needShow, mErr);
     },
     states: function () { srv('statesList', [], statesShow, mErr); },
+    notices: function () { srv('noticesList', [], function (d) { noticesShow(d); ntShow(d); }, mErr); },
     jobs: function () { srv('jobGet', [''], jbLists, mErr); }
   };
   /* Jobs (Queue, Edit jobs, States) · Ink (Ordering, Stock & minimums) · Reports (Waste, Low supplies) */
@@ -1724,6 +1750,41 @@
     mOpen(document.querySelector('#mTabs button[data-g="' + g + '"]').getAttribute('data-t'));
   });
   $('mTabs').addEventListener('click', function (e) { var b = e.target.closest('button[data-t]'); if (b) mOpen(b.getAttribute('data-t')); });
+
+  /* shop notices: the bar on every screen, and the Notices screen */
+  function noticesShow(d) {
+    var list = (d && d.notices) || [];
+    show('notices', list.length > 0);
+    $('notices').innerHTML = list.map(function (n) {
+      return '<div class="notice">' + esc(n.message) + '<div class="nby">From ' + esc(n.by || 'management') + ' · ' + esc(n.posted) +
+        (n.until ? ' · until ' + esc(n.until) : '') + '</div></div>';
+    }).join('');
+  }
+  function noticesLoad() { if (A.token) srv('noticesList', [], noticesShow); }
+  setInterval(function () { if (A.token && V.current !== 'login') noticesLoad(); }, 5 * 60000);
+  function ntShow(d) {
+    $('ntList').innerHTML = d.notices.length ? d.notices.map(function (n) {
+      return '<div class="item"><div><div class="t">' + esc(n.message) + '</div><div class="s">' + esc(n.by) + ' · ' + esc(n.posted) +
+        (n.until ? ' · until ' + esc(n.until) : ' · until removed') + '</div></div>' +
+        '<div class="acts"><button class="danger" data-ntrm="' + esc(n.id) + '">Remove</button></div></div>';
+    }).join('') : '<p class="muted">No notices up.</p>';
+  }
+  $('ntPost').addEventListener('click', function () {
+    var t = $('ntText').value.trim();
+    if (!t) { setMsg('mMsg', 'Type the notice.', 'err'); return; }
+    $('ntPost').disabled = true;
+    srv('noticeAdd', [t, $('ntUntil').value], function (d) {
+      $('ntPost').disabled = false; $('ntText').value = ''; $('ntUntil').value = '';
+      noticesShow(d); ntShow(d); setMsg('mMsg', 'Notice posted. Everyone sees it now.', 'ok');
+    }, function (e) { $('ntPost').disabled = false; mErr(e); });
+  });
+  $('ntList').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-ntrm]'); if (!b) return;
+    if (!confirm('Take this notice down?')) return;
+    b.disabled = true;
+    srv('noticeRemove', [b.getAttribute('data-ntrm')], function (d) { noticesShow(d); ntShow(d); setMsg('mMsg', 'Notice removed.', 'ok'); },
+      function (err) { b.disabled = false; mErr(err); });
+  });
 
   /* queue */
   var Q_TYPE = 'Order';
