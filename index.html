@@ -414,6 +414,7 @@
         <h2 id="doneTitle">Run finished</h2>
         <div id="doneMeta" class="muted"></div>
         <div id="doneTable"></div>
+        <div id="doneAssign" class="push yellow hidden"></div>
         <button id="nextBtn" class="primary wide">Start next run</button>
       </div>
   </section>
@@ -1302,7 +1303,8 @@
     setBusy(true); msg('Finishing run…');
     call('inkEndRun', [S.run.runId, $('slips').value, S.leftovers], function (res) {
       setBusy(false); msg('');
-      S.run = null; renderDone(res);
+      var key = S.run.jobKey;
+      S.run = null; renderDone(res); offerAssignDone(key);
     });
   });
 
@@ -1321,6 +1323,26 @@
     $('doneView').scrollIntoView();
   }
   $('nextBtn').addEventListener('click', function () { show('doneView', false); load(); });
+
+  /* The run just ended was this press's stock run or note: offer to mark the assignment done too. */
+  function offerAssignDone(jobKey) {
+    var c = S.assigned && S.assigned.current;
+    var on = !!(c && c.jobKey && c.jobKey === jobKey && c.type !== 'Order');
+    show('doneAssign', on);
+    if (!on) return;
+    $('doneAssign').innerHTML = 'This was ' + esc(S.press) + '\'s assignment: <b>' + esc(c.job) + '</b> · ' + qLine(c) +
+      '. Mark the assignment done too?<div class="row2"><button class="wide" id="assignKeep">Keep it</button>' +
+      '<button class="primary wide" id="assignDoneBtn" data-id="' + esc(c.id) + '">Mark done</button></div>';
+  }
+  $('doneAssign').addEventListener('click', function (e) {
+    if (e.target.id === 'assignKeep') { show('doneAssign', false); return; }
+    if (e.target.id !== 'assignDoneBtn') return;
+    e.target.disabled = true;
+    srv('assignDone', [S.press, e.target.getAttribute('data-id')], function (a) {
+      S.assigned = a; renderAssign(); show('doneAssign', false);
+      msg('Assignment marked done.' + (a.current ? ' Next for ' + S.press + ': ' + (a.current.job || a.current.note) + '.' : ''), 'ok');
+    }, function (err) { e.target.disabled = false; msg(errText(err), 'err'); });
+  });
 
   /* ----- live refresh: picks up taps from the other device on the same press ----- */
   function refreshRun() {
