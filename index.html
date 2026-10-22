@@ -300,6 +300,7 @@
         <button data-k="ok" class="primary" id="pinOk">Log in</button>
       </div>
       <div id="loginMsg" class="msg" style="text-align:center"></div>
+      <p class="muted appver" style="text-align:center;margin-top:18px"></p>
     </div>
   </section>
 
@@ -743,6 +744,7 @@
       <div class="cardhead"><h2>Change log</h2><button id="auditLoad" class="chip">Show</button></div>
       <div id="auditList"></div>
     </div>
+    <p class="muted appver" style="text-align:center"></p>
   </section>
 
   <!-- ===================== REPORT LOW SUPPLY ===================== -->
@@ -779,7 +781,9 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
+  var APP_VERSION = '2.001';   // 2.xxx: bump the last part by 1 on every deploy users see
   function $(id) { return document.getElementById(id); }
+  Array.prototype.forEach.call(document.querySelectorAll('.appver'), function (el) { el.textContent = 'Version ' + APP_VERSION; });
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
