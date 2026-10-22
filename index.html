@@ -252,6 +252,7 @@
       background: var(--bad); color: #fff; margin-left: 6px; text-align: center; }
     .cnt.soft { background: #e3e7ee; color: var(--text); }
     .cnt:empty { display: none; }
+    .mhead { position: sticky; top: 0; z-index: 5; background: var(--bg); padding-top: 6px; }
     .mgroups { margin-bottom: 8px; }
     .mgroups button { font-size: 17px; padding: 12px 4px; }
     .item > .qpress { grid-column: 1 / -1; margin-top: 0; }
@@ -540,6 +541,7 @@
 
   <!-- ===================== MANAGEMENT ===================== -->
   <section id="manageView" class="view hidden">
+    <div class="mhead">
     <div class="seg mgroups" id="mGroups">
       <button data-g="jobs" class="on">Jobs</button>
       <button data-g="ink">Ink<span class="cnt" data-c="order"></span></button>
@@ -553,6 +555,7 @@
       <button data-t="stock" data-g="ink">Stock &amp; minimums</button>
       <button data-t="waste" data-g="reports">Waste</button>
       <button data-t="supplies" data-g="reports">Low supplies<span class="cnt" data-c="supplies"></span></button>
+    </div>
     </div>
 
     <div id="m_queue" class="mpane">
@@ -762,6 +765,10 @@
   function fmt(n, d) { return Number(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }); }
   function errText(e) { return (e && e.message ? e.message : 'Something went wrong. Try again.').replace(/^Error:\s*/, ''); }
   function noop() {}
+  window.addEventListener('error', function (e) {   // show script errors on the phone so they can be reported
+    try { setMsg(V.current === 'management' ? 'mMsg' : V.current === 'inventory' ? 'invMsg' : V.current === 'admin' ? 'aMsg' : 'msg',
+      'Something went wrong: ' + (e.message || 'unknown error') + '. Reload and try again.', 'err'); } catch (x) { /* nothing else to do */ }
+  });
 
   /* ---- login state; every server request goes through api() with the login token ---- */
   var A = { token: null, name: '', level: 0, roles: [], idleMinutes: 30 };
@@ -1713,8 +1720,8 @@
   }
   $('mGroups').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-g]'); if (!b) return;
-    var g = b.getAttribute('data-g');
-    mOpen(M.last[g] || document.querySelector('#mTabs button[data-g="' + g + '"]').getAttribute('data-t'));
+    var g = b.getAttribute('data-g');   // always the group's first screen: Jobs → Queue, Ink → Ordering, Reports → Waste
+    mOpen(document.querySelector('#mTabs button[data-g="' + g + '"]').getAttribute('data-t'));
   });
   $('mTabs').addEventListener('click', function (e) { var b = e.target.closest('button[data-t]'); if (b) mOpen(b.getAttribute('data-t')); });
 
@@ -1741,7 +1748,7 @@
     return [amt, when].filter(Boolean).join(' · ');
   }
   function qShow(d) {
-    M.jobs = d.jobs; mCounts();
+    M.jobs = d.jobs; M.queue = d.queue; mCounts();
     var states = [];
     d.jobs.forEach(function (j) { if (states.indexOf(j.state) === -1) states.push(j.state); });
     var keep = $('qState').value || 'New York';
@@ -1783,21 +1790,30 @@
       qShow(d); setMsg('mMsg', 'Added to the queue.', 'ok');
     }, function (e) { $('qAdd').disabled = false; mErr(e); });
   });
+  /** Lock the list while one change saves, so a tap can't land on a row that's being redrawn. */
+  function qLock(on) {
+    Array.prototype.forEach.call(document.querySelectorAll('#qList select, #qList button'), function (el) { el.disabled = on; });
+  }
+  function qName(id) { var q = (M.queue || []).filter(function (x) { return x.id === id; })[0]; return q ? (q.job || q.note) : 'Job'; }
   $('qList').addEventListener('change', function (e) {
     var id = e.target.getAttribute('data-assign'); if (!id) return;
-    var press = e.target.value;
-    srv('queueAssign', [id, press], function (d) { qShow(d); setMsg('mMsg', press ? 'Assigned to ' + press + '.' : 'Taken off the press.', 'ok'); }, mErr);
+    var press = e.target.value, name = qName(id);
+    qLock(true); setMsg('mMsg', 'Saving: ' + name + (press ? ' → ' + press : ' off the press') + '…');
+    srv('queueAssign', [id, press], function (d) {
+      qShow(d); setMsg('mMsg', press ? name + ' assigned to ' + press + '.' : name + ' taken off the press.', 'ok');
+    }, function (err) { qLock(false); mErr(err); });
   });
   $('qList').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
     if (b.getAttribute('data-move')) {
-      b.disabled = true;
-      srv('queueMove', [b.getAttribute('data-move'), b.getAttribute('data-dir')], qShow, mErr);
+      qLock(true); setMsg('mMsg', 'Moving ' + qName(b.getAttribute('data-move')) + '…');
+      srv('queueMove', [b.getAttribute('data-move'), b.getAttribute('data-dir')], function (d) { qShow(d); setMsg('mMsg', ''); },
+        function (err) { qLock(false); mErr(err); });
       return;
     }
     var ship = b.getAttribute('data-ship'), unship = b.getAttribute('data-unship');
     if (!ship && !unship) return;
-    b.disabled = true;
+    qLock(true);
     var label = b.textContent;
     srv('queueShip', [ship || unship, !!unship], function () {
       M_LOAD.queue(); setMsg('mMsg', ship ? (label === 'Done' ? 'Marked done.' : 'Marked shipped.') : 'Back in the queue.', 'ok');
