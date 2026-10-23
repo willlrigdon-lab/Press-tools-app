@@ -248,6 +248,13 @@
     .pressline .pn { font-size: 15px; color: var(--muted); font-weight: 600; }
     .pressline .pn b { font-size: 22px; color: var(--text); margin-left: 4px; }
     .colhead { display: none; }
+    .optabs .tb { display: none; }
+    .ressec { font-size: 18px; margin: 18px 2px 4px; }
+    a.res { display: grid; grid-template-columns: 34px 1fr; gap: 8px; align-items: center; padding: 13px 4px; border-top: 1px solid var(--line);
+      color: var(--text); text-decoration: none; }
+    a.res .ic { font-size: 22px; text-align: center; }
+    a.res .t { font-weight: 700; font-size: 17px; color: var(--accent); }
+    a.res .s { color: var(--muted); font-size: 14px; }
     .cnt { display: inline-block; min-width: 22px; padding: 1px 7px; border-radius: 99px; font-size: 13px; line-height: 18px;
       background: var(--bad); color: #fff; margin-left: 6px; text-align: center; }
     .cnt.soft { background: #e3e7ee; color: var(--text); }
@@ -264,8 +271,10 @@
     @media (min-width: 760px) {
       .wrap { max-width: 1100px; }
       .view:not(#operatorView) { max-width: 560px; margin-left: auto; margin-right: auto; }
-      #operatorView .optabs { display: none; }
+      #operatorView .optabs .ph { display: none; }
+      #operatorView .optabs .tb { display: block; }
       #operatorView .opcol.offpane { display: block !important; }
+      #operatorView .opcols.offpane { display: none !important; }
       .opcols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
       .colhead { display: block; font-size: 19px; margin: 4px 2px 10px; }
     }
@@ -325,9 +334,9 @@
 
   <!-- phones: one tool at a time; tablets: side by side -->
   <div class="seg optabs" id="opTabs">
-    <button data-v="ink" class="on">Ink run</button><button data-v="waste">Waste roll</button>
+    <button data-v="ink" class="on ph">Ink run</button><button data-v="waste" class="ph">Waste roll</button><button data-v="ink" class="tb">Press tools</button><button data-v="res">Resources</button>
   </div>
-  <div class="opcols">
+  <div class="opcols" id="opCols">
   <!-- ===================== INK TRACKER ===================== -->
   <section class="opcol" id="secInk">
     <h2 class="colhead">Ink run</h2>
@@ -479,9 +488,17 @@
         <h2>Recently saved</h2>
         <ul id="w_recent" class="recent"><li><span class="when">Loading…</span></li></ul>
       </div>
-    
+
   </section>
   </div>
+
+  <!-- ===================== RESOURCES (troubleshooting, videos, SOPs, guides) ===================== -->
+  <section id="secRes" class="offpane">
+    <div class="card">
+      <input id="resSearch" type="search" autocomplete="off" placeholder="Search resources" aria-label="Search resources">
+      <div id="resList"><p class="muted">Loading…</p></div>
+    </div>
+  </section>
   </section>
 
   <!-- ===================== INK INVENTORY ===================== -->
@@ -559,6 +576,7 @@
       <button data-t="jobs" data-g="jobs">Edit jobs</button>
       <button data-t="states" data-g="jobs">States</button>
       <button data-t="notices" data-g="jobs">Notices</button>
+      <button data-t="resources" data-g="jobs">Resources</button>
       <button data-t="order" data-g="ink">Ordering<span class="cnt" data-c="order"></span></button>
       <button data-t="stock" data-g="ink">Stock &amp; minimums</button>
       <button data-t="waste" data-g="reports">Waste</button>
@@ -692,6 +710,27 @@
       </div>
     </div>
 
+    <div id="m_resources" class="mpane hidden">
+      <div class="card">
+        <h2>Add a resource</h2>
+        <p class="muted" style="margin-top:0">Shows on the operator's Resources tab.</p>
+        <label for="rsSection">Section</label>
+        <select id="rsSection"><option>Troubleshooting</option><option>Videos</option><option>SOPs</option><option>Best Practice Guides</option></select>
+        <label for="rsTitle">Title</label>
+        <input id="rsTitle" maxlength="120" autocomplete="off" placeholder="e.g. Press troubleshooting guide">
+        <label for="rsLink">Link</label>
+        <input id="rsLink" type="url" autocomplete="off" autocapitalize="off" placeholder="https://…">
+        <div class="hint">PDF: upload it to Google Drive → Share → General access: Anyone with the link (Viewer) → Copy link. Video: YouTube → Share → Copy.</div>
+        <label for="rsNote">Note (optional)</label>
+        <input id="rsNote" maxlength="300" autocomplete="off" placeholder="e.g. Ink spitting, register drift, web breaks">
+        <button id="rsAdd" class="primary wide">Add resource</button>
+      </div>
+      <div class="card">
+        <h2>Current resources</h2>
+        <div id="rsList"></div>
+      </div>
+    </div>
+
     <div id="m_states" class="mpane hidden">
       <div class="card">
         <h2>Active states</h2>
@@ -781,7 +820,7 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.001';   // 2.xxx: bump the last part by 1 on every deploy users see
+  var APP_VERSION = '2.002';   // 2.xxx: bump the last part by 1 on every deploy users see
   function $(id) { return document.getElementById(id); }
   Array.prototype.forEach.call(document.querySelectorAll('.appver'), function (el) { el.textContent = 'Version ' + APP_VERSION; });
   function esc(s) {
@@ -808,14 +847,40 @@
     }).api(A.token, name, args || []);
   }
 
-  /* ---- operator: Ink run | Waste roll tabs (phones). Tablets show both side by side. ---- */
+  /* ---- operator: Ink run | Waste roll | Resources tabs (phones). Tablets: Press tools (both side by side) | Resources. ---- */
   function opTab(v) {
-    if (v !== 'ink' && v !== 'waste') v = 'ink';
+    if (v !== 'ink' && v !== 'waste' && v !== 'res') v = 'ink';
     store('opTab', v);
-    Array.prototype.forEach.call($('opTabs').children, function (b) { b.classList.toggle('on', b.getAttribute('data-v') === v); });
+    Array.prototype.forEach.call($('opTabs').children, function (b) {
+      var bv = b.getAttribute('data-v');
+      b.classList.toggle('on', bv === v || (b.classList.contains('tb') && v === 'waste'));
+    });
     $('secInk').classList.toggle('offpane', v !== 'ink');
     $('secWaste').classList.toggle('offpane', v !== 'waste');
+    $('opCols').classList.toggle('offpane', v === 'res');
+    $('secRes').classList.toggle('offpane', v !== 'res');
+    if (v === 'res') resLoad();
   }
+
+  /* resources: links management adds under Manage → Jobs → Resources */
+  var RES = { list: null };
+  function resLoad() { if (A.token) srv('resourcesList', [], function (d) { RES.list = d; resShow(); }); }
+  function resIsVideo(link) { return /youtube\.com|youtu\.be/i.test(link); }
+  function resShow() {
+    var d = RES.list; if (!d) return;
+    var q = $('resSearch').value.trim().toLowerCase();
+    var list = d.resources.filter(function (x) { return !q || (x.title + ' ' + x.note + ' ' + x.section).toLowerCase().indexOf(q) !== -1; });
+    if (!d.resources.length) { $('resList').innerHTML = '<p class="muted">No resources yet. Management adds them under Manage → Jobs → Resources.</p>'; return; }
+    if (!list.length) { $('resList').innerHTML = '<p class="muted">Nothing matches "' + esc(q) + '".</p>'; return; }
+    var html = '', sec = null;
+    list.forEach(function (x) {
+      if (x.section !== sec) { sec = x.section; html += '<h2 class="ressec">' + esc(sec) + '</h2>'; }
+      html += '<a class="res" target="_blank" rel="noopener" href="' + esc(x.link) + '"><span class="ic">' + (resIsVideo(x.link) ? '▶️' : '📄') + '</span>' +
+        '<span><span class="t">' + esc(x.title) + '</span>' + (x.note ? '<br><span class="s">' + esc(x.note) + '</span>' : '') + '</span></a>';
+    });
+    $('resList').innerHTML = html;
+  }
+  $('resSearch').addEventListener('input', resShow);
   $('opTabs').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-v]'); if (b) { opTab(b.getAttribute('data-v')); window.scrollTo(0, 0); }
   });
@@ -1442,7 +1507,7 @@
     $('viewTitle').textContent = TITLES[view] || 'Press Tools';
     if (inApp) store('pt_view', view);
     window.scrollTo(0, 0);
-    if (view === 'operator') { load(); wLoadRecent(); flush(); }
+    if (view === 'operator') { load(); wLoadRecent(); flush(); if (store('opTab') === 'res') resLoad(); }
     if (view === 'inventory') invLoad();
     if (view === 'management') mOpen(M.tab);
     if (view === 'admin') aLoad();
@@ -1723,6 +1788,7 @@
     },
     states: function () { srv('statesList', [], statesShow, mErr); },
     notices: function () { srv('noticesList', [], function (d) { noticesShow(d); ntShow(d); }, mErr); },
+    resources: function () { srv('resourcesList', [], rsShow, mErr); },
     jobs: function () { srv('jobGet', [''], jbLists, mErr); }
   };
   /* Jobs (Queue, Edit jobs, States) · Ink (Ordering, Stock & minimums) · Reports (Waste, Low supplies) */
@@ -1787,6 +1853,33 @@
     if (!confirm('Take this notice down?')) return;
     b.disabled = true;
     srv('noticeRemove', [b.getAttribute('data-ntrm')], function (d) { noticesShow(d); ntShow(d); setMsg('mMsg', 'Notice removed.', 'ok'); },
+      function (err) { b.disabled = false; mErr(err); });
+  });
+
+  /* resources screen */
+  function rsShow(d) {
+    RES.list = d;
+    $('rsList').innerHTML = d.resources.length ? d.resources.map(function (x) {
+      return '<div class="item"><div><div class="t">' + (resIsVideo(x.link) ? '▶️ ' : '📄 ') + esc(x.title) + '</div><div class="s">' + esc(x.section) +
+        (x.note ? ' · ' + esc(x.note) : '') + '<br><a href="' + esc(x.link) + '" target="_blank" rel="noopener">Open link</a></div></div>' +
+        '<div class="acts"><button class="danger" data-rsrm="' + esc(x.id) + '">Remove</button></div></div>';
+    }).join('') : '<p class="muted">No resources yet.</p>';
+  }
+  $('rsAdd').addEventListener('click', function () {
+    var title = $('rsTitle').value.trim(), link = $('rsLink').value.trim();
+    if (!title) { setMsg('mMsg', 'Type a title.', 'err'); return; }
+    if (!/^https:\/\//i.test(link)) { setMsg('mMsg', 'Paste the full link, starting with https://', 'err'); return; }
+    $('rsAdd').disabled = true;
+    srv('resourceAdd', [$('rsSection').value, title, link, $('rsNote').value], function (d) {
+      $('rsAdd').disabled = false; $('rsTitle').value = ''; $('rsLink').value = ''; $('rsNote').value = '';
+      rsShow(d); setMsg('mMsg', 'Added. Operators see it on their Resources tab.', 'ok');
+    }, function (e) { $('rsAdd').disabled = false; mErr(e); });
+  });
+  $('rsList').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-rsrm]'); if (!b) return;
+    if (!confirm('Take this resource off the list?')) return;
+    b.disabled = true;
+    srv('resourceRemove', [b.getAttribute('data-rsrm')], function (d) { rsShow(d); setMsg('mMsg', 'Resource removed.', 'ok'); },
       function (err) { b.disabled = false; mErr(err); });
   });
 
