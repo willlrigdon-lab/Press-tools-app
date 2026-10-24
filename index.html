@@ -715,7 +715,7 @@
         <h2>Add a resource</h2>
         <p class="muted" style="margin-top:0">Shows on the operator's Resources tab.</p>
         <label for="rsSection">Section</label>
-        <select id="rsSection"><option>Troubleshooting</option><option>Videos</option><option>SOPs</option><option>Best Practice Guides</option></select>
+        <select id="rsSection"><option>Company Info</option><option>Troubleshooting</option><option>Videos</option><option>SOPs</option><option>Best Practice Guides</option></select>
         <label for="rsTitle">Title</label>
         <input id="rsTitle" maxlength="120" autocomplete="off" placeholder="e.g. Press troubleshooting guide">
         <label for="rsLink">Link</label>
@@ -820,7 +820,7 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.002';   // 2.xxx: bump the last part by 1 on every deploy users see
+  var APP_VERSION = '2.003';   // 2.xxx: bump the last part by 1 on every deploy users see
   function $(id) { return document.getElementById(id); }
   Array.prototype.forEach.call(document.querySelectorAll('.appver'), function (el) { el.textContent = 'Version ' + APP_VERSION; });
   function esc(s) {
