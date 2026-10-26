@@ -267,6 +267,8 @@
     .mgroups { margin-bottom: 8px; }
     .mgroups button { font-size: 17px; padding: 12px 4px; }
     .item > .qpress { grid-column: 1 / -1; margin-top: 0; }
+    .item > .glist { grid-column: 1 / -1; border-left: 3px solid var(--line); padding-left: 12px; margin: 2px 0 4px 4px; }
+    .glist .item { padding: 8px 0; }
     .countbar { bottom: var(--navh); }
     @media (min-width: 760px) {
       .wrap { max-width: 1100px; }
@@ -544,10 +546,10 @@
       <div class="cardhead">
         <h2 id="invListTitle">Ink on the shelf</h2>
         <div class="seg small" id="invScope">
-          <button data-v="active" class="on">Active states</button><button data-v="all">All inks</button>
+          <button data-v="active" class="on">Active games</button><button data-v="all">All inks</button>
         </div>
       </div>
-      <p class="muted" id="invHint" style="margin-top:4px">Only inks used by active states. Switch to "All inks" to count everything in the building.</p>
+      <p class="muted" id="invHint" style="margin-top:4px">Only inks used by active games. Switch to "All inks" to count everything in the building.</p>
       <div class="row2" id="countBtns">
         <button id="countToggle" class="primary wide" style="margin-top:6px">Count the shelf</button>
         <button id="lastCountBtn" class="wide" style="margin-top:6px">Last shelf count</button>
@@ -651,7 +653,7 @@
     <div id="m_stock" class="mpane hidden">
       <div class="card">
         <h2>Ink stock and minimums</h2>
-        <p class="muted" style="margin-top:0">Change "Item #" or "Keep at least" and tap Save on that line. Inks used by active states are marked.</p>
+        <p class="muted" style="margin-top:0">Change "Item #" or "Keep at least" and tap Save on that line. Inks used by active games are marked.</p>
         <div id="minList"></div>
       </div>
     </div>
@@ -664,7 +666,7 @@
       </div>
       <div class="card">
         <h2>Needed for queued jobs</h2>
-        <p class="muted" style="margin-top:0">Open orders and stock runs in active states: 1 startup bottle per ink plus the job's average use for the slips, compared with the shelf and the minimum. An open-ended stock run counts as 1,000,000 slips (a setting).</p>
+        <p class="muted" style="margin-top:0">Open orders and stock runs for active games: 1 startup bottle per ink plus the job's average use for the slips, compared with the shelf and the minimum. An open-ended stock run counts as 1,000,000 slips (a setting).</p>
         <div id="needList"></div>
       </div>
     </div>
@@ -733,8 +735,8 @@
 
     <div id="m_states" class="mpane hidden">
       <div class="card">
-        <h2>Active states</h2>
-        <p class="muted" style="margin-top:0">Only active states count for ink ordering and the shelf count. All ink can still be counted.</p>
+        <h2>Active states and games</h2>
+        <p class="muted" style="margin-top:0">Only active games count for ink ordering, ink needed and the shelf count. Turn on single games when only part of a state is approved. All ink can still be counted.</p>
         <p id="stateActiveNow" style="font-weight:700"></p>
         <div id="stateList"></div>
         <label for="newState">Add a state that's not on the list</label>
@@ -820,7 +822,7 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.003';   // 2.xxx: bump the last part by 1 on every deploy users see
+  var APP_VERSION = '2.004';   // 2.xxx: bump the last part by 1 on every deploy users see
   function $(id) { return document.getElementById(id); }
   Array.prototype.forEach.call(document.querySelectorAll('.appver'), function (el) { el.textContent = 'Version ' + APP_VERSION; });
   function esc(s) {
@@ -1652,7 +1654,7 @@
     show('countBar', INV.counting); show('countBtns', !INV.counting);
     document.body.classList.toggle('counting', INV.counting && V.current === 'inventory');
     $('invHint').textContent = INV.scope === 'all' ? 'Every ink in the catalog.'
-      : 'Only inks used by active states. Switch to "All inks" to count everything in the building.';
+      : 'Only inks used by active games. Switch to "All inks" to count everything in the building.';
     if (!list.length) { $('invList').innerHTML = '<p class="muted">No inks to show.</p>'; return; }
     $('invList').innerHTML = list.map(function (x) {
       var left = '<div><div class="t">' + esc(x.ink) + (x.color ? ' <span class="muted">· ' + esc(x.color) + '</span>' : '') + '</div>' +
@@ -1981,7 +1983,7 @@
   /* ink needed */
   function needShow(d) {
     if (!d.jobs.length) {
-      $('needList').innerHTML = '<p class="muted">No unshipped jobs in active states. Add jobs under Jobs → Queue.</p>'; return;
+      $('needList').innerHTML = '<p class="muted">No unshipped jobs for active games. Add jobs under Jobs → Queue.</p>'; return;
     }
     var notes = false;
     $('needList').innerHTML = '<table class="rep"><tr><th>Ink</th><th class="n">Need</th><th class="n">On hand</th><th class="n">Keep</th><th class="n">Order</th></tr>' +
@@ -2087,12 +2089,12 @@
   function orderShow(d) {
     mCounts();
     var under = Number(d.orderBelow) || 4, RANK = { Out: 0, Low: 1, Under: 2 };
-    var rows = d.inks.filter(function (x) { return x.order; }).map(function (x) {   // set on the server: active states only
+    var rows = d.inks.filter(function (x) { return x.order; }).map(function (x) {   // set on the server: active games only
       return { x: x, why: x.order };
     }).sort(function (a, b) {
       return RANK[a.why] - RANK[b.why] || a.x.ink.localeCompare(b.x.ink, undefined, { numeric: true });
     });
-    $('orderHint').textContent = 'Inks for active states that are out, below "keep at least", or under ' + under + ' bottles. ' +
+    $('orderHint').textContent = 'Inks for active games that are out, below "keep at least", or under ' + under + ' bottles. ' +
       rows.length + ' ink' + (rows.length === 1 ? '' : 's') + ' · ' + new Date().toLocaleDateString();
     if (!rows.length) { $('orderList').innerHTML = '<p class="muted">Nothing to order. Every ink has enough.</p>'; return; }
     var LABEL = { Out: 'Out', Low: 'Low', Under: 'Under ' + under }, KIND = { Out: 'red', Low: 'yellow', Under: 'yellow' };
@@ -2114,7 +2116,7 @@
     mCounts();
     $('minList').innerHTML = d.inks.map(function (x) {
       return '<div class="item stock"><div><div class="t">' + esc(x.ink) + (x.color ? ' <span class="muted">· ' + esc(x.color) + '</span>' : '') +
-        (x.activeState ? ' ' + badge('ok', 'Active state') : '') + '</div>' +
+        (x.activeState ? ' ' + badge('ok', 'Active game') : '') + '</div>' +
         '<div class="s">On hand ' + fmt(x.onHand, x.onHand % 1 ? 2 : 0) + ' ' + badge(STOCK_BADGE[x.status], x.status) +
         ' · ' + (x.item ? 'Item # <b>' + esc(x.item) + '</b>' : 'No item #') + '</div></div>' +
         '<div class="acts"><label>Item #<input data-item="' + esc(x.ink) + '" value="' + esc(x.item || '') + '" style="width:120px" aria-label="Item number, ' + esc(x.ink) + '"></label>' +
@@ -2254,15 +2256,28 @@
     }, function (e) { $('jbSave').disabled = false; mErr(e); });
   });
 
-  /* active states */
+  /* active states and single games (a state approved only in part) */
+  var ST = { open: {} };
   function statesShow(d) {
-    var on = d.states.filter(function (x) { return x.active; }).map(function (x) { return x.state; });
+    ST.last = d;
+    var on = d.states.filter(function (x) { return x.active; }).map(function (x) {
+      return x.state + (x.mode === 'some' ? ' (' + x.on + ' of ' + x.total + ')' : '');
+    });
     $('stateActiveNow').textContent = 'Active now: ' + (on.length ? on.join(', ') : 'none');
     $('stateList').innerHTML = d.states.map(function (x) {
-      return '<div class="item"><div><div class="t">' + esc(x.state) + '</div>' +
-        badge(x.active ? 'green' : 'gray', x.active ? 'Active' : 'Not active') + '</div><div class="acts">' +
-        '<button data-state="' + esc(x.state) + '" data-on="' + (x.active ? '0' : '1') + '" class="' + (x.active ? '' : 'primary') + '">' +
-        (x.active ? 'Turn off' : 'Turn on') + '</button></div></div>';
+      var open = ST.open[x.state] && x.games.length;
+      var tag = x.mode === 'all' ? badge('green', x.total ? 'All games' : 'Active') :
+        x.mode === 'some' ? badge('yellow', x.on + ' of ' + x.total + ' games') : badge('gray', 'Not active');
+      var all = x.mode === 'all';
+      return '<div class="item"><div><div class="t">' + esc(x.state) + '</div>' + tag + '</div><div class="acts">' +
+        (x.games.length ? '<button data-sgames="' + esc(x.state) + '">Games ' + (open ? '▴' : '▾') + '</button>' : '') +
+        '<button data-state="' + esc(x.state) + '" data-on="' + (all ? '0' : '1') + '" class="' + (all ? '' : 'primary') + '">' +
+        (all ? 'Turn off all' : 'Turn on all') + '</button></div>' +
+        (open ? '<div class="glist">' + x.games.map(function (g) {
+          return '<div class="item"><div><div class="t">' + esc(g.job) + '</div>' + badge(g.active ? 'green' : 'gray', g.active ? 'On' : 'Off') +
+            '</div><div class="acts"><button data-gstate="' + esc(x.state) + '" data-gjob="' + esc(g.job) + '" data-on="' + (g.active ? '0' : '1') +
+            '" class="' + (g.active ? '' : 'primary') + '">' + (g.active ? 'Turn off' : 'Turn on') + '</button></div></div>';
+        }).join('') + '</div>' : '') + '</div>';
     }).join('');
   }
   $('newStateAdd').addEventListener('click', function () {
@@ -2271,7 +2286,18 @@
     srv('stateAdd', [name, true], function (d) { $('newState').value = ''; statesShow(d); setMsg('mMsg', name + ' added and turned on.', 'ok'); }, mErr);
   });
   $('stateList').addEventListener('click', function (e) {
-    var b = e.target.closest('button[data-state]'); if (!b) return;
+    var g = e.target.closest('button[data-sgames]');
+    if (g) { var s = g.getAttribute('data-sgames'); ST.open[s] = !ST.open[s]; statesShow(ST.last); return; }
+    var b = e.target.closest('button[data-gjob]');
+    if (b) {
+      b.disabled = true;
+      var job = b.getAttribute('data-gjob'), turnOn = b.getAttribute('data-on') === '1';
+      srv('gameSet', [b.getAttribute('data-gstate'), job, turnOn], function (d) {
+        statesShow(d); setMsg('mMsg', job + (turnOn ? ' turned on.' : ' turned off.'), 'ok');
+      }, function (err) { b.disabled = false; mErr(err); });
+      return;
+    }
+    b = e.target.closest('button[data-state]'); if (!b) return;
     b.disabled = true;
     srv('stateSet', [b.getAttribute('data-state'), b.getAttribute('data-on') === '1'], statesShow, mErr);
   });
