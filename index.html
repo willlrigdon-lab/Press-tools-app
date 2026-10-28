@@ -147,6 +147,12 @@
     .tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
     .check { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 15px; margin: 0; }
     .check input { width: 22px; height: 22px; }
+    .qselbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: #fff4f4; border: 1px solid #f3c2c2;
+      border-radius: 12px; padding: 8px 10px; margin: 8px 0; position: sticky; bottom: calc(var(--navh) + 8px + env(safe-area-inset-bottom)); z-index: 4;
+      box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+    .qselbar span { font-weight: 700; flex: 1; }
+    .qselbar button { padding: 8px 12px; font-size: 15px; }
+    .qsel { width: 22px; height: 22px; margin: 0 8px 0 0; vertical-align: middle; }
     .item { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line); }
     .item:first-child { border-top: 0; }
     .item .t { font-weight: 700; }
@@ -607,8 +613,10 @@
       </div>
       <div class="card">
         <div class="cardhead"><h2>Open</h2>
-          <label class="check"><input type="checkbox" id="qShowShipped"> Show shipped / done</label></div>
+          <label class="check"><input type="checkbox" id="qShowShipped"> Show shipped / done / cancelled</label></div>
         <div id="qList"></div>
+        <div id="qSelBar" class="qselbar hidden"><span id="qSelN"></span>
+          <button id="qSelCancel" class="danger">Cancel selected</button><button id="qSelClear">Clear</button></div>
       </div>
     </div>
 
@@ -822,7 +830,7 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.004';   // 2.xxx: bump the last part by 1 on every deploy users see
+  var APP_VERSION = '2.005';   // 2.xxx: bump the last part by 1 on every deploy users see
   function $(id) { return document.getElementById(id); }
   Array.prototype.forEach.call(document.querySelectorAll('.appver'), function (el) { el.textContent = 'Version ' + APP_VERSION; });
   function esc(s) {
@@ -1304,26 +1312,32 @@
     if (Q.sending || !Q.items.length || !A.token) return;
     clearTimeout(Q.timer);
     Q.sending = true;
-    var t = Q.items[0];
-    var args = t.fn === 'inkPallet' ? [t.runId, t.qty, t.tapId] : [t.runId, t.side, t.ink, t.qty, t.tapId];
-    google.script.run.withSuccessHandler(function (run) {
+    // every waiting tap for the same run goes in one request; each keeps its Tap ID so a retry never counts twice
+    var runId = Q.items[0].runId, batch = [];
+    for (var i = 0; i < Q.items.length && Q.items[i].runId === runId && batch.length < 50; i++) batch.push(Q.items[i]);
+    var t = batch[batch.length - 1];
+    var taps = batch.map(function (x) { return { fn: x.fn, side: x.side, ink: x.ink, qty: x.qty, tapId: x.tapId }; });
+    google.script.run.withSuccessHandler(function (res) {
       Q.sending = false; Q.failed = false;
-      Q.items.shift(); saveQueue();
-      if (S.run && run.runId === S.run.runId) { S.run = withPending(run); renderRun(); }
-      if (!Q.items.length) msg('Saved: ' + t.label, 'ok');
+      var sent = {}; batch.forEach(function (x) { sent[x.tapId] = true; });
+      Q.items = Q.items.filter(function (x) { return !sent[x.tapId]; }); saveQueue();
+      if (S.run && res.run.runId === S.run.runId) { S.run = withPending(res.run); renderRun(); }
+      if (res.rejected && res.rejected.length) msg(res.rejected[0].error, 'err');
+      else if (!Q.items.length) msg('Saved: ' + t.label + (batch.length > 1 ? ' (' + batch.length + ' taps)' : ''), 'ok');
       renderQueue(); flush();
     }).withFailureHandler(function (e) {
       Q.sending = false;
       var text = errText(e);
       if (LOGIN_ERR.test(text)) { logout(text); return; }   // taps stay saved on this device until someone logs in
-      if (REJECTED.test(text)) {
-        Q.items.shift(); saveQueue();
+      if (REJECTED.test(text)) {   // the run itself is gone (ended or cancelled elsewhere): these taps can't be saved
+        var gone = {}; batch.forEach(function (x) { gone[x.tapId] = true; });
+        Q.items = Q.items.filter(function (x) { return !gone[x.tapId]; }); saveQueue();
         msg(text, 'err'); renderQueue(); refreshRun(); flush();
         return;
       }
       Q.failed = true; renderQueue();
       Q.timer = setTimeout(flush, 10000);
-    }).api(A.token, t.fn, args);
+    }).api(A.token, 'inkTaps', [runId, taps]);
   }
 
   function renderQueue() {
@@ -1777,7 +1791,7 @@
   /* =====================================================================
      MANAGEMENT
      ===================================================================== */
-  var M = { tab: 'queue', jobs: [], period: 'week', last: {} };
+  var M = { tab: 'queue', jobs: [], period: 'week', last: {}, sel: {} };
   function mErr(e) { setMsg('mMsg', errText(e), 'err'); }
   var M_LOAD = {
     queue: function () { srv('queueList', [$('qShowShipped').checked], qShow, mErr); },
@@ -1909,6 +1923,9 @@
   }
   function qShow(d) {
     M.jobs = d.jobs; M.queue = d.queue; mCounts();
+    var open = {}; d.queue.forEach(function (q) { if (!q.closed) open[q.id] = true; });
+    M.sel = M.sel || {}; Object.keys(M.sel).forEach(function (id) { if (!open[id]) delete M.sel[id]; });
+    qSelBar();
     var states = [];
     d.jobs.forEach(function (j) { if (states.indexOf(j.state) === -1) states.push(j.state); });
     var keep = $('qState').value || 'New York';
@@ -1925,13 +1942,16 @@
           '<button data-move="' + esc(q.id) + '" data-dir="1" aria-label="Move down">▼</button>' : '') + '</div>';
       var title = q.job ? esc(q.job) + ' <span class="muted">· ' + esc(q.state) + '</span>' : esc(q.note);
       var typeBadge = q.type === 'Stock' ? badge('gray', 'For stock') + ' ' : q.type === 'Note' ? badge('gray', 'Note') + ' ' : '';
-      var info = qLine(q) + (shipped ? (qLine(q) ? ' · ' : '') + (q.status === 'Shipped' ? 'shipped ' : 'done ') + esc(q.shipped) : '');
-      return '<div class="item"><div><div class="t">' + title + '</div>' +
+      var info = qLine(q) + (shipped ? (qLine(q) ? ' · ' : '') + q.status.toLowerCase() + ' ' + esc(q.shipped) : '');
+      var tick = shipped ? '' : '<input type="checkbox" class="qsel" data-qsel="' + esc(q.id) + '"' + (M.sel[q.id] ? ' checked' : '') +
+        ' aria-label="Select ' + esc(q.job || q.note) + '">';
+      return '<div class="item"><div><div class="t">' + tick + title + '</div>' +
         (info ? '<div class="s">' + info + '</div>' : '') +
         (q.job && q.note ? '<div class="s">“' + esc(q.note) + '”</div>' : '') +
         '<div>' + typeBadge + (q.job ? badge(q.flag, FLAG_TEXT[q.flag] + (q.runs ? ' (' + q.runs + ')' : '')) : '') + '</div></div>' +
         '<div class="acts">' + (shipped ? '<button data-unship="' + esc(q.id) + '">Undo</button>'
-          : '<button class="primary" data-ship="' + esc(q.id) + '">' + (q.type === 'Order' ? 'Shipped' : 'Done') + '</button>') + '</div>' + press + '</div>';
+          : '<button class="primary" data-ship="' + esc(q.id) + '">' + (q.type === 'Order' ? 'Shipped' : 'Done') + '</button>' +
+            '<button class="danger" data-qcancel="' + esc(q.id) + '">Cancel</button>') + '</div>' + press + '</div>';
     }).join('');
   }
   function qJobs() {
@@ -1955,7 +1975,32 @@
     Array.prototype.forEach.call(document.querySelectorAll('#qList select, #qList button'), function (el) { el.disabled = on; });
   }
   function qName(id) { var q = (M.queue || []).filter(function (x) { return x.id === id; })[0]; return q ? (q.job || q.note) : 'Job'; }
+  function qSelBar() {
+    var n = Object.keys(M.sel || {}).length;
+    show('qSelBar', n > 0);
+    $('qSelN').textContent = n + ' selected';
+  }
+  /** Cancel one or several queued jobs in one request (they leave the queue and the press lines; Undo brings one back). */
+  function qCancel(ids) {
+    var names = ids.map(qName);
+    if (!confirm('Cancel ' + (ids.length === 1 ? names[0] : ids.length + ' jobs:\n' + names.join('\n')) + '?\n\nIt leaves the queue and its press. You can undo it under "Show shipped / done / cancelled".')) return;
+    qLock(true); $('qSelCancel').disabled = true;
+    setMsg('mMsg', 'Cancelling ' + (ids.length === 1 ? names[0] : ids.length + ' jobs') + '…');
+    srv('queueCancel', [ids], function (d) {
+      ids.forEach(function (id) { delete M.sel[id]; });
+      $('qSelCancel').disabled = false;
+      if ($('qShowShipped').checked) M_LOAD.queue(); else qShow(d);
+      setMsg('mMsg', 'Cancelled ' + (d.cancelled.length === 1 ? d.cancelled[0] : d.cancelled.length + ' jobs') + '.' +
+        (d.skipped ? ' ' + d.skipped + ' already closed.' : ''), 'ok');
+    }, function (err) { qLock(false); $('qSelCancel').disabled = false; mErr(err); });
+  }
+  $('qSelCancel').addEventListener('click', function () { var ids = Object.keys(M.sel); if (ids.length) qCancel(ids); });
+  $('qSelClear').addEventListener('click', function () {
+    M.sel = {}; Array.prototype.forEach.call(document.querySelectorAll('#qList .qsel'), function (el) { el.checked = false; }); qSelBar();
+  });
   $('qList').addEventListener('change', function (e) {
+    var sel = e.target.getAttribute('data-qsel');
+    if (sel) { if (e.target.checked) M.sel[sel] = true; else delete M.sel[sel]; qSelBar(); return; }
     var id = e.target.getAttribute('data-assign'); if (!id) return;
     var press = e.target.value, name = qName(id);
     qLock(true); setMsg('mMsg', 'Saving: ' + name + (press ? ' → ' + press : ' off the press') + '…');
@@ -1971,6 +2016,7 @@
         function (err) { qLock(false); mErr(err); });
       return;
     }
+    if (b.getAttribute('data-qcancel')) { qCancel([b.getAttribute('data-qcancel')]); return; }
     var ship = b.getAttribute('data-ship'), unship = b.getAttribute('data-unship');
     if (!ship && !unship) return;
     qLock(true);
