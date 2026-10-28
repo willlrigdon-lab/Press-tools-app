@@ -147,6 +147,10 @@
     .tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
     .check { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 15px; margin: 0; }
     .check input { width: 22px; height: 22px; }
+    .changes { max-width: 520px; margin: 0 auto 12px; text-align: left; }
+    .changes summary { text-align: center; color: var(--accent); font-weight: 600; cursor: pointer; padding: 6px; }
+    .changes ol { list-style: none; padding: 0; margin: 6px 0 0; max-height: 50vh; overflow-y: auto; }
+    .changes li { padding: 8px 4px; border-top: 1px solid var(--line); font-size: 15px; }
     .qselbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: #fff4f4; border: 1px solid #f3c2c2;
       border-radius: 12px; padding: 8px 10px; margin: 8px 0; position: sticky; bottom: calc(var(--navh) + 8px + env(safe-area-inset-bottom)); z-index: 4;
       box-shadow: 0 4px 14px rgba(0,0,0,.12); }
@@ -830,9 +834,54 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.006';   // 2.xxx: bump the last part by 1 on every deploy users see
+  var APP_VERSION = '2.007';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
+  var APP_CHANGES = [
+    ['2.007', '10/28/2026', 'Update history: tap "Update history" under the version number to see what changed and when.'],
+    ['2.006', '10/28/2026', 'Faster screens: the stock list, ordering, ink needed, the queue and the operator job list read each sheet once.'],
+    ['2.005', '10/28/2026', 'Cancel jobs in the queue, one at a time or tick several. Faster saves for Start Run, shelf counts and quick taps.'],
+    ['2.004', '10/26/2026', 'Turn on single games inside a state, so partly approved states don\'t skew ink orders.'],
+    ['2.003', '10/24/2026', 'Company Info section in Resources (holiday schedule, company directory).'],
+    ['2.002', '10/23/2026', 'Resources tab on the Operator page: troubleshooting, videos, SOPs and best practice guides, with search.'],
+    ['2.001', '10/22/2026', 'Out of beta: version number on the login page.'],
+    ['1.030', '10/22/2026', 'Shop notices: a message for every press and area.'],
+    ['1.029', '10/22/2026', 'Manage buttons always open their first screen; the queue locks while a change saves.'],
+    ['1.028', '10/22/2026', 'End Run offers to mark a stock run or note assignment done.'],
+    ['1.027', '10/21/2026', 'The assigned job\'s setup sheet moves to the job assignment card.'],
+    ['1.026', '10/21/2026', 'Waste report lists every roll, with press and date filters, and prints to PDF.'],
+    ['1.025', '10/21/2026', 'Queue types: open-ended stock runs and notes for a press.'],
+    ['1.024', '10/21/2026', 'New layout: bottom bar, tabs, count badges and pop-up messages.'],
+    ['1.023', '10/21/2026', 'Order list shows ink, color and item #.'],
+    ['1.022', '10/21/2026', 'Open-run warning after 2 work hours with no update, plus a weekend warning.'],
+    ['1.021', '10/20/2026', 'Order list shows inks for active states only; a delivery counts as a shelf count.'],
+    ['1.020', '10/20/2026', 'Order list in Management (out, low, or under 4 bottles).'],
+    ['1.019', '10/19/2026', 'Item numbers on the ink stock lists.'],
+    ['1.018', '10/19/2026', 'Roll calculator entries kept per press, even after logging out.'],
+    ['1.017', '10/19/2026', 'Roll calculator keeps typed entries after a reload.'],
+    ['1.016', '10/19/2026', 'Partial bottles (¼ ½ ¾) on the ink tally.'],
+    ['1.015', '10/19/2026', 'Slips per pack on the setup sheet.'],
+    ['1.014', '10/14/2026', 'Replace an ink everywhere.'],
+    ['1.013', '10/14/2026', 'Review a shelf count after saving.'],
+    ['1.012', '10/14/2026', 'Shelf count keeps typed counts; Save counts bar stays on screen.'],
+    ['1.011', '10/13/2026', 'Remove or merge inks; setup sheet on the operator screen.'],
+    ['1.010', '10/13/2026', 'Job editor in Management.'],
+    ['1.009', '10/13/2026', 'Add inks that aren\'t on any job; add a state.'],
+    ['1.008', '10/13/2026', 'Ink order for 500K rounds up to whole bottles.'],
+    ['1.007', '10/13/2026', 'Times shown in US Central.'],
+    ['1.006', '10/13/2026', 'Nightly backups.'],
+    ['1.005', '10/13/2026', 'Job assignments per press; company logo.'],
+    ['1.004', '10/13/2026', 'PIN login with Operator, Inventory, Management and Admin areas.'],
+    ['1.003', '10/13/2026', 'A second link that works on any device.'],
+    ['1.002', '10/13/2026', 'Taps saved safely on bad wifi; open-run warning; Settings tab.'],
+    ['1.001', '10/13/2026', 'First version: waste roll calculator and ink tracker.']
+  ];
   function $(id) { return document.getElementById(id); }
-  Array.prototype.forEach.call(document.querySelectorAll('.appver'), function (el) { el.textContent = 'Version ' + APP_VERSION; });
+  Array.prototype.forEach.call(document.querySelectorAll('.appver'), function (el) {
+    el.textContent = 'Version ' + APP_VERSION;
+    el.insertAdjacentHTML('afterend', '<details class="changes"><summary>Update history</summary><ol>' + APP_CHANGES.map(function (c) {
+      return '<li><b>' + esc(c[0]) + '</b> <span class="muted">· ' + esc(c[1]) + '</span><br>' + esc(c[2]) + '</li>';
+    }).join('') + '</ol></details>');
+  });
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
