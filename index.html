@@ -265,6 +265,14 @@
     a.res .ic { font-size: 22px; text-align: center; }
     a.res .t { font-weight: 700; font-size: 17px; color: var(--accent); }
     a.res .s { color: var(--muted); font-size: 14px; }
+    details.dir { border-top: 1px solid var(--line); }
+    details.dir summary { display: grid; grid-template-columns: 34px 1fr; gap: 8px; align-items: center; padding: 13px 4px; cursor: pointer; list-style: none; }
+    details.dir summary::-webkit-details-marker { display: none; }
+    details.dir summary .ic { font-size: 22px; text-align: center; }
+    details.dir summary .t { font-weight: 700; font-size: 17px; color: var(--accent); }
+    details.dir .s { color: var(--muted); font-size: 14px; }
+    .dirrow { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 4px 10px 42px; border-top: 1px dashed var(--line); }
+    .dirrow a.call { white-space: nowrap; font-weight: 700; font-size: 17px; color: var(--accent); padding: 8px 10px; border: 1px solid var(--accent); border-radius: 10px; text-decoration: none; }
     .cnt { display: inline-block; min-width: 22px; padding: 1px 7px; border-radius: 99px; font-size: 13px; line-height: 18px;
       background: var(--bad); color: #fff; margin-left: 6px; text-align: center; }
     .cnt.soft { background: #e3e7ee; color: var(--text); }
@@ -834,9 +842,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.007';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.008';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.008', '10/30/2026', 'Company Directory is built into Resources → Company Info, so numbers can be tapped to call on iPhones too.'],
     ['2.007', '10/28/2026', 'Update history: tap "Update history" under the version number to see what changed and when.'],
     ['2.006', '10/28/2026', 'Faster screens: the stock list, ordering, ink needed, the queue and the operator job list read each sheet once.'],
     ['2.005', '10/28/2026', 'Cancel jobs in the queue, one at a time or tick several. Faster saves for Start Run, shelf counts and quick taps.'],
@@ -925,13 +934,31 @@
   var RES = { list: null };
   function resLoad() { if (A.token) srv('resourcesList', [], function (d) { RES.list = d; resShow(); }); }
   function resIsVideo(link) { return /youtube\.com|youtu\.be/i.test(link); }
+  /** tel: link for a typed number: 10 digits are US numbers (+1). */
+  function telHref(phone) {
+    var dg = String(phone).replace(/\D/g, '');
+    return 'tel:' + (dg.length === 10 ? '+1' + dg : dg.length === 11 && dg.charAt(0) === '1' ? '+' + dg : dg);
+  }
+  /** Company Directory: names and numbers from the Sheet's Directory tab, shown in the app so numbers can be tapped on any phone. */
+  function dirHtml(dir, q) {
+    var people = dir.filter(function (p) { return !q || 'company directory phone'.indexOf(q) !== -1 ||
+      (p.name + ' ' + p.role + ' ' + p.phone + ' ' + p.notes).toLowerCase().indexOf(q) !== -1; });
+    if (!people.length) return '';
+    return '<details class="dir"' + (q ? ' open' : '') + '><summary><span class="ic">📞</span><span><span class="t">Company Directory</span>' +
+      '<br><span class="s">Tap a number to call</span></span></summary>' + people.map(function (p) {
+        return '<div class="dirrow"><div><b>' + esc(p.name) + '</b>' + (p.role ? '<br><span class="s">' + esc(p.role) + '</span>' : '') +
+          (p.notes ? '<br><span class="s">' + esc(p.notes) + '</span>' : '') + '</div>' +
+          '<a class="call" target="_top" href="' + esc(telHref(p.phone)) + '">' + esc(p.phone) + '</a></div>';
+      }).join('') + '</details>';
+  }
   function resShow() {
     var d = RES.list; if (!d) return;
     var q = $('resSearch').value.trim().toLowerCase();
     var list = d.resources.filter(function (x) { return !q || (x.title + ' ' + x.note + ' ' + x.section).toLowerCase().indexOf(q) !== -1; });
-    if (!d.resources.length) { $('resList').innerHTML = '<p class="muted">No resources yet. Management adds them under Manage → Jobs → Resources.</p>'; return; }
-    if (!list.length) { $('resList').innerHTML = '<p class="muted">Nothing matches "' + esc(q) + '".</p>'; return; }
-    var html = '', sec = null;
+    var dir = dirHtml(d.directory || [], q);
+    if (!d.resources.length && !(d.directory || []).length) { $('resList').innerHTML = '<p class="muted">No resources yet. Management adds them under Manage → Jobs → Resources.</p>'; return; }
+    if (!list.length && !dir) { $('resList').innerHTML = '<p class="muted">Nothing matches "' + esc(q) + '".</p>'; return; }
+    var html = dir ? '<h2 class="ressec">Company Info</h2>' + dir : '', sec = dir ? 'Company Info' : null;
     list.forEach(function (x) {
       if (x.section !== sec) { sec = x.section; html += '<h2 class="ressec">' + esc(sec) + '</h2>'; }
       html += '<a class="res" target="_blank" rel="noopener" href="' + esc(x.link) + '"><span class="ic">' + (resIsVideo(x.link) ? '▶️' : '📄') + '</span>' +
