@@ -180,11 +180,21 @@
       body.printing-waste table.rolls th, body.printing-waste table.rolls td { padding: 3px 4px; }
     }
     table.order .badge { white-space: nowrap; }
+    .ordchk { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: 14px; white-space: nowrap; }
+    .ordchk input { width: 22px; height: 22px; margin: 0; }
+    .ordchk .s { font-size: 12px; }
+    tr.ordered td { background: #eef5ff; }
+    .badge.blue { background: #e3eeff; color: #1f4f9a; }
+    .findbar { position: sticky; top: 68px; z-index: 5; background: var(--card, #fff); padding: 6px 0; display: flex; gap: 8px; align-items: center; }
+    .findbar input { flex: 1; margin: 0; }
+    .findbar button { margin: 0; flex: none; }
+    .item.found { outline: 3px solid var(--accent, #2b6cb0); outline-offset: 2px; border-radius: 8px; }
     @media print {
       body.printing-order * { visibility: hidden; }
       body.printing-order #orderCard, body.printing-order #orderCard * { visibility: visible; }
       body.printing-order #orderCard { position: absolute; left: 0; top: 0; width: 100%; box-shadow: none; border: 0; }
       body.printing-order .noprint { display: none; }
+      body.printing-order tr.ordered td { background: none; }
     }
     .item.stock .acts { justify-content: flex-start; align-items: flex-end; }
     .item.stock .acts label { margin: 0; font-size: 13px; color: var(--muted); }
@@ -534,8 +544,9 @@
     </div>
     <div class="card" id="recvCard" data-tab="receive">
       <h2>Receive ink</h2>
-      <label for="recvInk">Ink</label>
-      <select id="recvInk"></select>
+      <label for="recvFind">Ink</label>
+      <input id="recvFind" type="search" autocomplete="off" placeholder="Type the ink number or name to find it" aria-label="Find the ink to receive">
+      <select id="recvInk" aria-label="Ink"></select>
       <div class="row2">
         <div><label for="recvQty">Bottles</label><input id="recvQty" inputmode="decimal" placeholder="e.g. 6"></div>
         <div><label for="recvNote">Note (optional)</label><input id="recvNote" placeholder="PO, supplier…"></div>
@@ -571,6 +582,10 @@
       <div class="row2" id="countBtns">
         <button id="countToggle" class="primary wide" style="margin-top:6px">Count the shelf</button>
         <button id="lastCountBtn" class="wide" style="margin-top:6px">Last shelf count</button>
+      </div>
+      <div class="findbar" id="invFindBar">
+        <input id="invFind" type="text" autocomplete="off" enterkeyhint="go" placeholder="Find ink: type the number or name" aria-label="Find ink">
+        <button id="invFindClear" class="hidden" type="button">Clear</button>
       </div>
       <div id="invList"></div>
       <div id="countBar" class="countbar hidden">
@@ -681,12 +696,13 @@
     <div id="m_order" class="mpane hidden">
       <div class="card" id="orderCard">
         <div class="cardhead"><h2>Out or low now</h2><button id="orderPrint" class="noprint">Print</button></div>
+        <p class="muted noprint" style="margin-top:0">Tick "Ordered" once an ink is ordered. It stays on this list marked Ordered until it's received.</p>
         <p class="muted" id="orderHint" style="margin-top:0"></p>
         <div id="orderList"></div>
       </div>
       <div class="card">
         <h2>Needed for queued jobs</h2>
-        <p class="muted" style="margin-top:0">Open orders and stock runs for active games: 1 startup bottle per ink plus the job's average use for the slips, compared with the shelf and the minimum. An open-ended stock run counts as 1,000,000 slips (a setting).</p>
+        <p class="muted" style="margin-top:0">Open orders and stock runs for active games: 1 startup bottle per ink plus the job's average use for the slips, compared with the shelf and the minimum. An open-ended stock run counts as 1,000,000 slips (a setting). Tick "Ordered" for inks ordered ahead for a job.</p>
         <div id="needList"></div>
       </div>
     </div>
@@ -842,9 +858,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.008';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.009';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.009', '11/2/2026', 'Ink ordering: an "Ordered" tick box on the order list and Ink needed, shown on the stock list and printouts until the ink is received. Ink Inventory: a find box to type an ink number and jump to it while counting or receiving.'],
     ['2.008', '10/30/2026', 'Company Directory is built into Resources → Company Info, so numbers can be tapped to call on iPhones too.'],
     ['2.007', '10/28/2026', 'Update history: tap "Update history" under the version number to see what changed and when.'],
     ['2.006', '10/28/2026', 'Faster screens: the stock list, ordering, ink needed, the queue and the operator job list read each sheet once.'],
@@ -1734,26 +1751,39 @@
     setMsg('invMsg', '');
     INV.inks = d.inks;
     var keep = $('recvInk').value;
-    $('recvInk').innerHTML = opt('', 'Choose ink…') + d.inks.map(function (x) {
-      return opt(x.ink, x.ink + (x.color ? ' · ' + x.color : ''), x.ink === keep);
-    }).join('');
+    recvFill(keep);
     invRender();
   }
+  /* Receive: the box above the ink list narrows it as you type and picks the best match */
+  function recvFill(keep) {
+    var q = $('recvFind').value, list = invFindFilter(INV.inks, q);
+    if (q.trim() && list.length && !list.some(function (x) { return x.ink === keep; })) keep = list[0].ink;
+    $('recvInk').innerHTML = (q.trim() ? '' : opt('', 'Choose ink…')) + (list.length ? list.map(function (x) {
+      return opt(x.ink, x.ink + (x.color ? ' · ' + x.color : '') + (x.ordered ? ' (ordered ' + x.ordered.replace(/\/\d{4}$/, '') + ')' : ''), x.ink === keep);
+    }).join('') : opt('', 'No ink matches'));
+  }
+  $('recvFind').addEventListener('input', function () { recvFill(''); });
   function invRender() {
-    var list = INV.inks.filter(function (x) { return INV.scope === 'all' || x.activeState; });
+    var list = invFindFilter(INV.inks.filter(function (x) { return INV.scope === 'all' || x.activeState; }), $('invFind').value);
     show('countBar', INV.counting); show('countBtns', !INV.counting);
     document.body.classList.toggle('counting', INV.counting && V.current === 'inventory');
     $('invHint').textContent = INV.scope === 'all' ? 'Every ink in the catalog.'
       : 'Only inks used by active games. Switch to "All inks" to count everything in the building.';
-    if (!list.length) { $('invList').innerHTML = '<p class="muted">No inks to show.</p>'; return; }
+    show('invFindClear', !!$('invFind').value);
+    if (!list.length) {
+      $('invList').innerHTML = '<p class="muted">' + ($('invFind').value.trim() ? 'No ink matches "' + esc($('invFind').value.trim()) + '"' +
+        (INV.scope === 'all' ? '.' : ' in active games. Try "All inks".') : 'No inks to show.') + '</p>';
+      invCountLabel(); return;
+    }
     $('invList').innerHTML = list.map(function (x) {
       var left = '<div><div class="t">' + esc(x.ink) + (x.color ? ' <span class="muted">· ' + esc(x.color) + '</span>' : '') + '</div>' +
         '<div class="s">On hand ' + fmt(x.onHand, x.onHand % 1 ? 2 : 0) + (x.min ? ' · keep ' + x.min : '') +
         (INV.counting ? '' : ' · ' + (x.lastCounted ? 'counted ' + esc(x.lastCounted) : '<b>never counted</b>')) +
         (!INV.counting && x.item ? ' · Item # ' + esc(x.item) : '') + '</div></div>';
-      if (!INV.counting) return '<div class="item">' + left + '<div>' + badge(STOCK_BADGE[x.status], x.status) + '</div></div>';
+      var ordB = x.ordered ? ' ' + badge('blue', 'Ordered ' + x.ordered.replace(/\/\d{4}$/, '')) : '';
+      if (!INV.counting) return '<div class="item" data-ink="' + esc(x.ink) + '">' + left + '<div style="text-align:right">' + badge(STOCK_BADGE[x.status], x.status) + ordB + '</div></div>';
       var c = INV.counts[x.ink] || { full: '', part: '0' };
-      return '<div class="item">' + left + '<div><div class="count-in">' +
+      return '<div class="item" data-ink="' + esc(x.ink) + '">' + left + '<div><div class="count-in">' +
         '<input data-full="' + esc(x.ink) + '" inputmode="numeric" placeholder="Full" value="' + esc(c.full) + '" aria-label="Full bottles of ' + esc(x.ink) + '">' +
         '<select data-part="' + esc(x.ink) + '" aria-label="Partial bottle of ' + esc(x.ink) + '">' +
         FRACS.map(function (f) { return opt(f[0], f[1], String(f[0]) === String(c.part)); }).join('') + '</select></div>' +
@@ -1762,6 +1792,45 @@
     if (INV.counting) list.forEach(function (x) { invVar(x.ink); });
     invCountLabel();
   }
+  /*
+   * Find an ink by typing (the shelves aren't in number order). Matches the ink, color or item #;
+   * best matches first: exact, then starts with, then contains. Enter jumps to the first match.
+   */
+  function invFindScore(x, q) {
+    var ink = x.ink.toLowerCase();
+    if (ink === q) return 0;
+    if (ink.indexOf(q) === 0) return 1;
+    if (ink.split(/[\s\/-]+/).some(function (w) { return w.indexOf(q) === 0; })) return 2;
+    if (ink.indexOf(q) !== -1) return 3;
+    if ((x.color || '').toLowerCase().indexOf(q) !== -1 || (x.item || '').toLowerCase().indexOf(q) !== -1) return 4;
+    return -1;
+  }
+  function invFindFilter(list, q) {
+    q = String(q || '').trim().toLowerCase();
+    if (!q) return list;
+    return list.map(function (x, i) { return { x: x, s: invFindScore(x, q), i: i }; })
+      .filter(function (o) { return o.s >= 0; })
+      .sort(function (a, b) { return a.s - b.s || a.i - b.i; })
+      .map(function (o) { return o.x; });
+  }
+  $('invFind').addEventListener('input', function () { invRender(); });
+  $('invFind').addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    var first = document.querySelector('#invList .item');
+    if (!first) return;
+    first.classList.add('found');
+    var box = first.querySelector('input[data-full]');
+    if (box) { box.focus(); box.select(); } else first.scrollIntoView({ block: 'center' });
+  });
+  /* counting: Enter in a count box goes back to the find box, cleared, ready for the next ink */
+  $('invList').addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' || !e.target.getAttribute('data-full') || !$('invFind').value) return;
+    e.preventDefault();
+    $('invFind').value = ''; invRender(); $('invFind').focus();
+  });
+  $('invFindClear').addEventListener('click', function () { $('invFind').value = ''; invRender(); $('invFind').focus(); });
+
   /** Leave counting: typed counts are thrown away and the Stock list shows. */
   function invCountDone() { INV.counts = {}; invTab('list'); invCountLabel(); }
   function invCountLabel() {
@@ -1849,7 +1918,7 @@
     $('niSave').disabled = true; setMsg('invMsg', 'Adding ' + ink + '…');
     srv('invAddInk', [ink, $('niColor').value, $('niMixing').checked, $('niCount').value], function (d) {
       $('niSave').disabled = false; niReset(); show('newInkForm', false); show('newInkToggle', true);
-      invShow(d); $('recvInk').value = d.added;
+      $('recvFind').value = ''; invShow(d); $('recvInk').value = d.added;
       setMsg('invMsg', d.added + ' added to the ink list.', 'ok');
     }, function (e) { $('niSave').disabled = false; setMsg('invMsg', errText(e), 'err'); });
   });
@@ -1860,7 +1929,8 @@
     $('recvSave').disabled = true; setMsg('invMsg', 'Saving…');
     srv('invReceive', [ink, qty, $('recvNote').value], function (d) {
       $('recvSave').disabled = false; $('recvQty').value = ''; $('recvNote').value = '';
-      invShow(d); setMsg('invMsg', 'Added ' + qty + ' bottle' + (Number(qty) === 1 ? '' : 's') + ' of ' + ink + '.', 'ok');
+      $('recvFind').value = ''; invShow(d);
+      setMsg('invMsg', 'Added ' + qty + ' bottle' + (Number(qty) === 1 ? '' : 's') + ' of ' + ink + '.' + (d.wasOrdered ? ' No longer marked ordered.' : ''), 'ok');
     }, function (e) { $('recvSave').disabled = false; setMsg('invMsg', errText(e), 'err'); });
   });
 
@@ -2108,12 +2178,12 @@
       $('needList').innerHTML = '<p class="muted">No unshipped jobs for active games. Add jobs under Jobs → Queue.</p>'; return;
     }
     var notes = false;
-    $('needList').innerHTML = '<table class="rep"><tr><th>Ink</th><th class="n">Need</th><th class="n">On hand</th><th class="n">Keep</th><th class="n">Order</th></tr>' +
+    $('needList').innerHTML = '<table class="rep"><tr><th>Ink</th><th class="n">Need</th><th class="n">On hand</th><th class="n">Keep</th><th class="n">Order</th><th>Ordered</th></tr>' +
       d.inks.map(function (x) {
         var mark = x.noData ? ' *' : x.estimated ? ' ~' : '';
         if (mark) notes = true;
-        return '<tr><td>' + esc(x.ink) + mark + (x.color ? ' <span class="muted">' + esc(x.color) + '</span>' : '') + '</td><td class="n">' + fmt(x.need, 1) +
-          '</td><td class="n">' + fmt(x.onHand, x.onHand % 1 ? 2 : 0) + '</td><td class="n">' + x.min + '</td><td class="n"><b>' + x.toOrder + '</b></td></tr>';
+        return '<tr' + (x.ordered ? ' class="ordered"' : '') + '><td>' + esc(x.ink) + mark + (x.color ? ' <span class="muted">' + esc(x.color) + '</span>' : '') + '</td><td class="n">' + fmt(x.need, 1) +
+          '</td><td class="n">' + fmt(x.onHand, x.onHand % 1 ? 2 : 0) + '</td><td class="n">' + x.min + '</td><td class="n"><b>' + x.toOrder + '</b></td><td>' + ordBox(x) + '</td></tr>';
       }).join('') + '</table>' +
       (notes ? '<p class="muted">* no tracked runs yet for this ink: only the startup bottle is counted. ~ estimated from this ink on other jobs.</p>' : '') +
       '<h3>Jobs included</h3>' + d.jobs.map(function (j) {
@@ -2211,25 +2281,43 @@
   function orderShow(d) {
     mCounts();
     var under = Number(d.orderBelow) || 4, RANK = { Out: 0, Low: 1, Under: 2 };
-    var rows = d.inks.filter(function (x) { return x.order; }).map(function (x) {   // set on the server: active games only
-      return { x: x, why: x.order };
-    }).sort(function (a, b) {
-      return RANK[a.why] - RANK[b.why] || a.x.ink.localeCompare(b.x.ink, undefined, { numeric: true });
+    var rows = d.inks.filter(function (x) { return x.order || x.ordered; }).map(function (x) {   // order: set on the server, active games only
+      return { x: x, why: x.order || 'OnOrder' };
+    }).sort(function (a, b) {   // still to order first (Out, Low, Under), then what's already ordered
+      return !!a.x.ordered - !!b.x.ordered || (RANK[a.why] || 3) - (RANK[b.why] || 3) || a.x.ink.localeCompare(b.x.ink, undefined, { numeric: true });
     });
+    var nOrd = rows.filter(function (r) { return r.x.ordered; }).length;
     $('orderHint').textContent = 'Inks for active games that are out, below "keep at least", or under ' + under + ' bottles. ' +
-      rows.length + ' ink' + (rows.length === 1 ? '' : 's') + ' · ' + new Date().toLocaleDateString();
+      (rows.length - nOrd) + ' to order' + (nOrd ? ', ' + nOrd + ' ordered' : '') + ' · ' + new Date().toLocaleDateString();
     if (!rows.length) { $('orderList').innerHTML = '<p class="muted">Nothing to order. Every ink has enough.</p>'; return; }
-    var LABEL = { Out: 'Out', Low: 'Low', Under: 'Under ' + under }, KIND = { Out: 'red', Low: 'yellow', Under: 'yellow' };
-    $('orderList').innerHTML = '<table class="order"><tr><th>Ink · Color · Item #</th><th class="n">Have</th><th class="n">Keep</th><th></th></tr>' +
+    var LABEL = { Out: 'Out', Low: 'Low', Under: 'Under ' + under, OnOrder: 'OK now' }, KIND = { Out: 'red', Low: 'yellow', Under: 'yellow', OnOrder: 'green' };
+    $('orderList').innerHTML = '<table class="order"><tr><th>Ink · Color · Item #</th><th class="n">Have</th><th class="n">Keep</th><th></th><th>Ordered</th></tr>' +
       rows.map(function (r) {
         var x = r.x;
-        return '<tr><td><b>' + esc(x.ink) + '</b>' + (x.color ? ' · ' + esc(x.color) : '') +
+        return '<tr' + (x.ordered ? ' class="ordered"' : '') + '><td><b>' + esc(x.ink) + '</b>' + (x.color ? ' · ' + esc(x.color) : '') +
           (x.item ? ' · ' + esc(x.item) : ' <span class="muted">· no item #</span>') +
           (x.lastCounted ? '' : '<div class="muted" style="font-size:13px">never counted</div>') + '</td>' +
           '<td class="n">' + fmt(x.onHand, x.onHand % 1 ? 2 : 0) + '</td><td class="n">' + (x.min ? fmt(x.min, x.min % 1 ? 2 : 0) : '—') + '</td>' +
-          '<td>' + badge(KIND[r.why], LABEL[r.why]) + '</td></tr>';
+          '<td>' + badge(KIND[r.why], LABEL[r.why]) + '</td><td>' + ordBox(x) + '</td></tr>';
       }).join('') + '</table>';
   }
+  /* "Ordered" tick box (Ordering screen): shows when and who; receiving the ink clears it */
+  function ordBox(x) {
+    return '<label class="ordchk"><input type="checkbox" data-ordered="' + esc(x.ink) + '"' + (x.ordered ? ' checked' : '') +
+      ' aria-label="Ordered, ' + esc(x.ink) + '">' + (x.ordered ? '<span class="s">' + esc(x.ordered.replace(/\/\d{4}$/, '')) +
+      (x.orderedBy ? ' · ' + esc(x.orderedBy) : '') + '</span>' : '') + '</label>';
+  }
+  $('m_order').addEventListener('change', function (e) {
+    var ink = e.target.getAttribute('data-ordered');
+    if (!ink) return;
+    var on = e.target.checked;
+    Array.prototype.forEach.call(document.querySelectorAll('#m_order [data-ordered]'), function (b) { b.disabled = true; });
+    setMsg('mMsg', (on ? 'Marking ' : 'Unmarking ') + ink + ' as ordered…');
+    srv('invSetOrdered', [ink, on], function (d) {
+      setMsg('mMsg', ink + (on ? ' marked ordered.' : ' no longer marked ordered.'), 'ok');
+      orderShow(d); srv('inkNeeded', [], needShow, mErr);
+    }, function (err) { mErr(err); M_LOAD.order(); });
+  });
   $('orderPrint').addEventListener('click', function () { document.body.classList.add('printing-order'); window.print(); });
   window.addEventListener('afterprint', function () { document.body.classList.remove('printing-order'); });
 
