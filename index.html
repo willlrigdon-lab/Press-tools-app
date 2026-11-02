@@ -234,6 +234,9 @@
     .assign { border-left: 6px solid var(--accent); }
     .assign .now { font-size: 22px; font-weight: 800; margin-top: 2px; }
     .assign .nowsub { color: var(--muted); margin-top: 2px; }
+    .assign .crew { margin-top: 6px; font-size: 16px; }
+    .runstate { color: var(--muted); font-weight: 700; }
+    .qcrew input { width: auto; flex: 1; min-width: 120px; font-size: 16px; padding: 8px; }
     .assign .next { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 15px; }
     .assign .next b { font-size: 16px; }
     .qpress { display: flex; gap: 6px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
@@ -858,9 +861,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.009';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.010';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.010', '11/2/2026', 'The ink run screen shows the state with the game name. Queue jobs get an operator (from the people list) and packers, shown on the press\'s assignment card.'],
     ['2.009', '11/2/2026', 'Ink ordering: an "Ordered" tick box on the order list and Ink needed, shown on the stock list and printouts until the ink is received. Ink Inventory: a find box to type an ink number and jump to it while counting or receiving.'],
     ['2.008', '10/30/2026', 'Company Directory is built into Resources → Company Info, so numbers can be tapped to call on iPhones too.'],
     ['2.007', '10/28/2026', 'Update history: tap "Update history" under the version number to see what changed and when.'],
@@ -1179,6 +1183,8 @@
     $('assignNow').innerHTML = '<div class="muted">Now</div><div class="now">' + esc(c.job || c.note) + '</div>' +
       (sub ? '<div class="nowsub">' + sub + '</div>' : '') +
       (c.job && c.note ? '<div class="nowsub" style="color:var(--text)">' + esc(c.note) + '</div>' : '') +
+      (c.operator || c.packers ? '<div class="crew">' + (c.operator ? 'Operator: <b>' + esc(c.operator) + '</b>' : '') +
+        (c.operator && c.packers ? ' · ' : '') + (c.packers ? 'Packers: <b>' + esc(c.packers) + '</b>' : '') + '</div>' : '') +
       (canPick ? '<button id="assignPick" class="wide">Pick this job below</button>' : '') +
       (cj ? '<details class="setupbox" id="assignSetup"' + (store('assignSetupOpen') === '1' ? ' open' : '') + '>' +
         '<summary>Setup sheet: position, ink, anilox</summary>' + setupHtml(cj) + '</details>' : '');
@@ -1278,7 +1284,7 @@
   /* ----- run ----- */
   function renderRun() {
     var r = S.run;
-    $('runTitle').textContent = r.job;
+    $('runTitle').innerHTML = esc(r.job) + ' <span class="runstate">· ' + esc(r.state) + '</span>';   // same game names exist in several states
     $('runMeta').innerHTML = esc(r.press) + ' · started ' + esc(r.started) + ' &nbsp;' +
       (r.verified ? '<span class="badge ok">Verified</span>' : '<span class="badge unv">Not verified yet</span>');
 
@@ -1539,7 +1545,7 @@
     var on = !!(c && c.jobKey && c.jobKey === jobKey && c.type !== 'Order');
     show('doneAssign', on);
     if (!on) return;
-    $('doneAssign').innerHTML = 'This was ' + esc(S.press) + '\'s assignment: <b>' + esc(c.job) + '</b> · ' + qLine(c) +
+    $('doneAssign').innerHTML = 'This was ' + esc(S.press) + '\'s assignment: <b>' + esc(c.job) + '</b> · ' + esc(c.state) + ' · ' + qLine(c) +
       '. Mark the assignment done too?<div class="row2"><button class="wide" id="assignKeep">Keep it</button>' +
       '<button class="primary wide" id="assignDoneBtn" data-id="' + esc(c.id) + '">Mark done</button></div>';
   }
@@ -2086,6 +2092,10 @@
         (q.press ? '<span class="muted">#' + q.pressOrder + ' in line</span>' +
           '<button data-move="' + esc(q.id) + '" data-dir="-1" aria-label="Move up">▲</button>' +
           '<button data-move="' + esc(q.id) + '" data-dir="1" aria-label="Move down">▼</button>' : '') + '</div>';
+      var crew = shipped ? '' : '<div class="qpress qcrew"><select data-crewop="' + esc(q.id) + '" aria-label="Operator for ' + esc(q.job || q.note) + '">' +
+        opt('', 'No operator', !q.operator) + (d.operators || []).concat(q.operator && (d.operators || []).indexOf(q.operator) === -1 ? [q.operator] : [])
+          .map(function (n) { return opt(n, n, n === q.operator); }).join('') + '</select>' +
+        '<input data-crewpk="' + esc(q.id) + '" value="' + esc(q.packers) + '" maxlength="200" placeholder="Packers" aria-label="Packers for ' + esc(q.job || q.note) + '"></div>';
       var title = q.job ? esc(q.job) + ' <span class="muted">· ' + esc(q.state) + '</span>' : esc(q.note);
       var typeBadge = q.type === 'Stock' ? badge('gray', 'For stock') + ' ' : q.type === 'Note' ? badge('gray', 'Note') + ' ' : '';
       var info = qLine(q) + (shipped ? (qLine(q) ? ' · ' : '') + q.status.toLowerCase() + ' ' + esc(q.shipped) : '');
@@ -2097,7 +2107,7 @@
         '<div>' + typeBadge + (q.job ? badge(q.flag, FLAG_TEXT[q.flag] + (q.runs ? ' (' + q.runs + ')' : '')) : '') + '</div></div>' +
         '<div class="acts">' + (shipped ? '<button data-unship="' + esc(q.id) + '">Undo</button>'
           : '<button class="primary" data-ship="' + esc(q.id) + '">' + (q.type === 'Order' ? 'Shipped' : 'Done') + '</button>' +
-            '<button class="danger" data-qcancel="' + esc(q.id) + '">Cancel</button>') + '</div>' + press + '</div>';
+            '<button class="danger" data-qcancel="' + esc(q.id) + '">Cancel</button>') + '</div>' + press + crew + '</div>';
     }).join('');
   }
   function qJobs() {
@@ -2118,7 +2128,7 @@
   });
   /** Lock the list while one change saves, so a tap can't land on a row that's being redrawn. */
   function qLock(on) {
-    Array.prototype.forEach.call(document.querySelectorAll('#qList select, #qList button'), function (el) { el.disabled = on; });
+    Array.prototype.forEach.call(document.querySelectorAll('#qList select, #qList button, #qList input'), function (el) { el.disabled = on; });
   }
   function qName(id) { var q = (M.queue || []).filter(function (x) { return x.id === id; })[0]; return q ? (q.job || q.note) : 'Job'; }
   function qSelBar() {
@@ -2147,6 +2157,16 @@
   $('qList').addEventListener('change', function (e) {
     var sel = e.target.getAttribute('data-qsel');
     if (sel) { if (e.target.checked) M.sel[sel] = true; else delete M.sel[sel]; qSelBar(); return; }
+    var cid = e.target.getAttribute('data-crewop') || e.target.getAttribute('data-crewpk');
+    if (cid) {   // operator picked or packers typed: save both for that job
+      var op = document.querySelector('#qList select[data-crewop="' + cid + '"]').value;
+      var pk = document.querySelector('#qList input[data-crewpk="' + cid + '"]').value.trim(), cname = qName(cid);
+      qLock(true); setMsg('mMsg', 'Saving crew for ' + cname + '…');
+      srv('queueCrew', [cid, op, pk], function (d) {
+        qShow(d); setMsg('mMsg', cname + ': ' + (op ? 'operator ' + op : 'no operator') + (pk ? ', packers ' + pk : '') + '.', 'ok');
+      }, function (err) { qLock(false); mErr(err); });
+      return;
+    }
     var id = e.target.getAttribute('data-assign'); if (!id) return;
     var press = e.target.value, name = qName(id);
     qLock(true); setMsg('mMsg', 'Saving: ' + name + (press ? ' → ' + press : ' off the press') + '…');
