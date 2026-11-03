@@ -299,7 +299,7 @@
     .mhead { position: sticky; top: 0; z-index: 5; background: var(--bg); padding-top: 6px; }
     .mgroups { margin-bottom: 8px; }
     .mgroups button { font-size: 17px; padding: 12px 4px; }
-    .item > .qpress { grid-column: 1 / -1; margin-top: 0; }
+    .item > .qpress, .item > .qoff { grid-column: 1 / -1; margin-top: 0; }
     .item > .glist { grid-column: 1 / -1; border-left: 3px solid var(--line); padding-left: 12px; margin: 2px 0 4px 4px; }
     .glist .item { padding: 8px 0; }
     .countbar { bottom: var(--navh); }
@@ -1034,9 +1034,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.015';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.016';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.016', '11/3/2026', 'Manage → Queue flags a job when its operator or a packer has days off marked today or in the next 7 days.'],
     ['2.015', '11/3/2026', 'Days off: anyone can mark days they\'ll be off (day off, PTO or sick day, with an optional note) on the new Days off button. Manage → Crew shows everyone on a calendar. People can be set as Operator or Packer; the queue\'s operator list shows only operators and packers can be picked from a list.'],
     ['2.014', '11/3/2026', 'Ink Inventory has an Anilox tab for how many of each anilox size we have. Manage → Queue warns when the jobs first in line on all presses need more of a size than we have.'],
     ['2.013', '11/3/2026', 'Removed the extra label above "Press Tools" on the login page.'],
@@ -2310,6 +2311,18 @@
     var when = q.due ? (q.type === 'Order' ? 'due ' : '') + esc(q.due) : '';
     return [amt, when].filter(Boolean).join(' · ');
   }
+  /** Crew members (operator + typed packers) with days off marked today or in the next 7 days. */
+  function qOffText(op, packers, off) {
+    if (!off) return '';
+    var names = [op].concat(String(packers || '').split(',')).map(function (x) { return String(x || '').trim(); }).filter(Boolean);
+    return names.filter(function (n, i) { return off[n] && names.indexOf(n) === i; }).map(function (n) {
+      return n + ' is off ' + off[n].map(function (e) { return dayNice(e.from) + (e.to !== e.from ? ' – ' + dayNice(e.to) : '') + ' (' + e.type + ')'; }).join(', ');
+    }).join('; ');
+  }
+  function qOffHtml(op, packers, off) {
+    var t = qOffText(op, packers, off);
+    return t ? '<div class="push yellow qoff">⚠ ' + esc(t) + '</div>' : '';
+  }
   function qShow(d) {
     M.jobs = d.jobs; M.queue = d.queue;
     var nOpen = d.queue.filter(function (q) { return !q.closed; }).length;   // queue badge from this list; a queue save doesn't change the ink or supplies counts
@@ -2350,7 +2363,8 @@
         '<div>' + typeBadge + (q.job ? badge(q.flag, FLAG_TEXT[q.flag] + (q.runs ? ' (' + q.runs + ')' : '')) : '') + '</div></div>' +
         '<div class="acts">' + (shipped ? '<button data-unship="' + esc(q.id) + '">Undo</button>'
           : '<button class="primary" data-ship="' + esc(q.id) + '">' + (q.type === 'Order' ? 'Shipped' : 'Done') + '</button>' +
-            '<button class="danger" data-qcancel="' + esc(q.id) + '">Cancel</button>') + '</div>' + press + crew + '</div>';
+            '<button class="danger" data-qcancel="' + esc(q.id) + '">Cancel</button>') + '</div>' + press + crew +
+        (shipped ? '' : qOffHtml(q.operator, q.packers, d.off)) + '</div>';
     }).join('');
   }
   function qJobs() {
@@ -2414,7 +2428,10 @@
       var pk = document.querySelector('#qList input[data-crewpk="' + cid + '"]').value.trim(), cname = qName(cid);
       qLock(true); setMsg('mMsg', 'Saving crew for ' + cname + '…');
       srv('queueCrew', [cid, op, pk], function (d) {
-        qShow(d); setMsg('mMsg', cname + ': ' + (op ? 'operator ' + op : 'no operator') + (pk ? ', packers ' + pk : '') + '.', 'ok');
+        qShow(d);
+        var offNow = qOffText(op, pk, d.off);
+        setMsg('mMsg', cname + ': ' + (op ? 'operator ' + op : 'no operator') + (pk ? ', packers ' + pk : '') + '.' +
+          (offNow ? ' Heads up: ' + offNow + '.' : ''), offNow ? 'err' : 'ok');
       }, function (err) { qLock(false); mErr(err); });
       return;
     }
