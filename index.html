@@ -403,6 +403,25 @@
       .card { box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
       .badge.red { color: #b42318; } .badge.yellow, .badge.unv { color: #6b4e00; } .badge.green, .badge.ok { color: #1a7f4b; } .badge.blue { color: #1f4f9a; }
     }
+
+    /* ---- days off calendar (2.015) ---- */
+    .cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin-top: 10px; }
+    .cal .dow { text-align: center; font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .08em; padding-bottom: 2px; }
+    .dcell { min-height: 66px; padding: 4px 3px; border-radius: 10px; border: 1px solid var(--line); background: var(--field); color: var(--text);
+      text-align: left; font-weight: 600; display: flex; flex-direction: column; gap: 2px; overflow: hidden; box-shadow: none; }
+    .dcell .dn { font-size: 12px; color: var(--muted); padding-left: 2px; }
+    .dcell.today { border-color: var(--accent); }
+    .dcell.today .dn { color: var(--accent); font-weight: 800; }
+    .dcell.sel { background: var(--accent-soft); border-color: var(--accent); }
+    .dcell.blank { visibility: hidden; }
+    .dname { display: block; font-size: 10.5px; line-height: 1.35; padding: 1px 4px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+    .dmore { font-size: 10.5px; color: var(--muted); padding-left: 3px; }
+    .t-off { background: rgba(148,163,184,.24); } .t-pto { background: rgba(95,168,216,.34); } .t-sick { background: rgba(251,146,60,.30); }
+    .callegend { display: flex; gap: 6px; justify-content: center; margin-top: 8px; }
+    .callegend .dname { display: inline-block; font-size: 12px; padding: 2px 8px; }
+    #calPrev, #calNext { padding: 8px 14px; }
+    .navin button { letter-spacing: .04em; }   /* five areas fit on a phone */
+    @media print { .t-off { background: #eee; } .t-pto { background: #dbeafe; } .t-sick { background: #ffedd5; } }
   </style>
 </head>
 <body>
@@ -716,6 +735,7 @@
       <button data-g="jobs" class="on">Jobs</button>
       <button data-g="ink">Ink<span class="cnt" data-c="order"></span></button>
       <button data-g="reports">Reports<span class="cnt" data-c="supplies"></span></button>
+      <button data-g="crew">Crew</button>
     </div>
     <div class="tabs" id="mTabs">
       <button data-t="queue" data-g="jobs" class="on">Queue<span class="cnt soft" data-c="queue"></span></button>
@@ -727,6 +747,7 @@
       <button data-t="stock" data-g="ink">Stock &amp; minimums</button>
       <button data-t="waste" data-g="reports">Waste</button>
       <button data-t="supplies" data-g="reports">Low supplies<span class="cnt" data-c="supplies"></span></button>
+      <button data-t="daysoff" data-g="crew">Days off</button>
     </div>
     </div>
 
@@ -894,6 +915,46 @@
         </div>
       </div>
     </div>
+    <div id="m_daysoff" class="mpane hidden">
+      <div class="card">
+        <div class="cardhead">
+          <button id="calPrev" class="chip" aria-label="Previous month">◀</button>
+          <h2 id="calTitle" style="flex:1;text-align:center"></h2>
+          <button id="calNext" class="chip" aria-label="Next month">▶</button>
+        </div>
+        <div class="callegend"><span class="dname t-off">Day off</span><span class="dname t-pto">PTO</span><span class="dname t-sick">Sick day</span></div>
+        <div class="cal" id="calGrid"></div>
+      </div>
+      <div class="card" id="calDayCard">
+        <h2 id="calDayTitle">Tap a day</h2>
+        <div id="calDay"><p class="muted">Tap a day to see who's off.</p></div>
+      </div>
+      <div class="card">
+        <h2>Everyone off this month</h2>
+        <div id="calList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== DAYS OFF (everyone) ===================== -->
+  <section id="daysOffView" class="view hidden">
+    <div class="card">
+      <h2>Mark days off</h2>
+      <div class="row2">
+        <div><label for="doFrom">From</label><input type="date" id="doFrom"></div>
+        <div><label for="doTo">To (optional)</label><input type="date" id="doTo"></div>
+      </div>
+      <p class="hint">Leave "To" blank for one day.</p>
+      <label>Type</label>
+      <div class="seg" id="doType"><button data-v="Day off" class="on">Day off</button><button data-v="PTO">PTO</button><button data-v="Sick day">Sick day</button></div>
+      <label for="doNotes">Notes (optional)</label>
+      <input id="doNotes" maxlength="300" autocomplete="off" placeholder="Optional. No reason needed.">
+      <button id="doAdd" class="primary wide">Add</button>
+    </div>
+    <div class="card">
+      <h2>My days off</h2>
+      <div id="doMine"><p class="muted">Loading…</p></div>
+    </div>
   </section>
 
   <!-- ===================== ADMIN ===================== -->
@@ -909,8 +970,10 @@
         <div class="row2">
           <div><label for="uLevel">Level</label>
             <select id="uLevel"><option value="1">1 · Operator + Ink Inventory</option><option value="2">2 · + Management</option><option value="3">3 · + Admin</option></select></div>
-          <div><label class="check" style="margin-top:38px"><input type="checkbox" id="uActive" checked> Can log in</label></div>
+          <div><label for="uRole">Role</label>
+            <select id="uRole"><option value="Operator">Operator</option><option value="Packer">Packer</option></select></div>
         </div>
+        <label class="check" style="margin-top:12px"><input type="checkbox" id="uActive" checked> Can log in</label>
         <div class="row2">
           <button id="uCancel" class="wide">Cancel</button>
           <button id="uSave" class="primary wide">Save</button>
@@ -964,15 +1027,17 @@
   <div id="invMsg" class="msg"></div>
   <div id="mMsg" class="msg"></div>
   <div id="aMsg" class="msg"></div>
+  <div id="doMsg" class="msg"></div>
 </div>
 
 <!-- areas this login can use -->
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.014';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.015';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.015', '11/3/2026', 'Days off: anyone can mark days they\'ll be off (day off, PTO or sick day, with an optional note) on the new Days off button. Manage → Crew shows everyone on a calendar. People can be set as Operator or Packer; the queue\'s operator list shows only operators and packers can be picked from a list.'],
     ['2.014', '11/3/2026', 'Ink Inventory has an Anilox tab for how many of each anilox size we have. Manage → Queue warns when the jobs first in line on all presses need more of a size than we have.'],
     ['2.013', '11/3/2026', 'Removed the extra label above "Press Tools" on the login page.'],
     ['2.012', '11/3/2026', 'New look, "Pressroom Dark": dark screens in the company logo\'s blue, rounded buttons, and the logo without its white box. Manage opens with tiles for inks to order, open jobs and low supplies (tap one to go there). Printouts stay black on white.'],
@@ -1686,7 +1751,7 @@
   /* =====================================================================
      SMALL HELPERS FOR THE NEW SCREENS
      ===================================================================== */
-  var TOASTS = ['msg', 'w_msg', 'invMsg', 'mMsg', 'aMsg'], TOAST_T = {};
+  var TOASTS = ['msg', 'w_msg', 'invMsg', 'mMsg', 'aMsg', 'doMsg'], TOAST_T = {};
   function setMsg(id, text, kind) {
     var m = $(id); m.textContent = text || ''; m.className = 'msg' + (kind ? ' ' + kind : '');
     if (TOASTS.indexOf(id) === -1) return;
@@ -1712,9 +1777,9 @@
      LOGIN, ROLES AND SCREENS
      ===================================================================== */
   var V = { current: 'login' };
-  var VIEWS = { login: 'loginView', operator: 'operatorView', inventory: 'inventoryView', management: 'manageView', admin: 'adminView' };
-  var TITLES = { operator: 'Operator', inventory: 'Ink Inventory', management: 'Management', admin: 'Admin' };
-  var NAV_LABEL = { operator: 'Operator', inventory: 'Inventory', management: 'Manage', admin: 'Admin' };
+  var VIEWS = { login: 'loginView', operator: 'operatorView', inventory: 'inventoryView', management: 'manageView', admin: 'adminView', daysoff: 'daysOffView' };
+  var TITLES = { operator: 'Operator', inventory: 'Ink Inventory', management: 'Management', admin: 'Admin', daysoff: 'Days off' };
+  var NAV_LABEL = { operator: 'Operator', inventory: 'Inventory', management: 'Manage', admin: 'Admin', daysoff: 'Days off' };
 
   function deviceId() {
     var d = store('pt_device');
@@ -1739,6 +1804,7 @@
     if (view === 'inventory') invLoad();
     if (view === 'management') mOpen(M.tab);
     if (view === 'admin') aLoad();
+    if (view === 'daysoff') doLoad();
   }
 
   function startSession(sess, reopened) {
@@ -2119,7 +2185,8 @@
     states: function () { srv('statesList', [], statesShow, mErr); },
     notices: function () { srv('noticesList', [], function (d) { noticesShow(d); ntShow(d); }, mErr); },
     resources: function () { srv('resourcesList', [], rsShow, mErr); },
-    jobs: function () { srv('jobGet', [''], jbLists, mErr); }
+    jobs: function () { srv('jobGet', [''], jbLists, mErr); },
+    daysoff: function () { calLoad(); }
   };
   /* Jobs (Queue, Edit jobs, States) · Ink (Ordering, Stock & minimums) · Reports (Waste, Low supplies) */
   function mGroupOf(t) { var b = document.querySelector('#mTabs button[data-t="' + t + '"]'); return b ? b.getAttribute('data-g') : 'jobs'; }
@@ -2269,7 +2336,9 @@
       var crew = shipped ? '' : '<div class="qpress qcrew"><select data-crewop="' + esc(q.id) + '" aria-label="Operator for ' + esc(q.job || q.note) + '">' +
         opt('', 'No operator', !q.operator) + (d.operators || []).concat(q.operator && (d.operators || []).indexOf(q.operator) === -1 ? [q.operator] : [])
           .map(function (n) { return opt(n, n, n === q.operator); }).join('') + '</select>' +
-        '<input data-crewpk="' + esc(q.id) + '" value="' + esc(q.packers) + '" maxlength="200" placeholder="Packers" aria-label="Packers for ' + esc(q.job || q.note) + '"></div>';
+        '<input data-crewpk="' + esc(q.id) + '" value="' + esc(q.packers) + '" maxlength="200" placeholder="Packers" aria-label="Packers for ' + esc(q.job || q.note) + '">' +
+        ((d.packers || []).length ? '<select data-crewadd="' + esc(q.id) + '" aria-label="Add a packer to ' + esc(q.job || q.note) + '">' + opt('', '+ packer', true) +
+          d.packers.map(function (n) { return opt(n, n, false); }).join('') + '</select>' : '') + '</div>';
       var title = q.job ? esc(q.job) + ' <span class="muted">· ' + esc(q.state) + '</span>' : esc(q.note);
       var typeBadge = q.type === 'Stock' ? badge('gray', 'For stock') + ' ' : q.type === 'Note' ? badge('gray', 'Note') + ' ' : '';
       var info = qLine(q) + (shipped ? (qLine(q) ? ' · ' : '') + q.status.toLowerCase() + ' ' + esc(q.shipped) : '');
@@ -2331,7 +2400,15 @@
   $('qList').addEventListener('change', function (e) {
     var sel = e.target.getAttribute('data-qsel');
     if (sel) { if (e.target.checked) M.sel[sel] = true; else delete M.sel[sel]; qSelBar(); return; }
-    var cid = e.target.getAttribute('data-crewop') || e.target.getAttribute('data-crewpk');
+    var add = e.target.getAttribute('data-crewadd');
+    if (add) {   // "+ packer": add the picked packer to the typed list, then save like a typed change
+      var box = document.querySelector('#qList input[data-crewpk="' + add + '"]'), who = e.target.value;
+      if (!who) return;
+      var names = box.value.split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+      if (names.indexOf(who) === -1) names.push(who);
+      box.value = names.join(', ');
+    }
+    var cid = add || e.target.getAttribute('data-crewop') || e.target.getAttribute('data-crewpk');
     if (cid) {   // operator picked or packers typed: save both for that job
       var op = document.querySelector('#qList select[data-crewop="' + cid + '"]').value;
       var pk = document.querySelector('#qList input[data-crewpk="' + cid + '"]').value.trim(), cname = qName(cid);
@@ -2709,6 +2786,107 @@
   /* =====================================================================
      ADMIN
      ===================================================================== */
+
+  /* =====================================================================
+     DAYS OFF: everyone marks their own; management sees the month calendar
+     ===================================================================== */
+  var DO_CLASS = { 'Day off': 't-off', 'PTO': 't-pto', 'Sick day': 't-sick' };
+  var DO_BADGE = { 'Day off': 'gray', 'PTO': 'blue', 'Sick day': 'yellow' };
+  var MON = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  var DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  function isoParts(iso) { return { y: +iso.slice(0, 4), m: +iso.slice(5, 7), d: +iso.slice(8, 10) }; }
+  function isoDow(iso) { var p = isoParts(iso); return new Date(Date.UTC(p.y, p.m - 1, p.d)).getUTCDay(); }
+  function isoAdd(iso, n) { var p = isoParts(iso); return new Date(Date.UTC(p.y, p.m - 1, p.d + n)).toISOString().slice(0, 10); }
+  /** 'yyyy-mm-dd' → 'Thu 11/5'. */
+  function dayNice(iso) { var p = isoParts(iso); return DOW[isoDow(iso)] + ' ' + p.m + '/' + p.d; }
+  function dayRange(e) { return dayNice(e.from) + (e.to !== e.from ? ' – ' + dayNice(e.to) + ' (' + e.days + ' days)' : ''); }
+
+  function doLoad() { srv('daysOffMine', [], doShow, function (e) { setMsg('doMsg', errText(e), 'err'); }); }
+  function doShow(d) {
+    $('doMine').innerHTML = d.mine.length ? d.mine.map(function (e) {
+      var past = e.to < d.today;
+      return '<div class="item"><div><div class="t">' + esc(dayRange(e)) + ' ' + badge(DO_BADGE[e.type] || 'gray', e.type) + (past ? ' ' + badge('gray', 'Past') : '') + '</div>' +
+        (e.notes ? '<div class="s">' + esc(e.notes) + '</div>' : '') + '</div>' +
+        '<div class="acts"><button class="danger" data-dorm="' + esc(e.id) + '">Remove</button></div></div>';
+    }).join('') : '<p class="muted">Nothing marked. Add a day above.</p>';
+  }
+  $('doType').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-v]'); if (!b) return;
+    Array.prototype.forEach.call($('doType').children, function (x) { x.classList.toggle('on', x === b); });
+  });
+  $('doAdd').addEventListener('click', function () {
+    var type = document.querySelector('#doType button.on').getAttribute('data-v');
+    var from = $('doFrom').value, to = $('doTo').value;
+    if (!from) { setMsg('doMsg', 'Pick the first day off.', 'err'); return; }
+    $('doAdd').disabled = true; setMsg('doMsg', 'Saving…');
+    srv('dayOffAdd', [from, to, type, $('doNotes').value], function (d) {
+      $('doAdd').disabled = false; $('doFrom').value = ''; $('doTo').value = ''; $('doNotes').value = '';
+      Array.prototype.forEach.call($('doType').children, function (x) { x.classList.toggle('on', x.getAttribute('data-v') === 'Day off'); });
+      doShow(d); setMsg('doMsg', type + ' saved: ' + dayNice(from) + (to && to !== from ? ' – ' + dayNice(to) : '') + '.', 'ok');
+    }, function (e) { $('doAdd').disabled = false; setMsg('doMsg', errText(e), 'err'); });
+  });
+  $('doMine').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-dorm]'); if (!b) return;
+    if (!confirm('Remove this day off?')) return;
+    b.disabled = true;
+    srv('dayOffRemove', [b.getAttribute('data-dorm')], function (d) { doShow(d); setMsg('doMsg', 'Removed.', 'ok'); },
+      function (err) { b.disabled = false; setMsg('doMsg', errText(err), 'err'); });
+  });
+
+  /* Manage → Crew → Days off: month calendar of everyone's days off */
+  var CAL = { ym: '', data: null, day: '' };
+  function calLoad(ym) {
+    if (ym !== undefined) CAL.ym = ym;
+    setMsg('mMsg', 'Loading…');
+    srv('daysOffMonth', [CAL.ym], function (d) { setMsg('mMsg', ''); calShow(d); }, mErr);
+  }
+  function calOn(iso) { return CAL.data.entries.filter(function (e) { return e.from <= iso && e.to >= iso; }); }
+  function calShow(d) {
+    CAL.data = d; CAL.ym = d.month;
+    var p = isoParts(d.first);
+    $('calTitle').textContent = MON[p.m - 1] + ' ' + p.y;
+    if (!CAL.day || CAL.day < d.first || CAL.day > d.last) CAL.day = d.today >= d.first && d.today <= d.last ? d.today : '';
+    var cells = DOW.map(function (w) { return '<div class="dow">' + w.charAt(0) + '</div>'; });
+    for (var i = 0; i < isoDow(d.first); i++) cells.push('<div class="dcell blank"></div>');
+    for (var iso = d.first; iso <= d.last; iso = isoAdd(iso, 1)) {
+      var on = calOn(iso);
+      var names = on.slice(0, 2).map(function (e) { return '<span class="dname ' + (DO_CLASS[e.type] || 't-off') + '">' + esc(e.name.split(' ')[0]) + '</span>'; }).join('');
+      cells.push('<button class="dcell' + (iso === d.today ? ' today' : '') + (iso === CAL.day ? ' sel' : '') + '" data-day="' + iso + '"' +
+        ' aria-label="' + esc(dayNice(iso) + ': ' + (on.length ? on.map(function (e) { return e.name; }).join(', ') : 'nobody off')) + '">' +
+        '<span class="dn">' + isoParts(iso).d + '</span>' + names + (on.length > 2 ? '<span class="dmore">+' + (on.length - 2) + '</span>' : '') + '</button>');
+    }
+    $('calGrid').innerHTML = cells.join('');
+    calDay();
+    $('calList').innerHTML = d.entries.length ? d.entries.map(calRow).join('') : '<p class="muted">Nobody has marked days off this month.</p>';
+  }
+  function calRow(e) {
+    return '<div class="item"><div><div class="t">' + esc(e.name) + ' <span class="muted">· ' + esc(e.role || '—') + '</span> ' + badge(DO_BADGE[e.type] || 'gray', e.type) + '</div>' +
+      '<div class="s">' + esc(dayRange(e)) + (e.notes ? ' · ' + esc(e.notes) : '') + '</div></div>' +
+      '<div class="acts"><button class="danger" data-calrm="' + esc(e.id) + '">Remove</button></div></div>';
+  }
+  function calDay() {
+    if (!CAL.day) { $('calDayTitle').textContent = 'Tap a day'; $('calDay').innerHTML = '<p class="muted">Tap a day to see who\'s off.</p>'; return; }
+    var on = calOn(CAL.day);
+    $('calDayTitle').textContent = dayNice(CAL.day) + (on.length ? ': ' + on.length + ' off' : '');
+    $('calDay').innerHTML = on.length ? on.map(calRow).join('') : '<p class="muted">Nobody off.</p>';
+  }
+  $('calGrid').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-day]'); if (!b) return;
+    CAL.day = b.getAttribute('data-day');
+    Array.prototype.forEach.call($('calGrid').querySelectorAll('.dcell'), function (x) { x.classList.toggle('sel', x === b); });
+    calDay();
+  });
+  function calShift(n) { var p = isoParts(CAL.data ? CAL.data.first : new Date().toISOString()); calLoad(new Date(Date.UTC(p.y, p.m - 1 + n, 1)).toISOString().slice(0, 7)); }
+  $('calPrev').addEventListener('click', function () { calShift(-1); });
+  $('calNext').addEventListener('click', function () { calShift(1); });
+  $('m_daysoff').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-calrm]'); if (!b) return;
+    if (!confirm('Remove this day off from the calendar?')) return;
+    b.disabled = true;
+    srv('dayOffRemove', [b.getAttribute('data-calrm'), CAL.ym], function (d) { calShow(d.month); setMsg('mMsg', 'Removed.', 'ok'); },
+      function (err) { b.disabled = false; mErr(err); });
+  });
+
   var ADM = { users: [] };
   function aErr(e) { setMsg('aMsg', errText(e), 'err'); }
   function aLoad() { srv('usersList', [], userShow, aErr); }
@@ -2716,14 +2894,14 @@
     ADM.users = list;
     $('userList').innerHTML = list.map(function (u) {
       return '<div class="item"><div><div class="t">' + esc(u.name) + ' ' + (u.active ? '' : badge('gray', 'Off')) + '</div>' +
-        '<div class="s">PIN ' + esc(u.pin) + ' · Level ' + u.level + '</div></div>' +
+        '<div class="s">' + esc(u.role || 'Operator') + ' · PIN ' + esc(u.pin) + ' · Level ' + u.level + '</div></div>' +
         '<div class="acts"><button data-urow="' + u.row + '">Edit</button></div></div>';
     }).join('') || '<p class="muted">No one yet.</p>';
   }
   function userForm(u) {
     show('userForm', true);
     $('uRow').value = u ? u.row : ''; $('uName').value = u ? u.name : ''; $('uPin').value = u ? u.pin : '';
-    $('uLevel').value = u ? u.level : 1; $('uActive').checked = u ? u.active : true;
+    $('uLevel').value = u ? u.level : 1; $('uActive').checked = u ? u.active : true; $('uRole').value = u && u.role === 'Packer' ? 'Packer' : 'Operator';
     $('uName').focus();
   }
   $('userNew').addEventListener('click', function () { userForm(null); });
@@ -2733,7 +2911,7 @@
     userForm(ADM.users.filter(function (u) { return String(u.row) === b.getAttribute('data-urow'); })[0]);
   });
   $('uSave').addEventListener('click', function () {
-    var u = { row: $('uRow').value, name: $('uName').value, pin: $('uPin').value, level: $('uLevel').value, active: $('uActive').checked };
+    var u = { row: $('uRow').value, name: $('uName').value, pin: $('uPin').value, level: $('uLevel').value, active: $('uActive').checked, role: $('uRole').value };
     $('uSave').disabled = true;
     srv('userSave', [u], function (list) {
       $('uSave').disabled = false; show('userForm', false); userShow(list); setMsg('aMsg', 'Saved ' + u.name + '.', 'ok');
