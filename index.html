@@ -861,9 +861,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.010';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.011';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.011', '11/3/2026', 'Faster saves for ink taps, Start Run and the job queue. The queue shows each job\'s real place in its press\'s line.'],
     ['2.010', '11/2/2026', 'The ink run screen shows the state with the game name. Queue jobs get an operator (from the people list) and packers, shown on the press\'s assignment card.'],
     ['2.009', '11/2/2026', 'Ink ordering: an "Ordered" tick box on the order list and Ink needed, shown on the stock list and printouts until the ink is received. Ink Inventory: a find box to type an ink number and jump to it while counting or receiving.'],
     ['2.008', '10/30/2026', 'Company Directory is built into Resources → Company Info, so numbers can be tapped to call on iPhones too.'],
@@ -1972,7 +1973,7 @@
     });
     Object.keys(M_LOAD).forEach(function (k) { show('m_' + k, k === t); });
     M_LOAD[t]();
-    if (['queue', 'supplies', 'stock', 'order'].indexOf(t) === -1) mCounts();   // those screens refresh the counts when they draw
+    if (['supplies', 'stock', 'order'].indexOf(t) === -1) mCounts();   // those screens refresh the counts when they draw
   }
   /** Numbers on the buttons: inks to order, open low-supply reports, unshipped jobs. */
   function mCounts() {
@@ -2074,7 +2075,9 @@
     return [amt, when].filter(Boolean).join(' · ');
   }
   function qShow(d) {
-    M.jobs = d.jobs; M.queue = d.queue; mCounts();
+    M.jobs = d.jobs; M.queue = d.queue;
+    var nOpen = d.queue.filter(function (q) { return !q.closed; }).length;   // queue badge from this list; a queue save doesn't change the ink or supplies counts
+    Array.prototype.forEach.call(document.querySelectorAll('#manageView .cnt[data-c="queue"]'), function (el) { el.textContent = nOpen ? nOpen : ''; });
     var open = {}; d.queue.forEach(function (q) { if (!q.closed) open[q.id] = true; });
     M.sel = M.sel || {}; Object.keys(M.sel).forEach(function (id) { if (!open[id]) delete M.sel[id]; });
     qSelBar();
@@ -2089,7 +2092,7 @@
       var shipped = q.closed;
       var press = shipped ? '' : '<div class="qpress"><select data-assign="' + esc(q.id) + '" aria-label="Press for ' + esc(q.job || q.note) + '">' +
         opt('', 'No press', !q.press) + d.presses.map(function (p) { return opt(p, p, p === q.press); }).join('') + '</select>' +
-        (q.press ? '<span class="muted">#' + q.pressOrder + ' in line</span>' +
+        (q.press ? '<span class="muted">#' + (q.line || q.pressOrder) + ' in line</span>' +
           '<button data-move="' + esc(q.id) + '" data-dir="-1" aria-label="Move up">▲</button>' +
           '<button data-move="' + esc(q.id) + '" data-dir="1" aria-label="Move down">▼</button>' : '') + '</div>';
       var crew = shipped ? '' : '<div class="qpress qcrew"><select data-crewop="' + esc(q.id) + '" aria-label="Operator for ' + esc(q.job || q.note) + '">' +
@@ -2187,8 +2190,8 @@
     if (!ship && !unship) return;
     qLock(true);
     var label = b.textContent;
-    srv('queueShip', [ship || unship, !!unship], function () {
-      M_LOAD.queue(); setMsg('mMsg', ship ? (label === 'Done' ? 'Marked done.' : 'Marked shipped.') : 'Back in the queue.', 'ok');
+    srv('queueShip', [ship || unship, !!unship, $('qShowShipped').checked], function (d) {
+      qShow(d); setMsg('mMsg', ship ? (label === 'Done' ? 'Marked done.' : 'Marked shipped.') : 'Back in the queue.', 'ok');
     }, mErr);
   });
 
