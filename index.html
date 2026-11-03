@@ -628,7 +628,19 @@
   <!-- ===================== INK INVENTORY ===================== -->
   <section id="inventoryView" class="view hidden">
     <div class="seg optabs" id="invTabs">
-      <button data-v="count">Count<span class="cnt soft" id="countTabN"></span></button><button data-v="receive">Receive</button><button data-v="list" class="on">Stock list</button>
+      <button data-v="count">Count<span class="cnt soft" id="countTabN"></span></button><button data-v="receive">Receive</button><button data-v="list" class="on">Stock</button><button data-v="anilox">Anilox</button>
+    </div>
+    <div class="card hidden" id="anxCard" data-tab="anilox">
+      <h2>Aniloxes</h2>
+      <p class="muted" style="margin-top:0">How many of each size we have. Manage → Queue warns when the jobs first in line on all presses need more of a size than this.</p>
+      <div id="anxCheck"></div>
+      <div id="anxBody"></div>
+      <label for="anxNewSize">Add a size</label>
+      <div class="row2">
+        <input id="anxNewSize" inputmode="numeric" placeholder="Size, e.g. 600" autocomplete="off">
+        <input id="anxNewHave" inputmode="numeric" placeholder="How many" autocomplete="off">
+      </div>
+      <button id="anxSave" class="primary wide">Save anilox counts</button>
     </div>
     <div id="countResult" class="card hidden" data-tab="list">
       <h2>Shelf count</h2>
@@ -740,6 +752,7 @@
       <div class="card">
         <div class="cardhead"><h2>Open</h2>
           <label class="check"><input type="checkbox" id="qShowShipped"> Show shipped / done / cancelled</label></div>
+        <div id="qAnilox"></div>
         <div id="qList"></div>
         <div id="qSelBar" class="qselbar hidden"><span id="qSelN"></span>
           <button id="qSelCancel" class="danger">Cancel selected</button><button id="qSelClear">Clear</button></div>
@@ -957,9 +970,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.013';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.014';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.014', '11/3/2026', 'Ink Inventory has an Anilox tab for how many of each anilox size we have. Manage → Queue warns when the jobs first in line on all presses need more of a size than we have.'],
     ['2.013', '11/3/2026', 'Removed the extra label above "Press Tools" on the login page.'],
     ['2.012', '11/3/2026', 'New look, "Pressroom Dark": dark screens in the company logo\'s blue, rounded buttons, and the logo without its white box. Manage opens with tiles for inks to order, open jobs and low supplies (tap one to go there). Printouts stay black on white.'],
     ['2.011', '11/3/2026', 'Faster saves for ink taps, Start Run and the job queue. The queue shows each job\'s real place in its press\'s line.'],
@@ -1831,7 +1845,7 @@
 
   /* Count | Receive | Stock list. Typed counts are kept while switching tabs, until saved or cancelled. */
   function invTab(v) {
-    if (['count', 'receive', 'list'].indexOf(v) === -1) v = 'list';
+    if (['count', 'receive', 'list', 'anilox'].indexOf(v) === -1) v = 'list';
     INV.tab = v; store('invTab', v);
     INV.counting = v === 'count';
     if (INV.counting) show('countResult', false);
@@ -1841,8 +1855,57 @@
     });
     $('invListTitle').textContent = INV.counting ? 'Count the shelf' : 'Ink on the shelf';
     setMsg('countMsg', '');
+    show('anxCard', v === 'anilox');
+    if (v === 'anilox') anxLoad();
     if (INV.inks.length) invRender();
   }
+
+  /* ---- Aniloxes: counts per size, and the shortage check for the Now job on each press ---- */
+  /** Shortage lines (Manage → Queue and the Anilox tab). c = aniloxCheck_ result. */
+  function anxShortHtml(c) {
+    if (!c) return '';
+    var h = '';
+    if (c.short.length) h += '<div class="push red" id="anxShort"><b>Anilox short</b>' + c.short.map(function (s) {
+      return '<div>' + s.size + ': needs ' + s.need + ', have ' + s.have + ' (' + s.jobs.map(function (j) {
+        return esc(j.press + ' ' + j.job) + (j.n > 1 ? ' ×' + j.n : '');
+      }).join(', ') + ')</div>';
+    }).join('') + '</div>';
+    if (c.blank.length) h += '<p class="muted">No anilox listed for ' + c.blank.map(function (b) {
+      return esc(b.press + ' ' + b.job) + ' (' + b.n + (b.n === 1 ? ' ink' : ' inks') + ')';
+    }).join(', ') + ', so those stations aren\'t checked.</p>';
+    return h;
+  }
+  function anxLoad() {
+    $('anxBody').innerHTML = '<p class="muted">Loading…</p>';
+    srv('aniloxList', [], anxShow, function (e) { setMsg('invMsg', errText(e), 'err'); });
+  }
+  function anxShow(d) {
+    $('anxCheck').innerHTML = anxShortHtml(d.check);
+    $('anxBody').innerHTML = d.sizes.length ? d.sizes.map(function (s) {
+      var sub = s.missing ? '<span class="badge red">Not on the list yet</span> ' : '';
+      sub += s.inUse ? 'In use by Now jobs: <b>' + s.inUse + '</b>' : 'Not used by Now jobs';
+      if (s.updated) sub += ' · counted ' + esc(s.updated) + (s.by ? ' by ' + esc(s.by) : '');
+      return '<div class="item"><div><div class="t">' + s.size + '</div><div class="s">' + sub + '</div></div>' +
+        '<input data-anx="' + s.size + '" inputmode="numeric" value="' + (s.missing ? '' : s.have) + '" aria-label="How many ' + s.size + ' aniloxes" style="width:84px;text-align:center"></div>';
+    }).join('') : '<p class="muted">No aniloxes on the list yet. Add each size below.</p>';
+  }
+  $('anxSave').addEventListener('click', function () {
+    var counts = [];
+    Array.prototype.forEach.call(document.querySelectorAll('#anxBody input[data-anx]'), function (el) {
+      if (el.value.trim() !== '') counts.push({ size: el.getAttribute('data-anx'), have: el.value.trim() });
+    });
+    var ns = $('anxNewSize').value.trim(), nh = $('anxNewHave').value.trim();
+    if (ns || nh) {
+      if (!ns || !nh) { setMsg('invMsg', 'Type both the new size and how many.', 'err'); return; }
+      counts.push({ size: ns, have: nh });
+    }
+    $('anxSave').disabled = true; setMsg('invMsg', 'Saving…');
+    srv('aniloxSave', [counts], function (d) {
+      $('anxSave').disabled = false; $('anxNewSize').value = ''; $('anxNewHave').value = '';
+      anxShow(d);
+      setMsg('invMsg', d.changed ? 'Saved anilox counts.' : 'No changes to save.', 'ok');
+    }, function (e) { $('anxSave').disabled = false; setMsg('invMsg', errText(e), 'err'); });
+  });
   $('invTabs').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-v]'); if (b) { invTab(b.getAttribute('data-v')); window.scrollTo(0, 0); }
   });
@@ -2194,6 +2257,7 @@
     $('qState').innerHTML = states.map(function (s) { return opt(s, s, s === keep); }).join('');
     qJobs();
     qTypeShow();
+    $('qAnilox').innerHTML = anxShortHtml(d.anilox);
     if (!d.queue.length) { $('qList').innerHTML = '<p class="muted">Nothing in the queue.</p>'; return; }
     $('qList').innerHTML = d.queue.map(function (q) {
       var shipped = q.closed;
