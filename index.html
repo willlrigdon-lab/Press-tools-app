@@ -421,6 +421,26 @@
     .callegend .dname { display: inline-block; font-size: 12px; padding: 2px 8px; }
     #calPrev, #calNext { padding: 8px 14px; }
     .navin button { letter-spacing: .04em; }   /* five areas fit on a phone */
+    /* ---- run log (2.017) ---- */
+    .ink .mix { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .ink .mixbtn { padding: 2px 0; font-size: 14px; }
+    .ink .mixlot { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; padding: 4px 6px 4px 10px; }
+    .ink .mixrm { padding: 0 4px; font-size: 14px; text-decoration: none; color: inherit; }
+    .ink .mixform { width: 100%; display: grid; gap: 6px; }
+    .ink .mixform input { font-size: 17px; padding: 10px; }
+    .ink .mixform button { padding: 10px; font-size: 16px; }
+    .rlrun { padding: 12px 0; border-top: 1px solid var(--line); }
+    .rlrun:first-child { border-top: 0; }
+    .rlrun .t { font-weight: 700; }
+    .rlrun .s { color: var(--muted); font-size: 14px; }
+    .rlentry { margin: 8px 0 0 10px; padding-left: 10px; border-left: 3px solid var(--line); }
+    @media print {
+      body.printing-runlog * { visibility: hidden; }
+      body.printing-runlog #runlogCard, body.printing-runlog #runlogCard * { visibility: visible; }
+      body.printing-runlog #runlogCard { position: absolute; left: 0; top: 0; width: 100%; border: 0; padding: 0; }
+      body.printing-runlog .noprint { display: none !important; }
+      body.printing-runlog .rlentry { border-left-color: #999; }
+    }
     @media print { .t-off { background: #eee; } .t-pto { background: #dbeafe; } .t-sick { background: #ffedd5; } }
   </style>
 </head>
@@ -531,6 +551,16 @@
         <div class="card">
           <h2>Ink bottles</h2>
           <div id="runInks"></div>
+        </div>
+        <div class="card" id="devCard">
+          <h2>Setup deviations</h2>
+          <p class="muted" style="margin-top:0">Anything different from the standard setup on this run. Mixed-in-house inks: tap "Mixed in house?" on the ink above.</p>
+          <div id="devList"></div>
+          <label for="devText">What changed</label>
+          <input id="devText" maxlength="300" autocomplete="off" placeholder="e.g. Ran 185 on a 660 instead of 800">
+          <label for="devInk">Ink (optional)</label>
+          <select id="devInk"></select>
+          <button id="devAdd" class="wide">+ Log deviation</button>
         </div>
 
         <div class="card">
@@ -747,6 +777,7 @@
       <button data-t="stock" data-g="ink">Stock &amp; minimums</button>
       <button data-t="waste" data-g="reports">Waste</button>
       <button data-t="supplies" data-g="reports">Low supplies<span class="cnt" data-c="supplies"></span></button>
+      <button data-t="runlog" data-g="reports">Run log</button>
       <button data-t="daysoff" data-g="crew">Days off</button>
     </div>
     </div>
@@ -810,6 +841,24 @@
       </div>
     </div>
 
+    <div id="m_runlog" class="mpane hidden">
+      <div class="card" id="runlogCard">
+        <div class="cardhead"><h2>Run log</h2><button id="rlPrint" class="noprint">Print / PDF</button></div>
+        <p class="muted noprint" style="margin-top:0">Mixed-in-house ink lots and setup deviations logged on ink runs.</p>
+        <div class="noprint">
+          <div class="row2">
+            <div><label for="rlState">State</label><select id="rlState"></select></div>
+            <div><label for="rlJob">Job</label><select id="rlJob"></select></div>
+          </div>
+          <div class="row2">
+            <div><label for="rlFrom">From</label><input type="date" id="rlFrom"></div>
+            <div><label for="rlTo">To</label><input type="date" id="rlTo"></div>
+          </div>
+        </div>
+        <p class="muted" id="rlFilters"></p>
+        <div id="rlList"></div>
+      </div>
+    </div>
     <div id="m_supplies" class="mpane hidden">
       <div class="card">
         <div class="cardhead"><h2>Low supply reports</h2>
@@ -1034,9 +1083,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.016';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.017';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.017', '11/3/2026', 'Ink run: record the lot number when an ink mixed in house is used ("Mixed in house?" on any ink), and log setup deviations. Manage → Reports → Run log lists them by job and date, and prints.'],
     ['2.016', '11/3/2026', 'Manage → Queue flags a job when its operator or a packer has days off marked today or in the next 7 days.'],
     ['2.015', '11/3/2026', 'Days off: anyone can mark days they\'ll be off (day off, PTO or sick day, with an optional note) on the new Days off button. Manage → Crew shows everyone on a calendar. People can be set as Operator or Packer; the queue\'s operator list shows only operators and packers can be picked from a list.'],
     ['2.014', '11/3/2026', 'Ink Inventory has an Anilox tab for how many of each anilox size we have. Manage → Queue warns when the jobs first in line on all presses need more of a size than we have.'],
@@ -1487,7 +1537,7 @@
     $('palMinus').disabled = !(r.pallets > 0);
     if (document.activeElement !== $('partialIn')) $('partialIn').value = r.partial ? r.partial : '';
 
-    var html = '';
+    var html = '', log = runLog();
     ['Front', 'Back'].forEach(function (side) {
       var inks = r.inks.filter(function (k) { return k.side === side; });
       if (!inks.length) return;
@@ -1506,11 +1556,70 @@
           (open ? '<div class="parts">' + [0.25, 0.5, 0.75].map(function (q) {
             return '<button class="plus" data-k="' + esc(k.key) + '" data-q="' + q + '">+' + PART[q] + '</button>';
           }).join('') + '</div>' : '') +
-          '</div></div>';
+          '</div>' + mixHtml(k, log) + '</div>';
       });
     });
+    var keepLot = $('mixLot') ? $('mixLot').value : '', keepNote = $('mixNote') ? $('mixNote').value : '';
+    var typing = document.activeElement && document.activeElement.id;
     $('runInks').innerHTML = html;
+    if ($('mixLot')) {   // a redraw (tap, refresh) keeps what's being typed
+      $('mixLot').value = keepLot; $('mixNote').value = keepNote;
+      if (typing === 'mixLot' || typing === 'mixNote') $(typing).focus();
+    }
+    devRender(log);
   }
+  /** This run's log (mixed lots, deviations). Loads send it with the run; taps don't, so it's kept here. */
+  function runLog() {
+    var r = S.run;
+    if (r.log) { S.log = { runId: r.runId, list: r.log }; delete r.log; }
+    return S.log && S.log.runId === r.runId ? S.log.list : [];
+  }
+  function mixHtml(k, log) {
+    var mixed = log.filter(function (x) { return x.kind === 'Mixed ink' && x.ink === k.ink && x.side === k.side; });
+    var h = '<div class="mix">' + mixed.map(function (x) {
+      return '<span class="badge blue mixlot">Mixed · Lot ' + esc(x.lot) + (x.details ? ' · ' + esc(x.details) : '') +
+        ' <button class="link mixrm" data-lrm="' + esc(x.id) + '" aria-label="Remove lot ' + esc(x.lot) + '">✕</button></span>';
+    }).join('');
+    if (S.mixOpen === k.key) {
+      h += '<div class="mixform"><input id="mixLot" maxlength="40" autocomplete="off" placeholder="Lot # from the bucket" aria-label="Lot number for ' + esc(k.ink) + '">' +
+        '<input id="mixNote" maxlength="300" autocomplete="off" placeholder="Note (optional)" aria-label="Note for the mixed ' + esc(k.ink) + '">' +
+        '<div class="row2"><button data-mixcancel="1">Cancel</button><button class="primary" data-mixsave="' + esc(k.key) + '">Save lot</button></div></div>';
+    } else {
+      h += '<button class="link mixbtn" data-mix="' + esc(k.key) + '">' + (mixed.length ? '+ another lot' : 'Mixed in house?') + '</button>';
+    }
+    return h + '</div>';
+  }
+  function devRender(log) {
+    var devs = log.filter(function (x) { return x.kind === 'Deviation'; });
+    $('devList').innerHTML = devs.map(function (x) {
+      return '<div class="item"><div><div class="t">' + esc(x.details) + '</div><div class="s">' + (x.ink ? esc(x.ink + ' (' + x.side + ')') + ' · ' : '') +
+        esc(x.by) + ' · ' + esc(x.when) + '</div></div><div class="acts"><button class="danger" data-lrm="' + esc(x.id) + '">Remove</button></div></div>';
+    }).join('');
+    if (document.activeElement !== $('devInk')) {
+      var keep = $('devInk').value;
+      $('devInk').innerHTML = opt('', 'No particular ink', !keep) + S.run.inks.map(function (k) {
+        return opt(k.key, k.ink + ' (' + k.side + ')', k.key === keep);
+      }).join('');
+    }
+  }
+  function logSaved(runId, list, text) { S.log = { runId: runId, list: list }; renderRun(); msg(text, 'ok'); }
+  function logRemove(id) {
+    if (!confirm('Remove this entry?')) return;
+    msg('Removing…');
+    var runId = S.run.runId;
+    call('runLogRemove', [id], function (list) { logSaved(runId, list, 'Removed.'); });
+  }
+  $('devAdd').addEventListener('click', function () {
+    var text = $('devText').value.trim(), key = $('devInk').value;
+    if (!text) { msg('Type what was different from the standard setup.', 'err'); return; }
+    var k = S.run.inks.filter(function (x) { return x.key === key; })[0], runId = S.run.runId;
+    $('devAdd').disabled = true; msg('Saving deviation…');
+    srv('runLogAdd', [runId, 'Deviation', k ? k.side : '', k ? k.ink : '', '', text], function (list) {
+      $('devAdd').disabled = false; $('devText').value = ''; $('devInk').value = '';
+      logSaved(runId, list, 'Deviation logged.');
+    }, function (e) { $('devAdd').disabled = false; msg(errText(e), 'err'); });
+  });
+  $('devList').addEventListener('click', function (e) { var b = e.target.closest('button[data-lrm]'); if (b) logRemove(b.getAttribute('data-lrm')); });
 
   /* pallets */
   function palTap(q) {
@@ -1534,6 +1643,21 @@
 
   /* bottles */
   $('runInks').addEventListener('click', function (e) {
+    var lr = e.target.closest('button[data-lrm]');
+    if (lr) { logRemove(lr.getAttribute('data-lrm')); return; }
+    var mx = e.target.closest('button[data-mix]');
+    if (mx) { S.mixOpen = mx.getAttribute('data-mix'); renderRun(); $('mixLot').focus(); return; }
+    if (e.target.closest('button[data-mixcancel]')) { S.mixOpen = null; renderRun(); return; }
+    var ms = e.target.closest('button[data-mixsave]');
+    if (ms) {
+      var mk = S.run.inks.filter(function (x) { return x.key === ms.getAttribute('data-mixsave'); })[0], lot = $('mixLot').value.trim(), runId = S.run.runId;
+      if (!lot) { msg('Type the lot number from the bucket.', 'err'); return; }
+      ms.disabled = true; msg('Saving lot…');
+      srv('runLogAdd', [runId, 'Mixed ink', mk.side, mk.ink, lot, $('mixNote').value.trim()], function (list) {
+        S.mixOpen = null; logSaved(runId, list, mk.ink + ': mixed in house, lot ' + lot + ' saved.');
+      }, function (err) { ms.disabled = false; msg(errText(err), 'err'); });
+      return;
+    }
     var p = e.target.closest('button[data-part]');
     if (p) {
       S.partialOpen = S.partialOpen === p.getAttribute('data-part') ? null : p.getAttribute('data-part');
@@ -2187,7 +2311,8 @@
     notices: function () { srv('noticesList', [], function (d) { noticesShow(d); ntShow(d); }, mErr); },
     resources: function () { srv('resourcesList', [], rsShow, mErr); },
     jobs: function () { srv('jobGet', [''], jbLists, mErr); },
-    daysoff: function () { calLoad(); }
+    daysoff: function () { calLoad(); },
+    runlog: function () { rlLoad(); }
   };
   /* Jobs (Queue, Edit jobs, States) · Ink (Ordering, Stock & minimums) · Reports (Waste, Low supplies) */
   function mGroupOf(t) { var b = document.querySelector('#mTabs button[data-t="' + t + '"]'); return b ? b.getAttribute('data-g') : 'jobs'; }
@@ -2527,6 +2652,50 @@
       '<td class="n" colspan="3">' + n(sum.p) + ' slips</td><td class="n">' + n(total.start, 2) + '</td><td class="n">' + n(sum.mc) + '</td>' +
       '<td class="n">' + n(total.finished, 2) + '</td><td class="n">' + n(total.waste, 2) + '</td><td class="n">' + n(total.wastePct * 100, 2) + '%</td></tr></table>';
   }
+  /* Manage → Reports → Run log */
+  var RL = { started: false, jobs: [] };
+  function rlLoad() {
+    if (!RL.started) {   // default: the last 30 days
+      RL.started = true;
+      var t = new Date(), f = new Date(t.getTime() - 29 * 86400000);
+      function iso(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+      $('rlFrom').value = iso(f); $('rlTo').value = iso(t);
+    }
+    setMsg('mMsg', 'Loading…');
+    srv('runLogReport', [$('rlState').value || '', $('rlJob').value || '', $('rlFrom').value, $('rlTo').value], rlShow, mErr);
+  }
+  function rlJobs() {
+    var st = $('rlState').value, keep = $('rlJob').value;
+    var jobs = RL.jobs.filter(function (j) { return !st || j.state === st; }).map(function (j) { return j.job; });
+    jobs = jobs.filter(function (j, i) { return jobs.indexOf(j) === i; }).sort();
+    $('rlJob').innerHTML = opt('', 'All jobs', !keep) + jobs.map(function (j) { return opt(j, j, j === keep); }).join('');
+  }
+  function rlShow(d) {
+    setMsg('mMsg', '');
+    RL.jobs = d.jobs;
+    var keepS = $('rlState').value;
+    $('rlState').innerHTML = opt('', 'All states', !keepS) + d.states.map(function (s) { return opt(s, s, s === keepS); }).join('');
+    rlJobs();
+    function md(v) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || ''); return m ? Number(m[2]) + '/' + Number(m[3]) + '/' + m[1] : ''; }
+    $('rlFilters').textContent = ($('rlState').value || 'All states') + ' · ' + ($('rlJob').value || 'all jobs') + ' · ' +
+      (d.from || d.to ? (md(d.from) || 'start') + ' – ' + (md(d.to) || 'today') : 'all dates') + ' · ' + d.runs.length + (d.runs.length === 1 ? ' run, ' : ' runs, ') + d.total + (d.total === 1 ? ' entry' : ' entries');
+    $('rlList').innerHTML = d.runs.length ? d.runs.map(function (g) {
+      return '<div class="rlrun"><div class="t">' + esc(g.job) + ' <span class="muted">· ' + esc(g.state) + '</span> ' +
+        (g.status === 'Cancelled' ? badge('gray', 'Run cancelled') : g.status === 'Open' ? badge('blue', 'Running') : '') + '</div>' +
+        '<div class="s">' + esc(g.press) + ' · started ' + esc(g.started) + (g.startedBy ? ' by ' + esc(g.startedBy) : '') + '</div>' +
+        g.entries.map(function (x) {
+          return '<div class="rlentry">' + (x.kind === 'Mixed ink'
+            ? badge('blue', 'Mixed ink') + ' <b>' + esc(x.ink) + '</b> <span class="muted">(' + esc(x.side) + ')</span> · Lot <b>' + esc(x.lot) + '</b>' + (x.details ? ' · ' + esc(x.details) : '')
+            : badge('yellow', 'Deviation') + ' ' + (x.ink ? '<b>' + esc(x.ink) + '</b> <span class="muted">(' + esc(x.side) + ')</span>: ' : '') + esc(x.details)) +
+            '<div class="s">' + esc(x.by) + ' · ' + esc(x.when) + '</div></div>';
+        }).join('') + '</div>';
+    }).join('') : '<p class="muted">No mixed inks or deviations logged for these filters.</p>';
+  }
+  ['rlFrom', 'rlTo', 'rlJob'].forEach(function (id) { $(id).addEventListener('change', rlLoad); });
+  $('rlState').addEventListener('change', function () { $('rlJob').value = ''; rlJobs(); rlLoad(); });
+  $('rlPrint').addEventListener('click', function () { document.body.classList.add('printing-runlog'); window.print(); });
+  window.addEventListener('afterprint', function () { document.body.classList.remove('printing-runlog'); });
+
   $('wPrint').addEventListener('click', function () {
     var st = document.createElement('style'); st.id = 'landscape'; st.textContent = '@page { size: landscape; margin: 10mm; }';
     document.head.appendChild(st);
