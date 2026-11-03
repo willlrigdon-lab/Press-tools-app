@@ -377,7 +377,6 @@
     .assign .now { font-size: 26px; letter-spacing: -0.02em; }
     .ink .name { font-size: 19px; }
     .ink .count b, .pal .count b { font-size: 24px; font-variant-numeric: tabular-nums; }
-    .eyebrow { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .18em; text-align: center; margin: 8px 0 2px; color: var(--accent); }
     /* logo: original lettering and colors, a white halo hugging the letters, a faint glow behind; no box */
     .logo { position: relative; }
     .logo::before { content: ""; position: absolute; left: 50%; top: 50%; width: 330px; height: 120px; transform: translate(-50%, -50%);
@@ -423,7 +422,6 @@
   <section id="loginView" class="view">
     <div class="login">
       <div class="logo" id="logoBox"><img id="logoImg" alt="Specialty Roll Products"></div>
-      <div class="eyebrow">Pressroom</div>
       <h1 style="text-align:center">Press Tools</h1>
       <p class="muted" style="text-align:center;margin-top:-6px">Enter your PIN</p>
       <div class="pin-dots" id="pinDots" aria-live="polite"></div>
@@ -959,9 +957,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.012';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.013';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.013', '11/3/2026', 'Removed the extra label above "Press Tools" on the login page.'],
     ['2.012', '11/3/2026', 'New look: dark screens in the company logo\'s blue, rounded buttons, and the logo without its white box. Manage opens with tiles for inks to order, open jobs and low supplies (tap one to go there). Printouts stay black on white.'],
     ['2.011', '11/3/2026', 'Faster saves for ink taps, Start Run and the job queue. The queue shows each job\'s real place in its press\'s line.'],
     ['2.010', '11/2/2026', 'The ink run screen shows the state with the game name. Queue jobs get an operator (from the people list) and packers, shown on the press\'s assignment card.'],
