@@ -1083,9 +1083,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.017';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.018';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.018', '11/9/2026', 'The setup sheet on a press\'s job assignment shows "Out · mix" beside any ink with none in stock.'],
     ['2.017', '11/3/2026', 'Ink run: record the lot number when an ink mixed in house is used ("Mixed in house?" on any ink), and log setup deviations. Manage → Reports → Run log lists them by job and date, and prints.'],
     ['2.016', '11/3/2026', 'Manage → Queue flags a job when its operator or a packer has days off marked today or in the next 7 days.'],
     ['2.015', '11/3/2026', 'Days off: anyone can mark days they\'ll be off (day off, PTO or sick day, with an optional note) on the new Days off button. Manage → Crew shows everyone on a calendar. People can be set as Operator or Packer; the queue\'s operator list shows only operators and packers can be picked from a list.'],
@@ -1416,7 +1417,7 @@
         (c.operator && c.packers ? ' · ' : '') + (c.packers ? 'Packers: <b>' + esc(c.packers) + '</b>' : '') + '</div>' : '') +
       (canPick ? '<button id="assignPick" class="wide">Pick this job below</button>' : '') +
       (cj ? '<details class="setupbox" id="assignSetup"' + (store('assignSetupOpen') === '1' ? ' open' : '') + '>' +
-        '<summary>Setup sheet: position, ink, anilox</summary>' + setupHtml(cj) + '</details>' : '');
+        '<summary>Setup sheet: position, ink, anilox</summary>' + setupHtml(cj, a.stock) + '</details>' : '');
     var n = a.next;
     $('assignNext').innerHTML = n ? '<div class="next">Next: <b>' + esc(n.job || n.note) + '</b> <span class="muted">· ' +
       [n.job ? esc(n.state) : '', qLine(n)].filter(Boolean).join(' · ') + (a.more ? ' · +' + a.more + ' more' : '') + '</span></div>'
@@ -1475,12 +1476,13 @@
     if (j.flag === 'red') html += '<div class="push red">This job has never been tracked. Please track it this run.</div>';
     else if (j.flag === 'yellow') html += '<div class="push yellow">Tracked ' + j.runs + ' of ' + goal + ' times. Please keep tracking it.</div>';
     html += assignedKey() === j.key ? '<p class="muted" style="margin:12px 0 0">The setup sheet for this job is on the Job assignment card above.</p>'
-      : setupHtml(j);
+      : setupHtml(j, S.assigned && S.assigned.stock);
     $('jobPreview').innerHTML = html;
   }
 
   /* The job's setup sheet: press position, ink, color and anilox for each side. */
-  function setupHtml(j) {
+  /** stock: {ink (lower case): bottles on hand} from the press's assignments; ≤ 0 shows "Out · mix". */
+  function setupHtml(j, stock) {
     if (!j) return '<p class="muted">This job is no longer on the Jobs list.</p>';
     var html = '<div class="setup-head">Setup sheet ' + (j.verified ? '<span class="badge ok">Approved</span>'
       : '<span class="badge unv">Not verified yet</span>') + '</div>';
@@ -1491,7 +1493,9 @@
       if (!inks.length) return;
       html += '<h3>' + side + '</h3><table class="setup"><tr><th class="n">Pos</th><th>Ink</th><th>Color</th><th class="n">Anilox</th></tr>' +
         inks.map(function (k) {
+          var out = stock && Object.prototype.hasOwnProperty.call(stock, k.ink.toLowerCase()) && stock[k.ink.toLowerCase()] <= 0;
           return '<tr><td class="n">' + (k.order === 999 ? '–' : esc(k.order)) + '</td><td><b>' + esc(k.ink) + '</b>' +
+            (out ? ' <span class="badge red mixneed" title="None in stock">Out · mix</span>' : '') +
             (k.notes ? '<div class="muted">' + esc(k.notes) + '</div>' : '') + '</td><td>' + esc(k.color || '') +
             '</td><td class="n">' + esc(k.anilox || '–') + '</td></tr>';
         }).join('') + '</table>';
@@ -1518,7 +1522,7 @@
       (r.verified ? '<span class="badge ok">Verified</span>' : '<span class="badge unv">Not verified yet</span>');
 
     show('runSetup', assignedKey() !== r.jobKey);   // the assigned job's setup sheet is on the assignment card
-    $('runSetupBody').innerHTML = setupHtml(S.jobs.filter(function (j) { return j.key === r.jobKey; })[0]);
+    $('runSetupBody').innerHTML = setupHtml(S.jobs.filter(function (j) { return j.key === r.jobKey; })[0], S.assigned && S.assigned.stock);
 
     // stale: no taps or rolls for N work hours, or left open over the weekend. Any update clears it.
     var st = r.stale;
