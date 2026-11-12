@@ -166,6 +166,10 @@
     .callbtn { display: block; text-align: center; text-decoration: none; font-weight: 800; font-size: 20px; padding: 16px; border-radius: 999px;
       background: #b91c1c; color: #fff; box-shadow: 0 6px 22px rgba(185,28,28,.45); }
     .callbtn small { display: block; font-size: 14px; font-weight: 600; opacity: .9; }
+    .reslink { color: var(--accent); font-weight: 700; text-decoration: none; }
+    .calllink { text-decoration: none; white-space: nowrap; font-weight: 700; }
+    .dir summary { cursor: pointer; padding: 10px 0 4px; }
+    .navin button { letter-spacing: .02em; font-size: 11px; }   /* six areas fit on a phone */
     .prob { padding: 12px 0; border-top: 1px solid var(--line); } .prob:first-child { border-top: 0; }
     .prob .t { font-weight: 800; } .prob .s { color: var(--muted); font-size: 14px; } .prob .d { margin: 6px 0; white-space: pre-wrap; }
     .prob .acts { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -307,6 +311,12 @@
     </div>
   </section>
 
+  <!-- ===================== RESOURCES (from Press Tools + this Sheet's Resources tab) ===================== -->
+  <section id="resourcesView" class="hidden">
+    <div class="findbar"><input id="resFind" type="text" autocomplete="off" placeholder="Search resources and people" aria-label="Search resources"></div>
+    <div id="resBody"><p class="muted">Loading…</p></div>
+  </section>
+
   <!-- ===================== ADMIN ===================== -->
   <section id="adminView" class="hidden">
     <div class="card">
@@ -318,6 +328,8 @@
       <div class="row2"><div><label for="uLevel">Level</label><select id="uLevel"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
         <div><label for="uActive">Active</label><select id="uActive"><option value="yes">Yes</option><option value="no">No</option></select></div></div>
       <div class="row2"><button class="wide" id="uCancel">Clear</button><button class="primary wide" id="uSave">Save person</button></div>
+      <p class="muted" style="margin-bottom:0">Names and PINs stay in sync with Press Tools: someone added in either app shows up in the other at level 1, and turning someone off turns them off in both. Levels are set in each app.</p>
+      <button class="wide" id="uSync">Sync with Press Tools now</button>
     </div>
     <div class="card">
       <h2>Manual data</h2>
@@ -339,8 +351,9 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '1.002';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '1.003';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   var APP_CHANGES = [
+    ['1.003', '11/12/2026', 'Resources: links from Press Tools (holiday schedule, SOPs, videos and more), the company directory with tap-to-call, and who\'s off in the next 2 weeks. People and PINs stay in sync with Press Tools.'],
     ['1.002', '11/12/2026', 'Problems: a "Critical problem? Call Taylor" button that phones maintenance with one tap.'],
     ['1.001', '11/12/2026', 'First version: machines and drawings with tap-to-open part cards for the DJJF-54 slitter, find any part, stock list with keep amounts, shelf counts, receiving, using parts for a machine, the parts order list with Ordered, and problem reports that email maintenance.']
   ];
@@ -378,8 +391,8 @@
 
   /* ---- areas ---- */
   var V = { current: 'login' };
-  var VIEWS = { login: 'loginView', machines: 'machinesView', parts: 'partsView', stock: 'stockView', problems: 'problemsView', admin: 'adminView' };
-  var TITLES = { machines: 'Machines', parts: 'Parts', stock: 'Stock', problems: 'Problems', admin: 'Admin' };
+  var VIEWS = { login: 'loginView', machines: 'machinesView', parts: 'partsView', stock: 'stockView', problems: 'problemsView', resources: 'resourcesView', admin: 'adminView' };
+  var TITLES = { machines: 'Machines', parts: 'Parts', stock: 'Stock', problems: 'Problems', resources: 'Resources', admin: 'Admin' };
   var BADGE = { problems: 'navProb', stock: 'navStock' };
   function go(view) {
     V.current = view;
@@ -397,6 +410,7 @@
     if (view === 'stock') sOpen(S.tab);
     if (view === 'problems') prLoad();
     if (view === 'admin') aLoad();
+    if (view === 'resources') resLoad();
     if (inApp) counts();
   }
   function startSession(sess) {
@@ -925,6 +939,40 @@
   });
 
   /* =====================================================================
+     RESOURCES: links, company directory (tap to call), who's off
+     ===================================================================== */
+  var RS = { data: null };
+  function resLoad() { srv('resourcesList', [], function (d) { RS.data = d; resRender(); }); }
+  function dmy(s) { var p = String(s).split('-'); return p.length === 3 ? Number(p[1]) + '/' + Number(p[2]) : s; }
+  function resRender() {
+    var d = RS.data, q = $('resFind').value.trim().toLowerCase(), h = '';
+    function has(x) { return !q || Object.keys(x).some(function (k) { return String(x[k]).toLowerCase().indexOf(q) !== -1; }); }
+    if (d.error) h += '<div class="card"><p class="muted" style="margin:0">' + esc(d.error) + '</p></div>';
+    var off = d.off.filter(has);
+    if (!q || off.length) h += '<div class="card"><h2>Who\'s off · next 2 weeks</h2>' + (off.length ? off.map(function (o) {
+      return '<div class="item"><div><div class="t">' + esc(o.name) + '</div><div class="s">' + esc(o.type) + (o.note ? ' · ' + esc(o.note) : '') + '</div></div><div class="r"><b>' +
+        esc(dmy(o.from)) + (o.to !== o.from ? '–' + esc(dmy(o.to)) : '') + '</b></div></div>'; }).join('') : '<p class="muted" style="margin:0">Nobody has days off marked.</p>') + '</div>';
+    var secs = [], by = {};
+    d.links.filter(has).forEach(function (l) { if (!by[l.section]) { by[l.section] = []; secs.push(l.section); } by[l.section].push(l); });
+    var dir = d.directory.filter(has);
+    if (dir.length && secs.indexOf('Company Info') === -1) secs.unshift('Company Info');
+    secs.forEach(function (sec) {
+      h += '<div class="card"><h2>' + esc(sec) + '</h2>' + (by[sec] || []).map(function (l) {
+        var yt = /youtu\.?be/i.test(l.link);
+        return '<div class="item"><div><a class="reslink" href="' + esc(l.link) + '" target="_blank" rel="noopener">' + (yt ? '▶ ' : '📄 ') + esc(l.title) + '</a>' +
+          (l.note ? '<div class="s">' + esc(l.note) + '</div>' : '') + '</div><div></div></div>';
+      }).join('');
+      if (sec === 'Company Info' && dir.length) h += '<details class="dir"' + (q ? ' open' : '') + '><summary><b>Company Directory</b> <span class="muted">(' + dir.length + ')</span></summary>' + dir.map(function (p) {
+        return '<div class="item"><div><div class="t">' + esc(p.name) + '</div><div class="s">' + esc(p.role) + (p.notes ? ' · ' + esc(p.notes) : '') + '</div></div>' +
+          '<a class="chip calllink" href="tel:' + esc(p.tel) + '" target="_top">📞 ' + esc(p.phone) + '</a></div>'; }).join('') + '</details>';
+      h += '</div>';
+    });
+    if (!secs.length && q) h += '<div class="card"><p class="muted" style="margin:0">Nothing matches.</p></div>';
+    $('resBody').innerHTML = h;
+  }
+  $('resFind').addEventListener('input', function () { if (RS.data) resRender(); });
+
+  /* =====================================================================
      ADMIN
      ===================================================================== */
   var AD = { row: 0 };
@@ -957,7 +1005,12 @@
   $('uSave').addEventListener('click', function () {
     setMsg('Saving…');
     srv('userSave', [{ row: AD.row, name: $('uName').value, pin: $('uPin').value, level: $('uLevel').value, active: $('uActive').value === 'yes' }],
-      function (l) { aUsers(l); aForm(null); setMsg('Saved.', 'ok'); aAudit(); });
+      function (r) { aUsers(r.users); aForm(null); setMsg('Saved. ' + (r.sync || ''), /failed/.test(r.sync || '') ? 'err' : 'ok'); aAudit(); });
+  });
+  $('uSync').addEventListener('click', function () {
+    $('uSync').disabled = true; setMsg('Syncing with Press Tools…');
+    srv('peopleSync', [], function (r) { $('uSync').disabled = false; setMsg(r.message, 'ok'); srv('usersList', [], aUsers); aAudit(); },
+      function (e) { $('uSync').disabled = false; setMsg(errText(e), 'err'); });
   });
   $('setupGo').addEventListener('click', function () {
     $('setupGo').disabled = true; setMsg('Loading the manual data. This takes a minute or two…');
