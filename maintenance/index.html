@@ -215,8 +215,18 @@
     <div id="mOne" class="hidden">
       <div class="cardhead"><button class="chip backbtn" id="mBack">‹ Machines</button><span class="muted" id="mOneSub"></span></div>
       <h1 id="mOneName" style="margin-top:8px"></h1>
-      <div class="findbar"><input id="secFind" type="text" autocomplete="off" placeholder="Find a section or part on this machine" aria-label="Find on this machine"></div>
+      <div class="seg tabs" id="mTabs"><button data-v="mech" class="on">Mechanical</button><button data-v="wiring">Wiring &amp; schematics</button></div>
+      <div class="findbar" id="secFindBar"><input id="secFind" type="text" autocomplete="off" placeholder="Find a section or part on this machine" aria-label="Find on this machine"></div>
       <div id="mOneBody"></div>
+      <div class="card lv2" id="mdAddCard">
+        <details id="mdAddBox"><summary><b id="mdAddTitle">+ Add a diagram</b></summary>
+          <p class="muted">A PDF or picture in Google Drive, shared "Anyone with the link → Viewer". Paste its link.</p>
+          <label for="mdTitle">Title</label><input id="mdTitle" maxlength="120" autocomplete="off" placeholder="e.g. Main cabinet wiring">
+          <label for="mdLink">Link (https://…)</label><input id="mdLink" autocomplete="off" inputmode="url" placeholder="https://drive.google.com/…">
+          <label for="mdNote">Note (optional)</label><input id="mdNote" maxlength="300" autocomplete="off">
+          <button class="primary wide" id="mdSave">Add</button>
+        </details>
+      </div>
     </div>
     <div id="dView" class="hidden">
       <div class="dwgbar">
@@ -315,6 +325,16 @@
   <section id="resourcesView" class="hidden">
     <div class="findbar"><input id="resFind" type="text" autocomplete="off" placeholder="Search resources and people" aria-label="Search resources"></div>
     <div id="resBody"><p class="muted">Loading…</p></div>
+    <div class="card lv2" id="resAddCard">
+      <details id="resAddBox"><summary><b>+ Add a maintenance link</b></summary>
+        <p class="muted">Manuals, SOPs, videos, troubleshooting guides… For a PDF, put it in Google Drive, share it "Anyone with the link → Viewer" and paste its link.</p>
+        <label for="raSection">Section</label><select id="raSection"></select>
+        <label for="raTitle">Title</label><input id="raTitle" maxlength="120" autocomplete="off" placeholder="e.g. DJJF-54 lockout steps">
+        <label for="raLink">Link (https://…)</label><input id="raLink" autocomplete="off" inputmode="url" placeholder="https://drive.google.com/…">
+        <label for="raNote">Note (optional)</label><input id="raNote" maxlength="300" autocomplete="off">
+        <button class="primary wide" id="raSave">Add link</button>
+      </details>
+    </div>
   </section>
 
   <!-- ===================== ADMIN ===================== -->
@@ -351,8 +371,9 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '1.003';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '1.004';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   var APP_CHANGES = [
+    ['1.004', '11/12/2026', 'Each machine has Mechanical and Wiring & schematics tabs (the slitter\'s schematics grouped by electrical, pneumatic, hydraulic and cabinets), and level 2 can add diagram links per machine. Resources shows only Company Info from Press Tools; maintenance adds its own SOPs, guides, videos and troubleshooting links there.'],
     ['1.003', '11/12/2026', 'Resources: links from Press Tools (holiday schedule, SOPs, videos and more), the company directory with tap-to-call, and who\'s off in the next 2 weeks. People and PINs stay in sync with Press Tools.'],
     ['1.002', '11/12/2026', 'Problems: a "Critical problem? Call Taylor" button that phones maintenance with one tap.'],
     ['1.001', '11/12/2026', 'First version: machines and drawings with tap-to-open part cards for the DJJF-54 slitter, find any part, stock list with keep amounts, shelf counts, receiving, using parts for a machine, the parts order list with Ordered, and problem reports that email maintenance.']
@@ -511,7 +532,7 @@
     $('mList').innerHTML = M.data.machines.map(function (m) {
       var n = m.sections.length;
       return '<button class="mach" data-m="' + esc(m.machine) + '"><b>' + esc(m.machine) + '</b> <span class="muted">' + esc([m.type, m.model].filter(Boolean).join(' · ')) + '</span>' +
-        '<span class="s">' + (n ? n + ' sections · ' + m.schematics.length + ' schematics' : 'No drawings yet') + '</span></button>';
+        '<span class="s">' + mSummary(m) + '</span></button>';
     }).join('');
   }
   $('mList').addEventListener('click', function (e) { var b = e.target.closest('[data-m]'); if (b) mShowMachine(b.getAttribute('data-m')); });
@@ -525,18 +546,58 @@
     mRenderMachine();
   }
   function drawBtn(d) { return '<button class="chip small" data-d="' + esc(d.id) + '">' + esc(d.title.replace(/^.* \(sheet (\d+)\)$/, 'Sheet $1')) + '</button>'; }
+  function mSummary(m) {
+    var wiring = m.schematics.length + m.docs.filter(function (x) { return x.kind === 'Wiring'; }).length;
+    var mech = m.sections.length, extra = m.docs.filter(function (x) { return x.kind === 'Mechanical'; }).length;
+    var bits = [];
+    if (mech) bits.push(mech + ' sections');
+    if (extra) bits.push(extra + ' mechanical diagram' + (extra === 1 ? '' : 's'));
+    if (wiring) bits.push(wiring + ' wiring / schematic' + (wiring === 1 ? '' : 's'));
+    return bits.length ? bits.join(' · ') : 'No drawings yet';
+  }
+  function docRows(list) {
+    return list.map(function (d) {
+      return '<div class="item"><div><a class="reslink" href="' + esc(d.link) + '" target="_blank" rel="noopener">📄 ' + esc(d.title) + '</a>' +
+        (d.note ? '<div class="s">' + esc(d.note) + '</div>' : '') + '</div><div>' +
+        (A.level >= 2 ? '<button class="link" data-mdrm="' + esc(d.id) + '">Remove</button>' : '') + '</div></div>';
+    }).join('');
+  }
   function mRenderMachine() {
-    var m = mOne(), q = $('secFind').value.trim();
-    if (!m.sections.length) { $('mOneBody').innerHTML = '<div class="card"><p class="muted">No drawings for this machine yet. Its manual can be loaded the same way as the slitter\'s.</p></div>'; return; }
-    if (q) { mFindParts(q); return; }
-    $('mOneBody').innerHTML = '<div class="card"><h2>Sections</h2>' + m.sections.map(function (s) {
+    var m = mOne(), q = $('secFind').value.trim(), tab = M.tab || 'mech';
+    Array.prototype.forEach.call($('mTabs').children, function (b) { b.classList.toggle('on', b.getAttribute('data-v') === tab); });
+    show('secFindBar', tab === 'mech' && m.sections.length > 0);
+    $('mdAddTitle').textContent = tab === 'wiring' ? '+ Add a wiring diagram for ' + m.machine : '+ Add a mechanical diagram for ' + m.machine;
+    var docs = m.docs.filter(function (x) { return x.kind === (tab === 'wiring' ? 'Wiring' : 'Mechanical'); });
+    if (tab === 'wiring') {
+      var groups = [], by = {};
+      m.schematics.forEach(function (d) { var g = d.title.replace(/\s*\d+$/, '') || 'Schematics'; if (!by[g]) { by[g] = []; groups.push(g); } by[g].push(d); });
+      $('mOneBody').innerHTML = (docs.length ? '<div class="card"><h2>Wiring diagrams</h2>' + docRows(docs) + '</div>' : '') +
+        groups.map(function (g) {
+          return '<div class="card"><h2>' + esc(g) + ' <span class="muted">(' + by[g].length + ')</span></h2><div style="display:flex;gap:6px;flex-wrap:wrap">' +
+            by[g].map(function (d) { return '<button class="chip small" data-d="' + esc(d.id) + '">' + esc(d.title.replace(/^.*?(\d+)$/, 'Sheet $1')) + '</button>'; }).join('') + '</div></div>';
+        }).join('') +
+        (!groups.length && !docs.length ? '<div class="card"><p class="muted" style="margin:0">No wiring diagrams for ' + esc(m.machine) + ' yet.' + (A.level >= 2 ? ' Add one below.' : '') + '</p></div>' : '');
+      return;
+    }
+    if (q && m.sections.length) { mFindParts(q); return; }
+    $('mOneBody').innerHTML = (m.sections.length ? '<div class="card"><h2>Sections</h2>' + m.sections.map(function (s) {
       var sheets = s.drawings.length > 1 ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">' + s.drawings.map(drawBtn).join('') + '</div>' : '';
       return '<div class="item tap" data-d="' + esc(s.drawings[0] ? s.drawings[0].id : '') + '" data-sec="' + esc(s.code) + '"><div><div class="t">' + esc(titleCase(s.name)) +
         ' <span class="muted">' + esc(s.code) + '</span></div><div class="s">' + s.parts + ' parts' + (s.drawings.length ? ' · ' + s.drawings.reduce(function (a, d) { return a + d.balloons; }, 0) + ' tap points' : ' · no drawing') + '</div>' + sheets + '</div><div>›</div></div>';
-    }).join('') + '</div>' +
+    }).join('') + '</div>' : '') +
+    (docs.length ? '<div class="card"><h2>Mechanical diagrams</h2>' + docRows(docs) + '</div>' : '') +
     (m.overview.length ? '<div class="card"><h2>Overview drawings</h2><div style="display:flex;gap:6px;flex-wrap:wrap">' + m.overview.map(drawBtn).join('') + '</div></div>' : '') +
-    (m.schematics.length ? '<div class="card"><details><summary><b>Schematics (' + m.schematics.length + ')</b> <span class="muted">electrical, pneumatic, hydraulic, cabinets</span></summary><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">' + m.schematics.map(drawBtn).join('') + '</div></details></div>' : '');
+    (!m.sections.length && !docs.length ? '<div class="card"><p class="muted" style="margin:0">No mechanical drawings for ' + esc(m.machine) + ' yet. Its manual can be loaded like the slitter\'s' + (A.level >= 2 ? ', or add a diagram below.' : '.') + '</p></div>' : '');
   }
+  $('mTabs').addEventListener('click', function (e) { var b = e.target.closest('button[data-v]'); if (!b) return; M.tab = b.getAttribute('data-v'); store('mt_mtab', M.tab); mRenderMachine(); });
+  M.tab = store('mt_mtab') || 'mech';
+  function mDocsDone(d) { M.data = d; mRenderMachine(); setMsg(d.message, 'ok'); }
+  $('mdSave').addEventListener('click', function () {
+    $('mdSave').disabled = true; setMsg('Adding…');
+    srv('machineDocAdd', [M.machine, M.tab === 'wiring' ? 'Wiring' : 'Mechanical', $('mdTitle').value, $('mdLink').value, $('mdNote').value], function (d) {
+      $('mdSave').disabled = false; ['mdTitle', 'mdLink', 'mdNote'].forEach(function (id) { $(id).value = ''; }); $('mdAddBox').open = false; mDocsDone(d);
+    }, function (e) { $('mdSave').disabled = false; setMsg(errText(e), 'err'); });
+  });
   function titleCase(s) { return String(s || '').toLowerCase().replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); }).replace(/\bJjf\b/g, 'JJF'); }
   $('secFind').addEventListener('input', mRenderMachine);
   /* find on a machine: sections by name and parts by number/name, from the parts list */
@@ -550,6 +611,8 @@
     });
   }
   $('mOneBody').addEventListener('click', function (e) {
+    var rm = e.target.closest('[data-mdrm]');
+    if (rm) { if (confirm('Remove this diagram link?')) srv('machineDocRemove', [rm.getAttribute('data-mdrm')], mDocsDone); return; }
     var p = e.target.closest('[data-part]'); if (p) { cardOpen(p.getAttribute('data-part'), { machine: M.machine }); return; }
     var b = e.target.closest('[data-d]'); if (b && b.getAttribute('data-d')) dOpen(b.getAttribute('data-d'));
   });
@@ -942,7 +1005,10 @@
      RESOURCES: links, company directory (tap to call), who's off
      ===================================================================== */
   var RS = { data: null };
-  function resLoad() { srv('resourcesList', [], function (d) { RS.data = d; resRender(); }); }
+  function resLoad() { srv('resourcesList', [], function (d) {
+    RS.data = d;
+    if (!$('raSection').options.length) $('raSection').innerHTML = d.sections.filter(function (x) { return x !== 'Company Info'; }).map(function (x) { return opt(x); }).join('');
+    resRender(); }); }
   function dmy(s) { var p = String(s).split('-'); return p.length === 3 ? Number(p[1]) + '/' + Number(p[2]) : s; }
   function resRender() {
     var d = RS.data, q = $('resFind').value.trim().toLowerCase(), h = '';
@@ -960,7 +1026,8 @@
       h += '<div class="card"><h2>' + esc(sec) + '</h2>' + (by[sec] || []).map(function (l) {
         var yt = /youtu\.?be/i.test(l.link);
         return '<div class="item"><div><a class="reslink" href="' + esc(l.link) + '" target="_blank" rel="noopener">' + (yt ? '▶ ' : '📄 ') + esc(l.title) + '</a>' +
-          (l.note ? '<div class="s">' + esc(l.note) + '</div>' : '') + '</div><div></div></div>';
+          (l.note ? '<div class="s">' + esc(l.note) + '</div>' : '') + '</div><div>' +
+          (l.id && A.level >= 2 ? '<button class="link" data-rrm="' + esc(l.id) + '" aria-label="Remove ' + esc(l.title) + '">Remove</button>' : '') + '</div></div>';
       }).join('');
       if (sec === 'Company Info' && dir.length) h += '<details class="dir"' + (q ? ' open' : '') + '><summary><b>Company Directory</b> <span class="muted">(' + dir.length + ')</span></summary>' + dir.map(function (p) {
         return '<div class="item"><div><div class="t">' + esc(p.name) + '</div><div class="s">' + esc(p.role) + (p.notes ? ' · ' + esc(p.notes) : '') + '</div></div>' +
@@ -971,6 +1038,18 @@
     $('resBody').innerHTML = h;
   }
   $('resFind').addEventListener('input', function () { if (RS.data) resRender(); });
+  function resDone(d) { RS.data = d; resRender(); setMsg(d.message, 'ok'); }
+  $('raSave').addEventListener('click', function () {
+    $('raSave').disabled = true; setMsg('Adding…');
+    srv('resourceAdd', [$('raSection').value, $('raTitle').value, $('raLink').value, $('raNote').value], function (d) {
+      $('raSave').disabled = false; ['raTitle', 'raLink', 'raNote'].forEach(function (id) { $(id).value = ''; }); $('resAddBox').open = false; resDone(d);
+    }, function (e) { $('raSave').disabled = false; setMsg(errText(e), 'err'); });
+  });
+  $('resBody').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-rrm]'); if (!b) return;
+    if (!confirm('Remove this link?')) return;
+    srv('resourceRemove', [b.getAttribute('data-rrm')], resDone);
+  });
 
   /* =====================================================================
      ADMIN
