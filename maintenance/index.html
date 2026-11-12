@@ -166,6 +166,7 @@
     .callbtn { display: block; text-align: center; text-decoration: none; font-weight: 800; font-size: 20px; padding: 16px; border-radius: 999px;
       background: #b91c1c; color: #fff; box-shadow: 0 6px 22px rgba(185,28,28,.45); }
     .callbtn small { display: block; font-size: 14px; font-weight: 600; opacity: .9; }
+    .callbtn + .callbtn { margin-top: 10px; }
     .reslink { color: var(--accent); font-weight: 700; text-decoration: none; }
     .calllink { text-decoration: none; white-space: nowrap; font-weight: 700; }
     .dir summary { cursor: pointer; padding: 10px 0 4px; }
@@ -327,7 +328,7 @@
     </div>
     <div class="card callcard hidden" id="prCallCard">
       <h3 style="margin-top:0">Critical problem?</h3>
-      <a id="prCall" class="callbtn" href="#" target="_top"></a>
+      <div id="prCalls"></div>
       <div id="prNoCall" class="hidden"><p style="margin:0;font-weight:700">Nobody from maintenance is on call right now.</p><p class="muted" id="prNext" style="margin:4px 0 0"></p>
         <p class="muted" style="margin:6px 0 0">If it's unsafe: stop the machine, lock it out and tell your lead. Report it below so it's waiting for maintenance.</p></div>
       <p class="muted" id="prCallHint" style="margin:8px 0 0">For anything unsafe or a machine that's down. Then report it below so it's logged.</p>
@@ -347,6 +348,7 @@
       <label>How bad</label>
       <div class="seg wrapseg" id="prSev"></div>
       <label for="prType">Kind</label><select id="prType"></select>
+      <div id="prEmailBox" class="hidden"><label for="prEmail">Send email to</label><select id="prEmail"></select></div>
       <label for="prDesc">What's wrong</label><textarea id="prDesc" maxlength="1000" placeholder="What happened, where on the machine, anything already tried"></textarea>
       <button class="primary wide" id="prSend">Send</button>
     </div>
@@ -407,8 +409,9 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '1.006';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '1.007';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   var APP_CHANGES = [
+    ['1.007', '11/12/2026', 'Problems: a Call button for everyone on call now (Taylor and Cody), and "Send email to" on Report a problem: everyone on call, Taylor or Cody. Each problem shows who was emailed.'],
     ['1.006', '11/12/2026', 'On-call hours: Taylor (and others on the on-call list) set their days, hours and time off on the Problems page, and the Critical problem button only offers to call someone who is working. Otherwise it says who is back next.'],
     ['1.005', '11/12/2026', 'Notices for everyone, in two levels: Standard (orange) and Critical (red, for lockout / tagout). A notice can name a machine, which then shows locked out in the machine list and on its page. Level 2 posts them on the Problems page.'],
     ['1.004', '11/12/2026', 'Each machine has Mechanical and Wiring & schematics tabs (the slitter\'s schematics grouped by electrical, pneumatic, hydraulic and cabinets), and level 2 can add diagram links per machine. Resources shows only Company Info from Press Tools; maintenance adds its own SOPs, guides, videos and troubleshooting links there.'],
@@ -1027,9 +1030,15 @@
     PR.data = d;
     show('prCallCard', !!d.call);
     var none = !!(d.call && d.call.none);
-    show('prCall', !!d.call && !none); show('prNoCall', none); show('prCallHint', !!d.call && !none);
+    show('prCalls', !!d.call && !none); show('prNoCall', none); show('prCallHint', !!d.call && !none);
     if (none) $('prNext').textContent = d.call.next || '';
-    else if (d.call) { $('prCall').href = 'tel:' + d.call.tel; $('prCall').innerHTML = '📞 Call ' + esc(d.call.name.split(' ')[0]) + '<small>' + esc(d.call.name) + ' · ' + esc(d.call.phone) + '</small>'; }
+    else if (d.call) $('prCalls').innerHTML = (d.call.people || [d.call]).map(function (c) {
+      return '<a class="callbtn" href="tel:' + esc(c.tel) + '" target="_top">📞 Call ' + esc(c.name.split(' ')[0]) + '<small>' + esc(c.name) + ' · ' + esc(c.phone) + '</small></a>';
+    }).join('');
+    var keepE = $('prEmail').value;
+    show('prEmailBox', (d.emailTo || []).length > 0);
+    $('prEmail').innerHTML = ((d.emailTo || []).length > 1 ? opt('all', 'Everyone on call (' + d.emailTo.map(function (o) { return o.full.split(' ')[0]; }).join(' and ') + ')', keepE === 'all') : '') +
+      (d.emailTo || []).map(function (o) { return opt(o.name, o.full, o.name === keepE); }).join('');
     var keepM = $('prMachine').value, keepT = $('prType').value;
     $('prMachine').innerHTML = opt('', 'Pick the machine…') + d.machines.map(function (m) { return opt(m, m, m === keepM); }).join('');
     var keepN = $('ntMachine').value;
@@ -1043,6 +1052,7 @@
       return '<div class="prob"><div class="t">' + esc(p.machine) + ' · ' + esc(p.type) + ' ' + badge(SEV[p.severity] || 'gray', p.severity) + ' ' + badge(ST[p.status], p.status) + '</div>' +
         '<div class="s">' + esc(p.id) + ' · ' + esc(p.time) + ' · ' + esc(p.by) + (p.source && p.source !== 'Maintenance' ? ' · from ' + esc(p.source) : '') + '</div>' +
         '<div class="d">' + esc(p.desc) + '</div>' +
+        (p.emailed ? '<div class="s">Emailed ' + esc(p.emailed) + '</div>' : '') +
         (p.seenBy ? '<div class="s">Seen by ' + esc(p.seenBy) + ' · ' + esc(p.seen) + '</div>' : '') +
         (p.status === 'Fixed' ? '<div class="s">Fixed by ' + esc(p.fixedBy) + ' · ' + esc(p.fixed) + (p.fixNotes ? ': ' + esc(p.fixNotes) : '') + '</div>' : '') +
         '<div id="fix-' + esc(p.id) + '"></div>' + acts + '</div>';
@@ -1055,7 +1065,7 @@
     if (!$('prMachine').value) { setMsg('Pick the machine.', 'err'); return; }
     if (!PR.sev) { setMsg('Pick how bad it is.', 'err'); return; }
     $('prSend').disabled = true; setMsg('Sending…');
-    srv('problemAdd', [$('prMachine').value, $('prType').value, PR.sev, $('prDesc').value], function (r) {
+    srv('problemAdd', [$('prMachine').value, $('prType').value, PR.sev, $('prDesc').value, $('prEmail').value || 'all'], function (r) {
       $('prSend').disabled = false; $('prDesc').value = ''; PR.sev = ''; setMsg(r.message, 'ok'); prLoad(); counts();
     }, function (e) { $('prSend').disabled = false; setMsg(errText(e), 'err'); });
   });
