@@ -170,6 +170,18 @@
     .calllink { text-decoration: none; white-space: nowrap; font-weight: 700; }
     .dir summary { cursor: pointer; padding: 10px 0 4px; }
     .navin button { letter-spacing: .02em; font-size: 11px; }   /* six areas fit on a phone */
+    #notices { margin: 0 0 10px; display: flex; flex-direction: column; gap: 8px; }
+    .notice { border-radius: 14px; padding: 11px 14px; font-weight: 700; display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: start; }
+    .notice .nby { font-size: 12.5px; font-weight: 600; opacity: .85; margin-top: 3px; }
+    .notice.std { background: rgba(251,146,60,.14); color: #fed7aa; border: 1px solid rgba(251,146,60,.45); border-left: 6px solid #f97316; }
+    .notice.crit { background: rgba(220,38,38,.22); color: #fff; border: 1px solid rgba(248,113,113,.6); border-left: 6px solid #dc2626; box-shadow: 0 0 0 1px rgba(220,38,38,.25), 0 8px 24px rgba(220,38,38,.25); }
+    .notice.crit .nt::before { content: "🔒 CRITICAL · "; font-weight: 800; letter-spacing: .04em; }
+    .notice .x { padding: 2px 10px; font-size: 13px; border-color: currentColor; color: inherit; }
+    .mach.locked { border-color: rgba(248,113,113,.7); background: rgba(220,38,38,.12); }
+    .lockline { color: #fca5a5; font-weight: 800; font-size: 14px; display: block; margin-top: 4px; }
+    .ntlvl button.on[data-v="Critical"] { background: #b91c1c; border-color: #ef4444; }
+    .ntlvl button.on[data-v="Standard"] { background: #c2410c; border-color: #f97316; }
+    @media print { .notice { color: #000 !important; background: #fff !important; } }
     .prob { padding: 12px 0; border-top: 1px solid var(--line); } .prob:first-child { border-top: 0; }
     .prob .t { font-weight: 800; } .prob .s { color: var(--muted); font-size: 14px; } .prob .d { margin: 6px 0; white-space: pre-wrap; }
     .prob .acts { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -189,6 +201,7 @@
     <div class="brand"><img id="logoSm" class="logo-sm" alt="Specialty Roll Products"><span id="viewTitle">Maintenance</span></div>
     <div class="who"><span id="whoName"></span><button id="switchBtn" class="chip">Switch user</button></div>
   </header>
+  <div id="notices" class="hidden" role="status" aria-live="polite"></div>
 
   <!-- ===================== LOGIN ===================== -->
   <section id="loginView">
@@ -215,6 +228,7 @@
     <div id="mOne" class="hidden">
       <div class="cardhead"><button class="chip backbtn" id="mBack">‹ Machines</button><span class="muted" id="mOneSub"></span></div>
       <h1 id="mOneName" style="margin-top:8px"></h1>
+      <div id="mOneLock"></div>
       <div class="seg tabs" id="mTabs"><button data-v="mech" class="on">Mechanical</button><button data-v="wiring">Wiring &amp; schematics</button></div>
       <div class="findbar" id="secFindBar"><input id="secFind" type="text" autocomplete="off" placeholder="Find a section or part on this machine" aria-label="Find on this machine"></div>
       <div id="mOneBody"></div>
@@ -300,10 +314,32 @@
 
   <!-- ===================== PROBLEMS ===================== -->
   <section id="problemsView" class="hidden">
+    <div class="card lv2" id="ntCard">
+      <details id="ntBox"><summary><b>+ Post a notice</b> <span class="muted">for everyone, e.g. a lockout</span></summary>
+        <label>Level</label>
+        <div class="seg ntlvl" id="ntLevel"><button data-v="Standard" class="on">Standard</button><button data-v="Critical">Critical · lockout</button></div>
+        <label for="ntMachine">Machine (optional)</label><select id="ntMachine"></select>
+        <label for="ntText">Notice</label><input id="ntText" maxlength="300" autocomplete="off" placeholder="e.g. MA2 LOCKED OUT for drive repair – do not run">
+        <label for="ntUntil">Show until (optional)</label><input id="ntUntil" type="datetime-local">
+        <p class="muted" style="margin:4px 0 0">Leave blank to show it until it's removed. Remove a notice with ✕ on it.</p>
+        <button class="primary wide" id="ntPost">Post notice</button>
+      </details>
+    </div>
     <div class="card callcard hidden" id="prCallCard">
       <h3 style="margin-top:0">Critical problem?</h3>
       <a id="prCall" class="callbtn" href="#" target="_top"></a>
-      <p class="muted" style="margin:8px 0 0">For anything unsafe or a machine that's down. Then report it below so it's logged.</p>
+      <div id="prNoCall" class="hidden"><p style="margin:0;font-weight:700">Nobody from maintenance is on call right now.</p><p class="muted" id="prNext" style="margin:4px 0 0"></p>
+        <p class="muted" style="margin:6px 0 0">If it's unsafe: stop the machine, lock it out and tell your lead. Report it below so it's waiting for maintenance.</p></div>
+      <p class="muted" id="prCallHint" style="margin:8px 0 0">For anything unsafe or a machine that's down. Then report it below so it's logged.</p>
+    </div>
+    <div class="card hidden" id="ocCard">
+      <details id="ocBox"><summary><b>My on-call hours</b> <span class="muted" id="ocNow"></span></summary>
+        <p class="muted">The app only offers to call you during these hours, and not while you're off. Problem emails still come to you.</p>
+        <label>Days</label><div class="seg wrapseg" id="ocDays"></div>
+        <div class="row2"><div><label for="ocStart">From</label><input id="ocStart" type="time"></div><div><label for="ocEnd">To</label><input id="ocEnd" type="time"></div></div>
+        <label for="ocAway">Off until (vacation, sick, done for the day)</label><input id="ocAway" type="datetime-local">
+        <div class="row2"><button class="wide" id="ocBack">I'm back now</button><button class="primary wide" id="ocSave">Save</button></div>
+      </details>
     </div>
     <div class="card">
       <h2>Report a problem</h2>
@@ -371,8 +407,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '1.004';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '1.006';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   var APP_CHANGES = [
+    ['1.006', '11/12/2026', 'On-call hours: Taylor (and others on the on-call list) set their days, hours and time off on the Problems page, and the Critical problem button only offers to call someone who is working. Otherwise it says who is back next.'],
+    ['1.005', '11/12/2026', 'Notices for everyone, in two levels: Standard (orange) and Critical (red, for lockout / tagout). A notice can name a machine, which then shows locked out in the machine list and on its page. Level 2 posts them on the Problems page.'],
     ['1.004', '11/12/2026', 'Each machine has Mechanical and Wiring & schematics tabs (the slitter\'s schematics grouped by electrical, pneumatic, hydraulic and cabinets), and level 2 can add diagram links per machine. Resources shows only Company Info from Press Tools; maintenance adds its own SOPs, guides, videos and troubleshooting links there.'],
     ['1.003', '11/12/2026', 'Resources: links from Press Tools (holiday schedule, SOPs, videos and more), the company directory with tap-to-call, and who\'s off in the next 2 weeks. People and PINs stay in sync with Press Tools.'],
     ['1.002', '11/12/2026', 'Problems: a "Critical problem? Call Taylor" button that phones maintenance with one tap.'],
@@ -432,7 +470,7 @@
     if (view === 'problems') prLoad();
     if (view === 'admin') aLoad();
     if (view === 'resources') resLoad();
-    if (inApp) counts();
+    if (inApp) { counts(); noticesLoad(); } else show('notices', false);
   }
   function startSession(sess) {
     A.token = sess.token || A.token; A.name = sess.name; A.level = sess.level; A.roles = sess.roles || []; A.idle = sess.idleMinutes || 30;
@@ -531,8 +569,9 @@
     mPane('list');
     $('mList').innerHTML = M.data.machines.map(function (m) {
       var n = m.sections.length;
-      return '<button class="mach" data-m="' + esc(m.machine) + '"><b>' + esc(m.machine) + '</b> <span class="muted">' + esc([m.type, m.model].filter(Boolean).join(' · ')) + '</span>' +
-        '<span class="s">' + mSummary(m) + '</span></button>';
+      var lk = lockedNotices(m.machine);
+      return '<button class="mach' + (lk.length ? ' locked' : '') + '" data-m="' + esc(m.machine) + '"><b>' + esc(m.machine) + '</b> <span class="muted">' + esc([m.type, m.model].filter(Boolean).join(' · ')) + '</span>' +
+        '<span class="s">' + mSummary(m) + '</span>' + (lk.length ? '<span class="lockline">🔒 ' + esc(lk[0].message) + '</span>' : '') + '</button>';
     }).join('');
   }
   $('mList').addEventListener('click', function (e) { var b = e.target.closest('[data-m]'); if (b) mShowMachine(b.getAttribute('data-m')); });
@@ -543,9 +582,14 @@
     var m = mOne();
     $('mOneName').textContent = m.machine;
     $('mOneSub').textContent = [m.type, m.model, m.serial ? 'SN ' + m.serial : ''].filter(Boolean).join(' · ');
+    mMachineLock();
     mRenderMachine();
   }
   function drawBtn(d) { return '<button class="chip small" data-d="' + esc(d.id) + '">' + esc(d.title.replace(/^.* \(sheet (\d+)\)$/, 'Sheet $1')) + '</button>'; }
+  function mMachineLock() {
+    var lk = M.machine ? lockedNotices(M.machine) : [];
+    $('mOneLock').innerHTML = lk.map(function (n) { return '<div class="notice crit" style="margin-bottom:10px"><div><div class="nt">' + esc(n.message) + '</div><div class="nby">' + esc(n.by) + ' · ' + esc(n.posted) + '</div></div></div>'; }).join('');
+  }
   function mSummary(m) {
     var wiring = m.schematics.length + m.docs.filter(function (x) { return x.kind === 'Wiring'; }).length;
     var mech = m.sections.length, extra = m.docs.filter(function (x) { return x.kind === 'Mechanical'; }).length;
@@ -957,13 +1001,39 @@
      PROBLEMS
      ===================================================================== */
   var PR = { data: null, sev: '' };
-  function prLoad() { srv('problemsList', [$('prFixed').checked], prShow); }
+  function prLoad() { srv('problemsList', [$('prFixed').checked], prShow); srv('oncallMine', [], ocShow, noop); }
+  var OC = { days: [] };
+  function ocShow(d) {
+    show('ocCard', !!d.onList); if (!d.onList) return;
+    OC.days = d.days.slice();
+    $('ocDays').innerHTML = d.allDays.map(function (x) { return '<button data-v="' + x + '"' + (OC.days.indexOf(x) !== -1 ? ' class="on"' : '') + '>' + x + '</button>'; }).join('');
+    $('ocStart').value = d.start; $('ocEnd').value = d.end; $('ocAway').value = d.away;
+    $('ocNow').textContent = d.availableNow ? '· on call now' : d.awayText ? '· off until ' + d.awayText : '· not on call now';
+  }
+  $('ocDays').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-v]'); if (!b) return;
+    var v = b.getAttribute('data-v'), i = OC.days.indexOf(v);
+    if (i === -1) OC.days.push(v); else OC.days.splice(i, 1);
+    b.classList.toggle('on', i === -1);
+  });
+  function ocSave(away) {
+    setMsg('Saving…');
+    srv('oncallSave', [OC.days, $('ocStart').value, $('ocEnd').value, away], function (d) { ocShow(d); setMsg(d.message, 'ok'); srv('problemsList', [$('prFixed').checked], prShow); },
+      function (e) { setMsg(errText(e), 'err'); });
+  }
+  $('ocSave').addEventListener('click', function () { ocSave($('ocAway').value); });
+  $('ocBack').addEventListener('click', function () { $('ocAway').value = ''; ocSave(''); });
   function prShow(d) {
     PR.data = d;
     show('prCallCard', !!d.call);
-    if (d.call) { $('prCall').href = 'tel:' + d.call.tel; $('prCall').innerHTML = '📞 Call ' + esc(d.call.name.split(' ')[0]) + '<small>' + esc(d.call.name) + ' · ' + esc(d.call.phone) + '</small>'; }
+    var none = !!(d.call && d.call.none);
+    show('prCall', !!d.call && !none); show('prNoCall', none); show('prCallHint', !!d.call && !none);
+    if (none) $('prNext').textContent = d.call.next || '';
+    else if (d.call) { $('prCall').href = 'tel:' + d.call.tel; $('prCall').innerHTML = '📞 Call ' + esc(d.call.name.split(' ')[0]) + '<small>' + esc(d.call.name) + ' · ' + esc(d.call.phone) + '</small>'; }
     var keepM = $('prMachine').value, keepT = $('prType').value;
     $('prMachine').innerHTML = opt('', 'Pick the machine…') + d.machines.map(function (m) { return opt(m, m, m === keepM); }).join('');
+    var keepN = $('ntMachine').value;
+    $('ntMachine').innerHTML = opt('', 'No machine (whole shop)') + d.machines.map(function (m) { return opt(m, m, m === keepN); }).join('');
     $('prType').innerHTML = d.types.map(function (t) { return opt(t, t, t === keepT); }).join('');
     $('prSev').innerHTML = d.severities.map(function (s) { return '<button data-v="' + esc(s) + '"' + (s === PR.sev ? ' class="on"' : '') + '>' + esc(s) + '</button>'; }).join('');
     var SEV = { 'Press down': 'red', 'Running with a problem': 'yellow', 'Minor': 'gray' }, ST = { Open: 'red', Seen: 'blue', Fixed: 'green' };
@@ -999,6 +1069,41 @@
     var g = e.target.closest('[data-fixgo]');
     if (g) { var pid = g.getAttribute('data-fixgo'); setMsg('Saving…');
       srv('problemSet', [pid, 'Fixed', $('fixNotes-' + pid).value], function (d) { prShow(d); setMsg(pid + ' marked fixed.', 'ok'); counts(); }); }
+  });
+
+  /* =====================================================================
+     NOTICES: under the top bar on every area; critical (lockout) first, in red
+     ===================================================================== */
+  var NT = { list: [], level: 'Standard' };
+  function noticesShow(d) {
+    NT.list = d.notices || [];
+    show('notices', NT.list.length > 0);
+    $('notices').innerHTML = NT.list.map(function (n) {
+      return '<div class="notice ' + (n.level === 'Critical' ? 'crit' : 'std') + '"><div><div class="nt">' + (n.machine ? '<b>' + esc(n.machine) + ':</b> ' : '') + esc(n.message) + '</div>' +
+        '<div class="nby">' + esc(n.by) + ' · ' + esc(n.posted) + (n.until ? ' · until ' + esc(n.until) : '') + '</div></div>' +
+        (A.level >= 2 ? '<button class="x" data-ntrm="' + esc(n.id) + '" aria-label="Remove notice">✕</button>' : '') + '</div>';
+    }).join('');
+    if (V.current === 'machines' && M.data) { if (!$('mList').classList.contains('hidden')) mShowList(); else if (!$('mOne').classList.contains('hidden')) mMachineLock(); }
+  }
+  function noticesLoad() { if (A.token) srv('noticesList', [], noticesShow, noop); }
+  setInterval(noticesLoad, 120000);
+  function lockedNotices(machine) { return NT.list.filter(function (n) { return n.level === 'Critical' && n.machine === machine; }); }
+  $('notices').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-ntrm]'); if (!b) return;
+    if (!confirm('Take this notice down?')) return;
+    srv('noticeRemove', [b.getAttribute('data-ntrm')], function (d) { noticesShow(d); setMsg('Notice removed.', 'ok'); });
+  });
+  $('ntLevel').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-v]'); if (!b) return;
+    NT.level = b.getAttribute('data-v'); Array.prototype.forEach.call(this.children, function (x) { x.classList.toggle('on', x === b); });
+  });
+  $('ntPost').addEventListener('click', function () {
+    $('ntPost').disabled = true; setMsg('Posting…');
+    srv('noticeAdd', [NT.level, $('ntText').value, $('ntMachine').value, $('ntUntil').value], function (d) {
+      $('ntPost').disabled = false; $('ntText').value = ''; $('ntUntil').value = ''; $('ntMachine').value = ''; $('ntBox').open = false; noticesShow(d);
+      NT.level = 'Standard'; Array.prototype.forEach.call($('ntLevel').children, function (x) { x.classList.toggle('on', x.getAttribute('data-v') === 'Standard'); });
+      setMsg('Notice posted for everyone.', 'ok'); window.scrollTo(0, 0);
+    }, function (e) { $('ntPost').disabled = false; setMsg(errText(e), 'err'); });
   });
 
   /* =====================================================================
