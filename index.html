@@ -441,6 +441,11 @@
       body.printing-runlog .noprint { display: none !important; }
       body.printing-runlog .rlentry { border-left-color: #999; }
     }
+    /* ---- lockout notices from Maintenance Tools (2.019) ---- */
+    .notice.crit { background: rgba(220,38,38,.22); color: #fff; border: 1px solid rgba(248,113,113,.6); border-left: 6px solid #dc2626;
+      box-shadow: 0 0 0 1px rgba(220,38,38,.25), 0 8px 24px rgba(220,38,38,.25); font-weight: 700; }
+    .notice.crit .nt::before { content: "🔒 LOCKOUT · "; font-weight: 800; letter-spacing: .04em; }
+    .notice.crit .nby { color: #fecaca; }
     @media print { .t-off { background: #eee; } .t-pto { background: #dbeafe; } .t-sick { background: #ffedd5; } }
   </style>
 </head>
@@ -1083,9 +1088,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.018';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.019';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.019', '11/12/2026', 'Lockout notices: when maintenance posts a critical notice (like a press locked out) in Maintenance Tools, it shows in red at the top of every screen here too.'],
     ['2.018', '11/9/2026', 'The setup sheet on a press\'s job assignment shows "Out · mix" beside any ink with none in stock.'],
     ['2.017', '11/3/2026', 'Ink run: record the lot number when an ink mixed in house is used ("Mixed in house?" on any ink), and log setup deviations. Manage → Reports → Run log lists them by job and date, and prints.'],
     ['2.016', '11/3/2026', 'Manage → Queue flags a job when its operator or a packer has days off marked today or in the next 7 days.'],
@@ -2358,9 +2364,12 @@
 
   /* shop notices: the bar on every screen, and the Notices screen */
   function noticesShow(d) {
-    var list = (d && d.notices) || [];
-    show('notices', list.length > 0);
-    $('notices').innerHTML = list.map(function (n) {
+    var list = (d && d.notices) || [], crit = (d && d.critical) || [];
+    show('notices', list.length + crit.length > 0);
+    $('notices').innerHTML = crit.map(function (n) {   // lockouts from Maintenance Tools: red, first, can't be removed here
+      return '<div class="notice crit"><div class="nt">' + (n.machine ? '<b>' + esc(n.machine) + ':</b> ' : '') + esc(n.message) + '</div>' +
+        '<div class="nby">From maintenance · ' + esc(n.by || '') + ' · ' + esc(n.posted) + (n.until ? ' · until ' + esc(n.until) : '') + '</div></div>';
+    }).join('') + list.map(function (n) {
       return '<div class="notice">' + esc(n.message) + '<div class="nby">From ' + esc(n.by || 'management') + ' · ' + esc(n.posted) +
         (n.until ? ' · until ' + esc(n.until) : '') + '</div></div>';
     }).join('');
