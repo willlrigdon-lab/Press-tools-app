@@ -162,6 +162,10 @@
     }
     .countin { width: 96px; font-size: 18px; padding: 9px; text-align: right; }
     .countbar { position: sticky; bottom: calc(var(--navh) + 8px + env(safe-area-inset-bottom)); z-index: 6; background: var(--bg2); border: 1px solid var(--line); border-radius: 16px; padding: 10px; margin-top: 10px; }
+    .callcard { border-color: rgba(248,113,113,.45); background: rgba(248,113,113,.08); }
+    .callbtn { display: block; text-align: center; text-decoration: none; font-weight: 800; font-size: 20px; padding: 16px; border-radius: 999px;
+      background: #b91c1c; color: #fff; box-shadow: 0 6px 22px rgba(185,28,28,.45); }
+    .callbtn small { display: block; font-size: 14px; font-weight: 600; opacity: .9; }
     .prob { padding: 12px 0; border-top: 1px solid var(--line); } .prob:first-child { border-top: 0; }
     .prob .t { font-weight: 800; } .prob .s { color: var(--muted); font-size: 14px; } .prob .d { margin: 6px 0; white-space: pre-wrap; }
     .prob .acts { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -282,6 +286,11 @@
 
   <!-- ===================== PROBLEMS ===================== -->
   <section id="problemsView" class="hidden">
+    <div class="card callcard hidden" id="prCallCard">
+      <h3 style="margin-top:0">Critical problem?</h3>
+      <a id="prCall" class="callbtn" href="#" target="_top"></a>
+      <p class="muted" style="margin:8px 0 0">For anything unsafe or a machine that's down. Then report it below so it's logged.</p>
+    </div>
     <div class="card">
       <h2>Report a problem</h2>
       <label for="prMachine">Machine</label><select id="prMachine"></select>
@@ -330,8 +339,9 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '1.001';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '1.002';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   var APP_CHANGES = [
+    ['1.002', '11/12/2026', 'Problems: a "Critical problem? Call Taylor" button that phones maintenance with one tap.'],
     ['1.001', '11/12/2026', 'First version: machines and drawings with tap-to-open part cards for the DJJF-54 slitter, find any part, stock list with keep amounts, shelf counts, receiving, using parts for a machine, the parts order list with Ordered, and problem reports that email maintenance.']
   ];
   function $(id) { return document.getElementById(id); }
@@ -873,6 +883,8 @@
   function prLoad() { srv('problemsList', [$('prFixed').checked], prShow); }
   function prShow(d) {
     PR.data = d;
+    show('prCallCard', !!d.call);
+    if (d.call) { $('prCall').href = 'tel:' + d.call.tel; $('prCall').innerHTML = '📞 Call ' + esc(d.call.name.split(' ')[0]) + '<small>' + esc(d.call.name) + ' · ' + esc(d.call.phone) + '</small>'; }
     var keepM = $('prMachine').value, keepT = $('prType').value;
     $('prMachine').innerHTML = opt('', 'Pick the machine…') + d.machines.map(function (m) { return opt(m, m, m === keepM); }).join('');
     $('prType').innerHTML = d.types.map(function (t) { return opt(t, t, t === keepT); }).join('');
