@@ -441,12 +441,16 @@
       body.printing-runlog .noprint { display: none !important; }
       body.printing-runlog .rlentry { border-left-color: #999; }
     }
-    /* ---- printed work order (Manage → Queue → Print) ---- */
+    /* ---- work order (Manage → Queue → Print): opens full-screen on white, then its own Print button prints it ---- */
     #workOrder { display: none; }
-    @media print {
-      body.printing-wo { background: #fff !important; }
-      body.printing-wo > *:not(#workOrder) { display: none !important; }
-      body.printing-wo #workOrder { display: block; color: #111; font: 11pt/1.35 Inter, Arial, sans-serif; padding: 4mm 2mm 0; }
+    body.wo-open { overflow: hidden; }
+    body.wo-open #workOrder { display: block; position: fixed; inset: 0; z-index: 60; overflow-y: auto; background: #fff; color: #111;
+      font: 11pt/1.35 Inter, Arial, sans-serif; padding: 0 14px 30px; text-align: left; }
+    .wo-bar { position: sticky; top: 0; z-index: 2; display: flex; gap: 8px; justify-content: flex-end; align-items: center;
+      background: #fff; padding: 10px 0; border-bottom: 1px solid #ccc; margin-bottom: 10px; }
+    .wo-bar span { flex: 1; color: #444; font-size: 10pt; }
+    .wo-bar button { border-radius: 999px; padding: 10px 18px; font-size: 16px; font-weight: 700; border: 2px solid #1a6496; background: #fff; color: #1a6496; box-shadow: none; }
+    .wo-bar button.go { background: #1a6496; color: #fff; }
       .wo-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #111; padding-bottom: 6px; }
       .wo-logo { height: 40px; width: auto; filter: none; }
       .wo-title { text-align: right; } .wo-big { font-size: 18pt; font-weight: 800; letter-spacing: .08em; } .wo-sm { font-size: 8.5pt; color: #444; }
@@ -464,6 +468,17 @@
       .wo-out { font-size: 8pt; border: 1px solid #111; border-radius: 3px; padding: 0 4px; font-weight: 700; }
       .wo-lines div { border-bottom: 1px solid #111; height: 26px; }
       .wo-none { color: #444; }
+    @media screen and (max-width: 640px) {   /* phone preview: smaller headings that wrap; the printed page is unchanged */
+      #workOrder .wo-t th { font-size: 7pt; letter-spacing: 0; padding: 4px 3px; overflow-wrap: anywhere; }
+      #workOrder .wo-t td { font-size: 9.5pt; padding: 4px 3px; overflow-wrap: anywhere; }
+      #workOrder .wo-grid { grid-template-columns: repeat(2, 1fr); }
+      #workOrder .wo-big { font-size: 14pt; } #workOrder .wo-job { font-size: 15pt; }
+    }
+    @media print {
+      body.wo-open { background: #fff !important; overflow: visible; }
+      body.wo-open > *:not(#workOrder) { display: none !important; }
+      body.wo-open #workOrder { position: static; overflow: visible; padding: 4mm 2mm 0; }
+      body.wo-open .wo-bar { display: none !important; }
     }
     /* ---- lockout notices from Maintenance Tools (2.019) ---- */
     .notice.crit { background: rgba(220,38,38,.22); color: #fff; border: 1px solid rgba(248,113,113,.6); border-left: 6px solid #dc2626;
@@ -1115,9 +1130,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.020';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.021';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.021', '11/13/2026', 'Work order: Print now opens the work order on screen first; tap Print on it to print. Phones would not print it before.'],
     ['2.020', '11/13/2026', 'Manage → Queue: Print a work order for any open job: what to run and why, press and crew, slips per stack, the setup sheet, and spaces to write ink lots, setup deviations and the run record.'],
     ['2.019', '11/12/2026', 'Lockout notices: when maintenance posts a critical notice (like a press locked out) in Maintenance Tools, it shows in red at the top of every screen here too.'],
     ['2.018', '11/9/2026', 'The setup sheet on a press\'s job assignment shows "Out · mix" beside any ink with none in stock.'],
@@ -2742,12 +2758,19 @@
   function woPrint(id) {
     setMsg('mMsg', 'Getting the work order for ' + qName(id) + '…');
     srv('workOrder', [id], function (w) {
-      $('workOrder').innerHTML = woHtml(w);
+      // phones only print from a direct tap, so the sheet opens first and its own Print button prints it
+      $('workOrder').innerHTML = '<div class="wo-bar"><span>Work order preview</span>' +
+        '<button class="go" id="woPrintBtn">Print</button><button id="woClose">Close</button></div>' + woHtml(w);
+      $('workOrder').setAttribute('aria-hidden', 'false');
       setMsg('mMsg', '');
-      document.body.classList.add('printing-wo');
-      window.print();
+      document.body.classList.add('wo-open');
+      $('workOrder').scrollTop = 0;
     }, mErr);
   }
+  $('workOrder').addEventListener('click', function (e) {
+    if (e.target.id === 'woPrintBtn') window.print();
+    if (e.target.id === 'woClose') { document.body.classList.remove('wo-open'); $('workOrder').setAttribute('aria-hidden', 'true'); }
+  });
   function woHtml(w) {
     var TYPE = { Order: 'Order', Stock: 'For stock', Note: 'Note' };
     var run = w.type === 'Note' && !w.slips ? '—' : w.slips ? fmt(w.slips, 0) + ' slips' : 'Open-ended';
@@ -2779,7 +2802,7 @@
       '<th>Partial pallet (slips)</th><th>Total slips</th><th>Rolls</th></tr><tr><td></td><td></td><td></td><td></td><td></td><td></td></tr></table>';
     return h;
   }
-  window.addEventListener('afterprint', function () { document.body.classList.remove('printing-runlog'); document.body.classList.remove('printing-wo'); });
+  window.addEventListener('afterprint', function () { document.body.classList.remove('printing-runlog'); });
 
   $('wPrint').addEventListener('click', function () {
     var st = document.createElement('style'); st.id = 'landscape'; st.textContent = '@page { size: landscape; margin: 10mm; }';
