@@ -441,6 +441,30 @@
       body.printing-runlog .noprint { display: none !important; }
       body.printing-runlog .rlentry { border-left-color: #999; }
     }
+    /* ---- printed work order (Manage → Queue → Print) ---- */
+    #workOrder { display: none; }
+    @media print {
+      body.printing-wo { background: #fff !important; }
+      body.printing-wo > *:not(#workOrder) { display: none !important; }
+      body.printing-wo #workOrder { display: block; color: #111; font: 11pt/1.35 Inter, Arial, sans-serif; padding: 4mm 2mm 0; }
+      .wo-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #111; padding-bottom: 6px; }
+      .wo-logo { height: 40px; width: auto; filter: none; }
+      .wo-title { text-align: right; } .wo-big { font-size: 18pt; font-weight: 800; letter-spacing: .08em; } .wo-sm { font-size: 8.5pt; color: #444; }
+      .wo-job { font-size: 18pt; margin: 10px 0 8px; color: #111; letter-spacing: 0; } .wo-job span { font-weight: 600; color: #333; }
+      .wo-job .wo-badge { font-size: 9pt; border: 1px solid #111; border-radius: 4px; padding: 1px 6px; vertical-align: middle; }
+      .wo-grid { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid #111; }
+      .wo-f { padding: 5px 7px; border-right: 1px solid #999; border-bottom: 1px solid #999; }
+      .wo-k { font-size: 7.5pt; text-transform: uppercase; letter-spacing: .1em; color: #444; font-weight: 700; } .wo-v { font-size: 11pt; min-height: 1.3em; }
+      .wo-for { margin: 8px 0 0; padding: 6px 8px; border: 1px solid #111; }
+      #workOrder h2 { font-size: 11pt; margin: 12px 0 4px; color: #111; text-transform: uppercase; letter-spacing: .1em; }
+      .wo-t { width: 100%; border-collapse: collapse; } .wo-t th, .wo-t td { border: 1px solid #111; padding: 5px 6px; text-align: left; color: #111; font-size: 10.5pt; }
+      .wo-t th { background: #eee; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .06em; }
+      .wo-t { table-layout: fixed; } .wo-set th:nth-child(1) { width: 7%; } .wo-set th:nth-child(2) { width: 22%; } .wo-set th:nth-child(3) { width: 13%; }
+      .wo-set th:nth-child(4) { width: 10%; } .wo-set th:nth-child(5) { width: 22%; } .wo-t .wo-w { width: 26%; } .wo-rec td { height: 34px; }
+      .wo-out { font-size: 8pt; border: 1px solid #111; border-radius: 3px; padding: 0 4px; font-weight: 700; }
+      .wo-lines div { border-bottom: 1px solid #111; height: 26px; }
+      .wo-none { color: #444; }
+    }
     /* ---- lockout notices from Maintenance Tools (2.019) ---- */
     .notice.crit { background: rgba(220,38,38,.22); color: #fff; border: 1px solid rgba(248,113,113,.6); border-left: 6px solid #dc2626;
       box-shadow: 0 0 0 1px rgba(220,38,38,.25), 0 8px 24px rgba(220,38,38,.25); font-weight: 700; }
@@ -1075,6 +1099,9 @@
 </div>
 
 <!-- pop-up messages, just above the bottom bar -->
+<!-- printed work order (Manage → Queue → Print); only shown while printing -->
+<div id="workOrder" class="wo" aria-hidden="true"></div>
+
 <div id="toasts" aria-live="polite">
   <div id="msg" class="msg"></div>
   <div id="w_msg" class="msg"></div>
@@ -1088,9 +1115,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.019';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.020';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.020', '11/13/2026', 'Manage → Queue: Print a work order for any open job: what to run and why, press and crew, slips per stack, the setup sheet, and spaces to write ink lots, setup deviations and the run record.'],
     ['2.019', '11/12/2026', 'Lockout notices: when maintenance posts a critical notice (like a press locked out) in Maintenance Tools, it shows in red at the top of every screen here too.'],
     ['2.018', '11/9/2026', 'The setup sheet on a press\'s job assignment shows "Out · mix" beside any ink with none in stock.'],
     ['2.017', '11/3/2026', 'Ink run: record the lot number when an ink mixed in house is used ("Mixed in house?" on any ink), and log setup deviations. Manage → Reports → Run log lists them by job and date, and prints.'],
@@ -2501,6 +2529,7 @@
         '<div>' + typeBadge + (q.job ? badge(q.flag, FLAG_TEXT[q.flag] + (q.runs ? ' (' + q.runs + ')' : '')) : '') + '</div></div>' +
         '<div class="acts">' + (shipped ? '<button data-unship="' + esc(q.id) + '">Undo</button>'
           : '<button class="primary" data-ship="' + esc(q.id) + '">' + (q.type === 'Order' ? 'Shipped' : 'Done') + '</button>' +
+            '<button data-qprint="' + esc(q.id) + '" title="Print a work order">Print</button>' +
             '<button class="danger" data-qcancel="' + esc(q.id) + '">Cancel</button>') + '</div>' + press + crew +
         (shipped ? '' : qOffHtml(q.operator, q.packers, d.off)) + '</div>';
     }).join('');
@@ -2589,6 +2618,7 @@
       return;
     }
     if (b.getAttribute('data-qcancel')) { qCancel([b.getAttribute('data-qcancel')]); return; }
+    if (b.getAttribute('data-qprint')) { woPrint(b.getAttribute('data-qprint')); return; }
     var ship = b.getAttribute('data-ship'), unship = b.getAttribute('data-unship');
     if (!ship && !unship) return;
     qLock(true);
@@ -2707,7 +2737,49 @@
   ['rlFrom', 'rlTo', 'rlJob'].forEach(function (id) { $(id).addEventListener('change', rlLoad); });
   $('rlState').addEventListener('change', function () { $('rlJob').value = ''; rlJobs(); rlLoad(); });
   $('rlPrint').addEventListener('click', function () { document.body.classList.add('printing-runlog'); window.print(); });
-  window.addEventListener('afterprint', function () { document.body.classList.remove('printing-runlog'); });
+
+  /* Manage → Queue → Print: one-page work order for an open job */
+  function woPrint(id) {
+    setMsg('mMsg', 'Getting the work order for ' + qName(id) + '…');
+    srv('workOrder', [id], function (w) {
+      $('workOrder').innerHTML = woHtml(w);
+      setMsg('mMsg', '');
+      document.body.classList.add('printing-wo');
+      window.print();
+    }, mErr);
+  }
+  function woHtml(w) {
+    var TYPE = { Order: 'Order', Stock: 'For stock', Note: 'Note' };
+    var run = w.type === 'Note' && !w.slips ? '—' : w.slips ? fmt(w.slips, 0) + ' slips' : 'Open-ended';
+    function cell(k, v) { return '<div class="wo-f"><div class="wo-k">' + k + '</div><div class="wo-v">' + (v || '&nbsp;') + '</div></div>'; }
+    var h = '<div class="wo-head"><img class="wo-logo" src="' + LOGO + '" alt="Specialty Roll Products">' +
+      '<div class="wo-title"><div class="wo-big">WORK ORDER</div><div class="wo-sm">Printed ' + esc(w.printed) + ' · ' + esc(w.id) + '</div></div></div>';
+    h += '<h1 class="wo-job">' + (w.job ? esc(w.job) + ' <span>· ' + esc(w.state) + '</span>' : esc(w.note)) +
+      (w.job ? ' <span class="wo-badge">' + (w.verified ? 'Approved setup' : 'Setup not verified') + '</span>' : '') + '</h1>';
+    h += '<div class="wo-grid">' + cell('Type', esc(TYPE[w.type] || w.type)) + cell('Run', esc(run)) + cell('Due', esc(w.due)) +
+      cell('Press', esc(w.press ? w.press + (w.line ? ' · #' + w.line + ' in line' : '') : 'Not assigned')) +
+      cell('Operator', esc(w.operator)) + cell('Packers', esc(w.packers)) +
+      cell('Pack', w.slipsPerPack ? '<b>' + fmt(w.slipsPerPack, 0) + '</b> slips per stack' : '') +
+      cell('Queued', esc((w.added || '') + (w.addedBy ? ' by ' + w.addedBy : ''))) + '</div>';
+    if (w.note && w.job) h += '<div class="wo-for"><b>For:</b> ' + esc(w.note) + '</div>';
+    if (w.inks.length) {
+      ['Front', 'Back'].forEach(function (side) {
+        var inks = w.inks.filter(function (k) { return k.side === side; });
+        if (!inks.length) return;
+        h += '<h2>' + side + '</h2><table class="wo-t wo-set"><tr><th>Pos</th><th>Ink</th><th>Color</th><th>Anilox</th><th>Notes</th><th class="wo-w">Lot # (if mixed)</th></tr>' +
+          inks.map(function (k) {
+            var out = (w.stock[k.ink.toLowerCase()] || 0) <= 0;
+            return '<tr><td>' + esc(k.order === '' ? '–' : k.order) + '</td><td><b>' + esc(k.ink) + '</b>' + (out ? ' <span class="wo-out">Out · mix</span>' : '') +
+              '</td><td>' + esc(k.color || '') + '</td><td>' + esc(k.anilox || '–') + '</td><td>' + esc(k.notes || '') + '</td><td class="wo-w"></td></tr>';
+          }).join('') + '</table>';
+      });
+    } else h += '<p class="wo-none">No job setup for this item.</p>';
+    h += '<h2>Setup deviations</h2><div class="wo-lines"><div></div><div></div><div></div><div></div></div>';
+    h += '<h2>Run record</h2><table class="wo-t wo-rec"><tr><th>Start date / time</th><th>Finish date / time</th><th>Full pallets</th>' +
+      '<th>Partial pallet (slips)</th><th>Total slips</th><th>Rolls</th></tr><tr><td></td><td></td><td></td><td></td><td></td><td></td></tr></table>';
+    return h;
+  }
+  window.addEventListener('afterprint', function () { document.body.classList.remove('printing-runlog'); document.body.classList.remove('printing-wo'); });
 
   $('wPrint').addEventListener('click', function () {
     var st = document.createElement('style'); st.id = 'landscape'; st.textContent = '@page { size: landscape; margin: 10mm; }';
