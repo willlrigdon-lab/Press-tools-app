@@ -409,8 +409,9 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '1.007';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '1.008';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   var APP_CHANGES = [
+    ['1.008', '11/16/2026', 'Slitter wiring diagrams and schematics are listed by their real names from the manual (like "08E Rewind/Bedroll Drive"), blank pages are hidden, and the machine\'s Mechanical tab has a shortcut to them.'],
     ['1.007', '11/12/2026', 'Problems: a Call button for everyone on call now (Taylor and Cody), and "Send email to" on Report a problem: everyone on call, Taylor or Cody. Each problem shows who was emailed.'],
     ['1.006', '11/12/2026', 'On-call hours: Taylor (and others on the on-call list) set their days, hours and time off on the Problems page, and the Critical problem button only offers to call someone who is working. Otherwise it says who is back next.'],
     ['1.005', '11/12/2026', 'Notices for everyone, in two levels: Standard (orange) and Critical (red, for lockout / tagout). A notice can name a machine, which then shows locked out in the machine list and on its page. Level 2 posts them on the Problems page.'],
@@ -593,6 +594,9 @@
     var lk = M.machine ? lockedNotices(M.machine) : [];
     $('mOneLock').innerHTML = lk.map(function (n) { return '<div class="notice crit" style="margin-bottom:10px"><div><div class="nt">' + esc(n.message) + '</div><div class="nby">' + esc(n.by) + ' · ' + esc(n.posted) + '</div></div></div>'; }).join('');
   }
+  /* schematic titles: "Electrical · 08E Rewind/Bedroll Drive" (group · drawing name); older "Electrical 3" */
+  function schemGroup(t) { return t.indexOf(' · ') !== -1 ? t.split(' · ')[0] : (t.replace(/\s*\d+$/, '') || 'Schematics'); }
+  function schemLabel(t) { return t.indexOf(' · ') !== -1 ? t.split(' · ').slice(1).join(' · ') : t; }
   function mSummary(m) {
     var wiring = m.schematics.length + m.docs.filter(function (x) { return x.kind === 'Wiring'; }).length;
     var mech = m.sections.length, extra = m.docs.filter(function (x) { return x.kind === 'Mechanical'; }).length;
@@ -617,11 +621,15 @@
     var docs = m.docs.filter(function (x) { return x.kind === (tab === 'wiring' ? 'Wiring' : 'Mechanical'); });
     if (tab === 'wiring') {
       var groups = [], by = {};
-      m.schematics.forEach(function (d) { var g = d.title.replace(/\s*\d+$/, '') || 'Schematics'; if (!by[g]) { by[g] = []; groups.push(g); } by[g].push(d); });
+      m.schematics.forEach(function (d) { var g = schemGroup(d.title); if (!by[g]) { by[g] = []; groups.push(g); } by[g].push(d); });
       $('mOneBody').innerHTML = (docs.length ? '<div class="card"><h2>Wiring diagrams</h2>' + docRows(docs) + '</div>' : '') +
         groups.map(function (g) {
-          return '<div class="card"><h2>' + esc(g) + ' <span class="muted">(' + by[g].length + ')</span></h2><div style="display:flex;gap:6px;flex-wrap:wrap">' +
-            by[g].map(function (d) { return '<button class="chip small" data-d="' + esc(d.id) + '">' + esc(d.title.replace(/^.*?(\d+)$/, 'Sheet $1')) + '</button>'; }).join('') + '</div></div>';
+          var named = by[g].some(function (d) { return d.title.indexOf(' · ') !== -1; });
+          return '<div class="card"><h2>' + esc(g) + ' <span class="muted">(' + by[g].length + ')</span></h2>' + (named ? by[g].map(function (d) {
+              var t = schemLabel(d.title), m2 = t.match(/^(\d{2}[A-Z])\s+(.*)$/);
+              return '<div class="item tap" data-d="' + esc(d.id) + '"><div><div class="t">' + esc(m2 ? m2[2] : t) + '</div>' + (m2 ? '<div class="s">Drawing ' + esc(m2[1]) + '</div>' : '') + '</div><div>›</div></div>';
+            }).join('') : '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+            by[g].map(function (d) { return '<button class="chip small" data-d="' + esc(d.id) + '">' + esc(d.title.replace(/^.*?(\d+)$/, 'Sheet $1')) + '</button>'; }).join('') + '</div>') + '</div>';
         }).join('') +
         (!groups.length && !docs.length ? '<div class="card"><p class="muted" style="margin:0">No wiring diagrams for ' + esc(m.machine) + ' yet.' + (A.level >= 2 ? ' Add one below.' : '') + '</p></div>' : '');
       return;
@@ -633,6 +641,8 @@
         ' <span class="muted">' + esc(s.code) + '</span></div><div class="s">' + s.parts + ' parts' + (s.drawings.length ? ' · ' + s.drawings.reduce(function (a, d) { return a + d.balloons; }, 0) + ' tap points' : ' · no drawing') + '</div>' + sheets + '</div><div>›</div></div>';
     }).join('') + '</div>' : '') +
     (docs.length ? '<div class="card"><h2>Mechanical diagrams</h2>' + docRows(docs) + '</div>' : '') +
+    (m.schematics.length || m.docs.some(function (x) { return x.kind === 'Wiring'; }) ? '<div class="card"><div class="item tap" data-gowiring="1" style="border:0;padding:0"><div><div class="t">⚡ Wiring diagrams &amp; schematics</div><div class="s">' +
+      (m.schematics.length + m.docs.filter(function (x) { return x.kind === 'Wiring'; }).length) + ' sheets: electrical, pneumatic, hydraulic, exit conveyor, cabinet layouts</div></div><div>›</div></div></div>' : '') +
     (m.overview.length ? '<div class="card"><h2>Overview drawings</h2><div style="display:flex;gap:6px;flex-wrap:wrap">' + m.overview.map(drawBtn).join('') + '</div></div>' : '') +
     (!m.sections.length && !docs.length ? '<div class="card"><p class="muted" style="margin:0">No mechanical drawings for ' + esc(m.machine) + ' yet. Its manual can be loaded like the slitter\'s' + (A.level >= 2 ? ', or add a diagram below.' : '.') + '</p></div>' : '');
   }
@@ -658,6 +668,7 @@
     });
   }
   $('mOneBody').addEventListener('click', function (e) {
+    if (e.target.closest('[data-gowiring]')) { M.tab = 'wiring'; store('mt_mtab', M.tab); mRenderMachine(); window.scrollTo(0, 0); return; }
     var rm = e.target.closest('[data-mdrm]');
     if (rm) { if (confirm('Remove this diagram link?')) srv('machineDocRemove', [rm.getAttribute('data-mdrm')], mDocsDone); return; }
     var p = e.target.closest('[data-part]'); if (p) { cardOpen(p.getAttribute('data-part'), { machine: M.machine }); return; }
@@ -671,7 +682,7 @@
     $('dwgIn').innerHTML = '<div class="wait">Loading drawing…</div>';
     srv('drawingGet', [id], function (d) {
       M.d = d; M.sel = -1;
-      $('dTitle').textContent = d.title + (d.asm ? ' · ' + d.asm : '');
+      $('dTitle').textContent = d.title + (d.asm ? ' · ' + d.asm : '');   // schematics: "Electrical · 08E Rewind/Bedroll Drive"
       $('dListTitle').textContent = d.kind === 'Parts' ? 'Parts in this section (' + d.list.length + ')' : 'No parts list on this drawing';
       show('dListCard', d.kind === 'Parts'); show('dHint', d.kind === 'Parts');
       M.zoom = window.innerWidth < 700 ? 2.2 : 1;
