@@ -409,8 +409,9 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '1.009';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '1.010';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   var APP_CHANGES = [
+    ['1.010', '11/17/2026', 'Retroflex: 51 pictures from its manuals on the machine page, in groups: controls and screens, doctor blade, adjustments, lubrication points, service and removal, installation. They have no tap points (the manuals came without parts drawings).'],
     ['1.009', '11/16/2026', 'New machines: the JCP case packer (parts drawings with tap points, wiring and air diagrams) and the Retroflex press with its unwind/rewind (spare parts lists). Sections with no drawing now open their parts list.'],
     ['1.008', '11/16/2026', 'Slitter wiring diagrams and schematics are listed by their real names from the manual (like "08E Rewind/Bedroll Drive"), blank pages are hidden, and the machine\'s Mechanical tab has a shortcut to them.'],
     ['1.007', '11/12/2026', 'Problems: a Call button for everyone on call now (Taylor and Cody), and "Send email to" on Report a problem: everyone on call, Taylor or Cody. Each problem shows who was emailed.'],
@@ -597,6 +598,18 @@
   }
   /* schematic titles: "Electrical · 08E Rewind/Bedroll Drive" (group · drawing name); older "Electrical 3" */
   function schemGroup(t) { return t.indexOf(' · ') !== -1 ? t.split(' · ')[0] : (t.replace(/\s*\d+$/, '') || 'Schematics'); }
+  // Overview pictures: titles "Group · Name" (e.g. Retroflex manual pictures) show as named lists per group; others as chips.
+  function overviewHtml(list) {
+    if (!list.length) return '';
+    var plain = list.filter(function (d) { return d.title.indexOf(' · ') === -1; }), groups = [], by = {};
+    list.forEach(function (d) { if (d.title.indexOf(' · ') === -1) return; var g = schemGroup(d.title); if (!by[g]) { by[g] = []; groups.push(g); } by[g].push(d); });
+    return (plain.length ? '<div class="card"><h2>Overview drawings</h2><div style="display:flex;gap:6px;flex-wrap:wrap">' + plain.map(drawBtn).join('') + '</div></div>' : '') +
+      groups.map(function (g) {
+        return '<div class="card"><h2>' + esc(g) + ' <span class="muted">(' + by[g].length + ')</span></h2>' + by[g].map(function (d) {
+          return '<div class="item tap" data-d="' + esc(d.id) + '"><div><div class="t">' + esc(schemLabel(d.title)) + '</div></div><div>›</div></div>';
+        }).join('') + '</div>';
+      }).join('');
+  }
   function schemLabel(t) { return t.indexOf(' · ') !== -1 ? t.split(' · ').slice(1).join(' · ') : t; }
   function mSummary(m) {
     var wiring = m.schematics.length + m.docs.filter(function (x) { return x.kind === 'Wiring'; }).length;
@@ -644,7 +657,7 @@
     (docs.length ? '<div class="card"><h2>Mechanical diagrams</h2>' + docRows(docs) + '</div>' : '') +
     (m.schematics.length || m.docs.some(function (x) { return x.kind === 'Wiring'; }) ? '<div class="card"><div class="item tap" data-gowiring="1" style="border:0;padding:0"><div><div class="t">⚡ Wiring diagrams &amp; schematics</div><div class="s">' +
       (m.schematics.length + m.docs.filter(function (x) { return x.kind === 'Wiring'; }).length) + ' sheets: electrical, pneumatic, hydraulic, exit conveyor, cabinet layouts</div></div><div>›</div></div></div>' : '') +
-    (m.overview.length ? '<div class="card"><h2>Overview drawings</h2><div style="display:flex;gap:6px;flex-wrap:wrap">' + m.overview.map(drawBtn).join('') + '</div></div>' : '') +
+    overviewHtml(m.overview) +
     (!m.sections.length && !docs.length ? '<div class="card"><p class="muted" style="margin:0">No mechanical drawings for ' + esc(m.machine) + ' yet. Its manual can be loaded like the slitter\'s' + (A.level >= 2 ? ', or add a diagram below.' : '.') + '</p></div>' : '');
   }
   $('mTabs').addEventListener('click', function (e) { var b = e.target.closest('button[data-v]'); if (!b) return; M.tab = b.getAttribute('data-v'); store('mt_mtab', M.tab); mRenderMachine(); });
