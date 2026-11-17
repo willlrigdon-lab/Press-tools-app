@@ -843,6 +843,14 @@
         </div>
         <label for="qNote" id="qNoteLabel">Note (optional)</label>
         <input id="qNote" maxlength="300" autocomplete="off" placeholder="e.g. Set up and test when plates arrive">
+        <label>Press (optional)</label>
+        <div class="seg" id="qPress"><button data-v="" class="on">None</button><button data-v="MA1">MA1</button><button data-v="MA2">MA2</button><button data-v="MA3">MA3</button></div>
+        <div class="row2">
+          <div><label for="qOp">Operator (optional)</label><select id="qOp"><option value="">No operator</option></select></div>
+          <div><label for="qPk">Packers (optional)</label><input id="qPk" maxlength="200" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Names, comma between">
+            <select id="qPkAdd" class="hidden" aria-label="Add a packer to the new job" style="margin-top:6px"></select></div>
+        </div>
+        <p class="hint">Pick the press and crew now to save them with the job. They can still be changed on the job below.</p>
         <button id="qAdd" class="primary wide">Add to queue</button>
       </div>
       <div class="card">
@@ -1130,9 +1138,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.022';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.023';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.023', '11/17/2026', 'Manage → Queue: pick the press, operator and packers while adding a job, so it all saves at once. They can still be changed on the job afterwards.'],
     ['2.022', '11/17/2026', 'Behind the scenes: three small code updates to newer browser methods. Nothing looks or works differently.'],
     ['2.021', '11/13/2026', 'Work order: Print now opens the work order on screen first; tap Print on it to print. Phones would not print it before.'],
     ['2.020', '11/13/2026', 'Manage → Queue: Print a work order for any open job: what to run and why, press and crew, slips per stack, the setup sheet, and spaces to write ink lots, setup deviations and the run record.'],
@@ -2473,7 +2482,7 @@
   });
 
   /* queue */
-  var Q_TYPE = 'Order';
+  var Q_TYPE = 'Order', Q_PRESS = '';
   var Q_HINT = { Order: 'An order: slips and due date.', Stock: 'Run a job for stock. Slips and date are optional; leave slips blank to run until changed.',
     Note: 'Anything else for a press, like "Set up and test Quick Draw plates when they arrive". Job and date are optional.' };
   function qTypeShow() {
@@ -2487,6 +2496,20 @@
     if (first) first.textContent = Q_TYPE === 'Note' ? 'No job' : 'Choose a job…';
   }
   segPick('qType', function (v) { Q_TYPE = v; qTypeShow(); });
+  segPick('qPress', function (v) { Q_PRESS = v; });
+  /** Crew pickers on the "Add to the queue" card, filled from the queue list (operators and packers on the Users tab). */
+  function qAddCrew(d) {
+    var keep = $('qOp').value;
+    $('qOp').innerHTML = opt('', 'No operator', !keep) + (d.operators || []).map(function (n) { return opt(n, n, n === keep); }).join('');
+    $('qPkAdd').innerHTML = opt('', '+ packer', true) + (d.packers || []).map(function (n) { return opt(n, n, false); }).join('');
+    show('qPkAdd', (d.packers || []).length > 0);
+  }
+  $('qPkAdd').addEventListener('change', function () {
+    var who = this.value; if (!who) return;
+    var names = $('qPk').value.split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+    if (names.indexOf(who) === -1) names.push(who);
+    $('qPk').value = names.join(', '); this.value = '';
+  });
   /** Short description of a queue line or assignment: slips/stock and date. */
   function qLine(q) {
     var amt = q.type === 'Note' ? '' : q.type === 'Stock' ? 'For stock' + (q.slips ? ' · ' + fmt(q.slips, 0) + ' slips' : ' · open-ended')
@@ -2520,6 +2543,7 @@
     $('qState').innerHTML = states.map(function (s) { return opt(s, s, s === keep); }).join('');
     qJobs();
     qTypeShow();
+    qAddCrew(d);
     $('qAnilox').innerHTML = anxShortHtml(d.anilox);
     if (!d.queue.length) { $('qList').innerHTML = '<p class="muted">Nothing in the queue.</p>'; return; }
     $('qList').innerHTML = d.queue.map(function (q) {
@@ -2562,9 +2586,15 @@
     if (!$('qJob').value && Q_TYPE !== 'Note') { setMsg('mMsg', 'Choose a job.', 'err'); return; }
     if (Q_TYPE === 'Note' && !$('qNote').value.trim()) { setMsg('mMsg', 'Type what the press should do.', 'err'); return; }
     $('qAdd').disabled = true;
-    srv('queueAdd', [$('qJob').value, Q_TYPE === 'Note' ? '' : $('qSlips').value, $('qDue').value, Q_TYPE, $('qNote').value], function (d) {
+    var press = Q_PRESS, op = $('qOp').value, pk = $('qPk').value.trim();
+    srv('queueAdd', [$('qJob').value, Q_TYPE === 'Note' ? '' : $('qSlips').value, $('qDue').value, Q_TYPE, $('qNote').value, press, op, pk], function (d) {
       $('qAdd').disabled = false; $('qSlips').value = ''; $('qDue').value = ''; $('qNote').value = '';
-      qShow(d); setMsg('mMsg', 'Added to the queue.', 'ok');
+      $('qOp').value = ''; $('qPk').value = ''; Q_PRESS = '';
+      Array.prototype.forEach.call($('qPress').children, function (x) { x.classList.toggle('on', x.getAttribute('data-v') === ''); });
+      qShow(d);
+      var off = qOffText(op, pk, d.off);
+      setMsg('mMsg', 'Added to the queue' + (press ? ' on ' + press : '') + (op ? ', operator ' + op : '') + (pk ? ', packers ' + pk : '') + '.' +
+        (off ? ' Heads up: ' + off + '.' : ''), off ? 'err' : 'ok');
     }, function (e) { $('qAdd').disabled = false; mErr(e); });
   });
   /** Lock the list while one change saves, so a tap can't land on a row that's being redrawn. */
