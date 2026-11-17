@@ -1130,9 +1130,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.021';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.022';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.022', '11/17/2026', 'Behind the scenes: three small code updates to newer browser methods. Nothing looks or works differently.'],
     ['2.021', '11/13/2026', 'Work order: Print now opens the work order on screen first; tap Print on it to print. Phones would not print it before.'],
     ['2.020', '11/13/2026', 'Manage → Queue: Print a work order for any open job: what to run and why, press and crew, slips per stack, the setup sheet, and spaces to write ink lots, setup deviations and the run record.'],
     ['2.019', '11/12/2026', 'Lockout notices: when maintenance posts a critical notice (like a press locked out) in Maintenance Tools, it shows in red at the top of every screen here too.'],
@@ -1301,7 +1302,7 @@
 
   function wShowRecent(list) {
     var ul = $('w_recent');
-    ul.innerHTML = '';
+    ul.replaceChildren();
     if (!list || !list.length) {
       ul.innerHTML = '<li><span class="when">No rolls saved yet.</span></li>';
       return;
@@ -1520,7 +1521,7 @@
   function renderPreview() {
     var j = S.jobs.filter(function (x) { return x.key === $('jobSel').value; })[0];
     $('startBtn').disabled = !j;
-    if (!j) { $('jobPreview').innerHTML = ''; return; }
+    if (!j) { $('jobPreview').replaceChildren(); return; }
     var goal = S.goalRuns || 5;
     var html = '<h3><span class="badge ' + j.flag + '">' + (j.runs ? 'Tracked ' + j.runs + ' of ' + goal : 'Never tracked') + '</span></h3>';
     if (j.flag === 'red') html += '<div class="push red">This job has never been tracked. Please track it this run.</div>';
@@ -2358,7 +2359,7 @@
     supplies: function () { srv('supplyRequests', [$('supShowAll').checked], supShow, mErr); },
     stock: function () { srv('invStock', [], minShow, mErr); },
     order: function () {   // out/low now + needed for queued jobs, on one screen
-      $('orderList').innerHTML = '<p class="muted">Loading…</p>'; $('needList').innerHTML = '';
+      $('orderList').innerHTML = '<p class="muted">Loading…</p>'; $('needList').replaceChildren();
       srv('invStock', [], orderShow, mErr); srv('inkNeeded', [], needShow, mErr);
     },
     states: function () { srv('statesList', [], statesShow, mErr); },
