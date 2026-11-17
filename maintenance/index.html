@@ -409,8 +409,9 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '1.008';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '1.009';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   var APP_CHANGES = [
+    ['1.009', '11/16/2026', 'New machines: the JCP case packer (parts drawings with tap points, wiring and air diagrams) and the Retroflex press with its unwind/rewind (spare parts lists). Sections with no drawing now open their parts list.'],
     ['1.008', '11/16/2026', 'Slitter wiring diagrams and schematics are listed by their real names from the manual (like "08E Rewind/Bedroll Drive"), blank pages are hidden, and the machine\'s Mechanical tab has a shortcut to them.'],
     ['1.007', '11/12/2026', 'Problems: a Call button for everyone on call now (Taylor and Cody), and "Send email to" on Report a problem: everyone on call, Taylor or Cody. Each problem shows who was emailed.'],
     ['1.006', '11/12/2026', 'On-call hours: Taylor (and others on the on-call list) set their days, hours and time off on the Problems page, and the Critical problem button only offers to call someone who is working. Otherwise it says who is back next.'],
@@ -672,8 +673,22 @@
     var rm = e.target.closest('[data-mdrm]');
     if (rm) { if (confirm('Remove this diagram link?')) srv('machineDocRemove', [rm.getAttribute('data-mdrm')], mDocsDone); return; }
     var p = e.target.closest('[data-part]'); if (p) { cardOpen(p.getAttribute('data-part'), { machine: M.machine }); return; }
-    var b = e.target.closest('[data-d]'); if (b && b.getAttribute('data-d')) dOpen(b.getAttribute('data-d'));
+    var b = e.target.closest('[data-d]'); if (b && b.getAttribute('data-d')) { dOpen(b.getAttribute('data-d')); return; }
+    var bs = e.target.closest('[data-sec]'); if (bs && !bs.getAttribute('data-d')) mSection(bs.getAttribute('data-sec'));
+    if (e.target.closest('[data-secback]')) mRenderMachine();
   });
+  /* a section with no drawing (e.g. Retroflex spare parts lists): its parts as a list */
+  function mSection(code) {
+    var m = mOne(), s = m.sections.filter(function (x) { return x.code === code; })[0]; if (!s) return;
+    var pre = m.machine + ' ' + code;
+    pEnsure(function () {
+      var hits = P.parts.filter(function (p) { return p.where.some(function (w) { return w.indexOf(pre) === 0 && /^\d/.test(w.slice(pre.length)); }); });
+      $('mOneBody').innerHTML = '<div class="card"><div class="item tap" data-secback="1" style="border:0;padding:0 0 8px"><div class="t">‹ All sections</div></div>' +
+        '<h2>' + esc(titleCase(s.name)) + '</h2><p class="muted" style="margin-top:0">No drawing for this section. ' + hits.length + ' parts from the manual\'s spare parts list.</p>' +
+        (hits.length ? hits.map(partRow).join('') : '<p class="muted">No parts listed.</p>') + '</div>';
+      window.scrollTo(0, 0);
+    });
+  }
 
   /* ---- drawing viewer ---- */
   function dOpen(id, balloonN) {
