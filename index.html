@@ -985,9 +985,9 @@
     <div id="m_resources" class="mpane hidden">
       <div class="card">
         <h2>Add a resource</h2>
-        <p class="muted" style="margin-top:0">Shows on the operator's Resources tab.</p>
+        <p class="muted" style="margin-top:0">Shows on the operator's Resources tab. Management Forms show only below, under Printable forms.</p>
         <label for="rsSection">Section</label>
-        <select id="rsSection"><option>Company Info</option><option>Troubleshooting</option><option>Videos</option><option>SOPs</option><option>Best Practice Guides</option></select>
+        <select id="rsSection"><option>Company Info</option><option>Troubleshooting</option><option>Videos</option><option>SOPs</option><option>Best Practice Guides</option><option>Management Forms</option></select>
         <label for="rsTitle">Title</label>
         <input id="rsTitle" maxlength="120" autocomplete="off" placeholder="e.g. Press troubleshooting guide">
         <label for="rsLink">Link</label>
@@ -996,6 +996,11 @@
         <label for="rsNote">Note (optional)</label>
         <input id="rsNote" maxlength="300" autocomplete="off" placeholder="e.g. Ink spitting, register drift, web breaks">
         <button id="rsAdd" class="primary wide">Add resource</button>
+      </div>
+      <div class="card">
+        <h2>Printable forms</h2>
+        <p class="muted" style="margin-top:0">Open a form, then print it from the PDF viewer. Add more with Section: Management Forms.</p>
+        <div id="rsForms"></div>
       </div>
       <div class="card">
         <h2>Current resources</h2>
@@ -1138,9 +1143,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.023';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.024';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.024', '11/19/2026', 'Manage → Resources has a Printable forms list (first: the Training Acknowledgment Form). Forms added under Management Forms show only there, not on the operator\'s Resources tab.'],
     ['2.023', '11/17/2026', 'Manage → Queue: pick the press, operator and packers while adding a job, so it all saves at once. They can still be changed on the job afterwards.'],
     ['2.022', '11/17/2026', 'Behind the scenes: three small code updates to newer browser methods. Nothing looks or works differently.'],
     ['2.021', '11/13/2026', 'Work order: Print now opens the work order on screen first; tap Print on it to print. Phones would not print it before.'],
@@ -1265,9 +1271,10 @@
   function resShow() {
     var d = RES.list; if (!d) return;
     var q = $('resSearch').value.trim().toLowerCase();
-    var list = d.resources.filter(function (x) { return !q || (x.title + ' ' + x.note + ' ' + x.section).toLowerCase().indexOf(q) !== -1; });
+    var ops = d.resources.filter(function (x) { return x.section !== 'Management Forms'; });   // forms for management show only on Manage → Resources
+    var list = ops.filter(function (x) { return !q || (x.title + ' ' + x.note + ' ' + x.section).toLowerCase().indexOf(q) !== -1; });
     var dir = dirHtml(d.directory || [], q);
-    if (!d.resources.length && !(d.directory || []).length) { $('resList').innerHTML = '<p class="muted">No resources yet. Management adds them under Manage → Jobs → Resources.</p>'; return; }
+    if (!ops.length && !(d.directory || []).length) { $('resList').innerHTML = '<p class="muted">No resources yet. Management adds them under Manage → Jobs → Resources.</p>'; return; }
     if (!list.length && !dir) { $('resList').innerHTML = '<p class="muted">Nothing matches "' + esc(q) + '".</p>'; return; }
     var html = dir ? '<h2 class="ressec">Company Info</h2>' + dir : '', sec = dir ? 'Company Info' : null;
     list.forEach(function (x) {
@@ -2462,6 +2469,11 @@
         (x.note ? ' · ' + esc(x.note) : '') + '<br><a href="' + esc(x.link) + '" target="_blank" rel="noopener">Open link</a></div></div>' +
         '<div class="acts"><button class="danger" data-rsrm="' + esc(x.id) + '">Remove</button></div></div>';
     }).join('') : '<p class="muted">No resources yet.</p>';
+    var forms = d.resources.filter(function (x) { return x.section === 'Management Forms'; });
+    $('rsForms').innerHTML = forms.length ? forms.map(function (x) {
+      return '<a class="res" target="_blank" rel="noopener" href="' + esc(x.link) + '"><span class="ic">🖨️</span><span><span class="t">' + esc(x.title) + '</span>' +
+        (x.note ? '<br><span class="s">' + esc(x.note) + '</span>' : '') + '</span></a>';
+    }).join('') : '<p class="muted">No forms yet.</p>';
   }
   $('rsAdd').addEventListener('click', function () {
     var title = $('rsTitle').value.trim(), link = $('rsLink').value.trim();
