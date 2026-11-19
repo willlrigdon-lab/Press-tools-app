@@ -52,9 +52,9 @@
     h3 { font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 18px 0 8px; }
     .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
     label { display: block; font-weight: 600; font-size: 15px; margin: 12px 0 5px; }
-    select, input { width: 100%; font-size: 19px; padding: 12px; border: 1px solid var(--line);
+    select, input, textarea { width: 100%; font-size: 19px; padding: 12px; border: 1px solid var(--line);
       border-radius: 10px; background: #fff; color: var(--text); }
-    input:focus, select:focus { outline: 3px solid #b7cdf0; border-color: var(--accent); }
+    input:focus, select:focus, textarea:focus { outline: 3px solid #b7cdf0; border-color: var(--accent); }
     button { font: inherit; font-weight: 700; border-radius: 12px; border: 2px solid var(--accent);
       background: #fff; color: var(--accent); padding: 13px; cursor: pointer; }
     button.primary { background: var(--accent); color: #fff; }
@@ -334,9 +334,9 @@
     th { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; }
     .card { border-radius: 20px; padding: 18px; background: var(--card); border: 1px solid var(--line);
       box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 10px 30px rgba(0,0,0,.35); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
-    select, input { border-radius: 14px; background: var(--field); color: var(--text); border-color: var(--line); }
-    input::placeholder { color: var(--muted); opacity: .8; }
-    input:focus, select:focus { outline: 3px solid var(--accent-soft); border-color: var(--accent); }
+    select, input, textarea { border-radius: 14px; background: var(--field); color: var(--text); border-color: var(--line); }
+    input::placeholder, textarea::placeholder { color: var(--muted); opacity: .8; }
+    input:focus, select:focus, textarea:focus { outline: 3px solid var(--accent-soft); border-color: var(--accent); }
     button { border-radius: 999px; background: transparent; color: var(--accent); border-color: var(--accent); }
     button.primary, .ink .plus, .pal .plus, .seg button.on, .tabs button.on, .keypad button.primary {
       background: var(--logo-blue); border-color: #2a7ab0; color: #fff; box-shadow: 0 6px 22px var(--accent-glow); }
@@ -531,6 +531,7 @@
       <div class="pn">Press<b id="pressName"></b></div>
       <button id="pressChange" class="chip">Change press</button>
     </div>
+    <button id="issueBtn" type="button" class="wide" style="margin-top:10px">Report an issue</button>
   </div>
 
   <div id="assignCard" class="card assign hidden">
@@ -808,7 +809,7 @@
     <div class="seg mgroups" id="mGroups">
       <button data-g="jobs" class="on">Jobs</button>
       <button data-g="ink">Ink<span class="cnt" data-c="order"></span></button>
-      <button data-g="reports">Reports<span class="cnt" data-c="supplies"></span></button>
+      <button data-g="reports">Reports<span class="cnt" data-c="reports"></span></button>
       <button data-g="crew">Crew</button>
     </div>
     <div class="tabs" id="mTabs">
@@ -822,6 +823,7 @@
       <button data-t="waste" data-g="reports">Waste</button>
       <button data-t="supplies" data-g="reports">Low supplies<span class="cnt" data-c="supplies"></span></button>
       <button data-t="runlog" data-g="reports">Run log</button>
+      <button data-t="issues" data-g="reports">Issues<span class="cnt" data-c="issues"></span></button>
       <button data-t="daysoff" data-g="crew">Days off</button>
     </div>
     </div>
@@ -909,6 +911,13 @@
         </div>
         <p class="muted" id="rlFilters"></p>
         <div id="rlList"></div>
+      </div>
+    </div>
+    <div id="m_issues" class="mpane hidden">
+      <div class="card">
+        <div class="cardhead"><h2>Issue reports</h2>
+          <label class="check"><input type="checkbox" id="issShowAll"> Show handled</label></div>
+        <div id="issList"></div>
       </div>
     </div>
     <div id="m_supplies" class="mpane hidden">
@@ -1105,6 +1114,22 @@
     <p class="muted appver" style="text-align:center"></p>
   </section>
 
+  <!-- ===================== REPORT AN ISSUE (operator) ===================== -->
+  <div id="issueSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="issueTitle">
+    <form id="issueForm" class="sheet-card" aria-labelledby="issueTitle" novalidate>
+      <h2 id="issueTitle">Report an issue</h2>
+      <p id="issueAttach" class="muted" style="margin-top:0"></p>
+      <label for="issueText">What's the issue?</label>
+      <textarea id="issueText" name="issue" rows="5" style="font-family:inherit;resize:vertical" maxlength="1000" required aria-describedby="issueHint" placeholder="e.g. Web keeps wandering on unit 3"></textarea>
+      <div id="issueHint" class="hint">The time, your name, the press and its assigned job are added for you. Management reads these under Reports → Issues.</div>
+      <div class="row2">
+        <button id="issueCancel" type="button" class="wide">Close</button>
+        <button id="issueSend" type="submit" class="primary wide">Send</button>
+      </div>
+      <div id="issueMsg" class="msg" aria-live="polite"></div>
+    </form>
+  </div>
+
   <!-- ===================== REPORT LOW SUPPLY ===================== -->
   <div id="lowSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="lowTitle">
     <div class="sheet-card">
@@ -1143,9 +1168,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.024';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.025';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.025', '11/19/2026', 'Report an issue on the Operator screen: type what\'s wrong, and the time, your name, the press and its assigned job are added for you. Management reads them under Manage → Reports → Issues and marks them handled.'],
     ['2.024', '11/19/2026', 'Manage → Resources has a Printable forms list (first: the Training Acknowledgment Form). Forms added under Management Forms show only there, not on the operator\'s Resources tab.'],
     ['2.023', '11/17/2026', 'Manage → Queue: pick the press, operator and packers while adding a job, so it all saves at once. They can still be changed on the job afterwards.'],
     ['2.022', '11/17/2026', 'Behind the scenes: three small code updates to newer browser methods. Nothing looks or works differently.'],
@@ -2101,6 +2127,34 @@
   });
 
   /* =====================================================================
+     REPORT AN ISSUE (operator screen): time, name, press and assigned job are added by the server
+     ===================================================================== */
+  function issueAttachText() {
+    var c = S.assigned && S.assigned.current, now = new Date();
+    var when = (now.getMonth() + 1) + '/' + now.getDate() + ' ' + now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    if (!S.press) return 'No press picked · ' + when;
+    return 'Press ' + S.press + ' · ' + (c ? (c.job ? c.job + (c.state ? ' · ' + c.state : '') : (c.note || 'Note')) : 'no job assigned') + ' · ' + when;
+  }
+  $('issueBtn').addEventListener('click', function () {
+    setMsg('issueMsg', ''); $('issueText').value = ''; $('issueText').removeAttribute('aria-invalid');
+    $('issueAttach').textContent = issueAttachText();
+    show('issueSheet', true); $('issueText').focus();
+  });
+  $('issueCancel').addEventListener('click', function () { show('issueSheet', false); });
+  $('issueSheet').addEventListener('click', function (e) { if (e.target === this) show('issueSheet', false); });
+  $('issueForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var text = $('issueText').value.trim();
+    if (!text) { $('issueText').setAttribute('aria-invalid', 'true'); setMsg('issueMsg', 'Type what the issue is.', 'err'); return; }
+    $('issueText').removeAttribute('aria-invalid');
+    $('issueSend').disabled = true; setMsg('issueMsg', 'Sending…');
+    srv('issueReport', [text, S.press || ''], function (r) {
+      $('issueSend').disabled = false; $('issueText').value = '';
+      setMsg('issueMsg', r.message, 'ok');
+    }, function (err) { $('issueSend').disabled = false; setMsg('issueMsg', errText(err), 'err'); });
+  });
+
+  /* =====================================================================
      INK INVENTORY
      ===================================================================== */
   var INV = { scope: 'active', counting: false, inks: [], counts: {}, tab: 'list' };   // counts: {ink: {full, part}} typed so far
@@ -2373,6 +2427,7 @@
     queue: function () { srv('queueList', [$('qShowShipped').checked], qShow, mErr); },
     waste: function () { wReport(); },
     supplies: function () { srv('supplyRequests', [$('supShowAll').checked], supShow, mErr); },
+    issues: function () { srv('issuesList', [$('issShowAll').checked], issShow, mErr); },
     stock: function () { srv('invStock', [], minShow, mErr); },
     order: function () {   // out/low now + needed for queued jobs, on one screen
       $('orderList').innerHTML = '<p class="muted">Loading…</p>'; $('needList').replaceChildren();
@@ -2398,13 +2453,13 @@
     });
     Object.keys(M_LOAD).forEach(function (k) { show('m_' + k, k === t); });
     M_LOAD[t]();
-    if (['supplies', 'stock', 'order'].indexOf(t) === -1) mCounts();   // those screens refresh the counts when they draw
+    if (['supplies', 'issues', 'stock', 'order'].indexOf(t) === -1) mCounts();   // those screens refresh the counts when they draw
   }
   /** Numbers on the buttons: inks to order, open low-supply reports, unshipped jobs. */
   function mCounts() {
     srv('manageCounts', [], function (c) {
       Array.prototype.forEach.call(document.querySelectorAll('#manageView .cnt[data-c]'), function (el) {
-        var n = c[el.getAttribute('data-c')] || 0; el.textContent = n ? n : '';
+        var k = el.getAttribute('data-c'), n = k === 'reports' ? (c.supplies || 0) + (c.issues || 0) : c[k] || 0; el.textContent = n ? n : '';
       });
       ['order', 'queue', 'supplies'].forEach(function (k) { mStat(k, c[k] || 0); });
     });
@@ -2879,6 +2934,24 @@
         '<div class="acts">' + acts + '</div></div>';
     }).join('');
   }
+  function issShow(d) {
+    mCounts();
+    if (!d.issues.length) { $('issList').innerHTML = '<p class="muted">No issues reported.</p>'; return; }
+    $('issList').innerHTML = d.issues.map(function (x) {
+      var open = x.status !== 'Handled';
+      return '<div class="item"><div><div class="t">' + (x.press ? esc(x.press) + ' · ' : '') + (x.job ? esc(x.job) + (x.state ? ' · ' + esc(x.state) : '') : '<span class="muted">No job assigned</span>') + '</div>' +
+        '<div class="s">' + esc(x.by || '') + ' · ' + esc(x.time) + '</div>' +
+        '<div style="white-space:pre-wrap;margin:6px 0">' + esc(x.text) + '</div>' +
+        '<div>' + (open ? badge('red', 'Open') : badge('green', 'Handled') + ' <span class="s">' + esc(x.handledBy) + ' · ' + esc(x.handled) + '</span>') + '</div></div>' +
+        '<div class="acts"><button data-iid="' + esc(x.id) + '" data-ist="' + (open ? 'Handled' : 'Open') + '"' + (open ? ' class="primary"' : '') + '>' + (open ? 'Handled' : 'Reopen') + '</button></div></div>';
+    }).join('');
+  }
+  $('issShowAll').addEventListener('change', function () { M_LOAD.issues(); });
+  $('issList').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-iid]'); if (!b) return;
+    b.disabled = true;
+    srv('issueSetStatus', [b.getAttribute('data-iid'), b.getAttribute('data-ist'), $('issShowAll').checked], issShow, function (err) { b.disabled = false; mErr(err); });
+  });
   $('supList').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-sid]'); if (!b) return;
     b.disabled = true;
