@@ -486,6 +486,9 @@
     .notice.crit .nt::before { content: "🔒 LOCKOUT · "; font-weight: 800; letter-spacing: .04em; }
     .notice.crit .nby { color: #fecaca; }
     @media print { .t-off { background: #eee; } .t-pto { background: #dbeafe; } .t-sick { background: #ffedd5; } }
+    /* links that look like buttons (Printable forms: Print / download, Open) */
+    a.btn { display: inline-block; font-weight: 700; font-size: 15px; padding: 9px 12px; border: 2px solid var(--accent); border-radius: 999px; color: var(--accent); text-decoration: none; text-align: center; }
+    a.btn.primary { background: var(--logo-blue); border-color: #2a7ab0; color: #fff; box-shadow: 0 6px 22px var(--accent-glow); }
   </style>
 </head>
 <body>
@@ -1011,7 +1014,7 @@
       </div>
       <div class="card">
         <h2>Printable forms</h2>
-        <p class="muted" style="margin-top:0">Open a form, then print it from the PDF viewer. Add more with Section: Management Forms.</p>
+        <p class="muted" style="margin-top:0">Print / download saves the PDF on your phone: open the download, then use Print. Add more with Section: Management Forms.</p>
         <div id="rsForms"></div>
       </div>
       <div class="card">
@@ -1189,9 +1192,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.027';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.028';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.028', '11/19/2026', 'Printable forms: a Print / download button gets the PDF itself onto your phone, so it prints the whole form instead of just its name.'],
     ['2.027', '11/19/2026', 'Maintenance requests now reach Maintenance Tools: your phone passes the request straight on, so no extra Google approval is needed.'],
     ['2.026', '11/19/2026', 'Maintenance request on the Operator screen: pick how bad it is (Press down, Running with a problem, Minor) and type what\'s wrong. It goes straight to Maintenance Tools as a problem on that press, with the job attached, and emails Taylor.'],
     ['2.025', '11/19/2026', 'Report an issue on the Operator screen: type what\'s wrong, and the time, your name, the press and its assigned job are added for you. Management reads them under Manage → Reports → Issues and marks them handled.'],
@@ -2577,6 +2581,11 @@
   });
 
   /* resources screen */
+  /** The file id in a Google Drive link (…/file/d/ID/… or …?id=ID), or ''. */
+  function driveFileId(link) {
+    var m = /\/file\/d\/([\w-]+)/.exec(link) || (/drive\.google\.com/.test(link) && /[?&]id=([\w-]+)/.exec(link));
+    return m ? m[1] : '';
+  }
   function rsShow(d) {
     RES.list = d;
     $('rsList').innerHTML = d.resources.length ? d.resources.map(function (x) {
@@ -2585,9 +2594,12 @@
         '<div class="acts"><button class="danger" data-rsrm="' + esc(x.id) + '">Remove</button></div></div>';
     }).join('') : '<p class="muted">No resources yet.</p>';
     var forms = d.resources.filter(function (x) { return x.section === 'Management Forms'; });
+    // phones can't print Google Drive's preview page (it prints just the file name), so "Print / download" hands over the PDF itself
     $('rsForms').innerHTML = forms.length ? forms.map(function (x) {
-      return '<a class="res" target="_blank" rel="noopener" href="' + esc(x.link) + '"><span class="ic">🖨️</span><span><span class="t">' + esc(x.title) + '</span>' +
-        (x.note ? '<br><span class="s">' + esc(x.note) + '</span>' : '') + '</span></a>';
+      var id = driveFileId(x.link), dl = id ? 'https://drive.google.com/uc?export=download&id=' + encodeURIComponent(id) : x.link;
+      return '<div class="item"><div><div class="t">🖨️ ' + esc(x.title) + '</div>' + (x.note ? '<div class="s">' + esc(x.note) + '</div>' : '') + '</div>' +
+        '<div class="acts"><a class="btn primary" data-formdl target="_blank" rel="noopener" href="' + esc(dl) + '">Print / download</a>' +
+        '<a class="btn" data-formopen target="_blank" rel="noopener" href="' + esc(x.link) + '">Open</a></div></div>';
     }).join('') : '<p class="muted">No forms yet.</p>';
   }
   $('rsAdd').addEventListener('click', function () {
