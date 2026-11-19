@@ -531,7 +531,10 @@
       <div class="pn">Press<b id="pressName"></b></div>
       <button id="pressChange" class="chip">Change press</button>
     </div>
-    <button id="issueBtn" type="button" class="wide" style="margin-top:10px">Report an issue</button>
+    <div class="row2" style="margin-top:10px">
+      <button id="issueBtn" type="button" class="wide" style="margin-top:0">Report an issue</button>
+      <button id="maintBtn" type="button" class="wide" style="margin-top:0">Maintenance request</button>
+    </div>
   </div>
 
   <div id="assignCard" class="card assign hidden">
@@ -1130,6 +1133,24 @@
     </form>
   </div>
 
+  <!-- ===================== MAINTENANCE REQUEST (operator → Maintenance Tools) ===================== -->
+  <div id="maintSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="maintTitle">
+    <form id="maintForm" class="sheet-card" aria-labelledby="maintTitle" novalidate>
+      <h2 id="maintTitle">Maintenance request</h2>
+      <p id="maintAttach" class="muted" style="margin-top:0"></p>
+      <label id="maintSevLabel">How bad is it?</label>
+      <div class="seg" id="maintSev" role="group" aria-labelledby="maintSevLabel"><button type="button" data-v="Press down">Press down</button><button type="button" data-v="Running with a problem" class="on">Running with a problem</button><button type="button" data-v="Minor">Minor</button></div>
+      <label for="maintText">What's wrong?</label>
+      <textarea id="maintText" name="request" rows="4" maxlength="1000" required aria-describedby="maintHint" style="font-family:inherit;resize:vertical" placeholder="e.g. Unit 3 gear grinding at speed"></textarea>
+      <div id="maintHint" class="hint">Goes to Maintenance Tools and emails maintenance. The time, your name, the press and its job are added for you.</div>
+      <div class="row2">
+        <button id="maintCancel" type="button" class="wide">Close</button>
+        <button id="maintSend" type="submit" class="primary wide">Send to maintenance</button>
+      </div>
+      <div id="maintMsg" class="msg" aria-live="polite"></div>
+    </form>
+  </div>
+
   <!-- ===================== REPORT LOW SUPPLY ===================== -->
   <div id="lowSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="lowTitle">
     <div class="sheet-card">
@@ -1168,9 +1189,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.025';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.026';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.026', '11/19/2026', 'Maintenance request on the Operator screen: pick how bad it is (Press down, Running with a problem, Minor) and type what\'s wrong. It goes straight to Maintenance Tools as a problem on that press, with the job attached, and emails Taylor.'],
     ['2.025', '11/19/2026', 'Report an issue on the Operator screen: type what\'s wrong, and the time, your name, the press and its assigned job are added for you. Management reads them under Manage → Reports → Issues and marks them handled.'],
     ['2.024', '11/19/2026', 'Manage → Resources has a Printable forms list (first: the Training Acknowledgment Form). Forms added under Management Forms show only there, not on the operator\'s Resources tab.'],
     ['2.023', '11/17/2026', 'Manage → Queue: pick the press, operator and packers while adding a job, so it all saves at once. They can still be changed on the job afterwards.'],
@@ -2152,6 +2174,32 @@
       $('issueSend').disabled = false; $('issueText').value = '';
       setMsg('issueMsg', r.message, 'ok');
     }, function (err) { $('issueSend').disabled = false; setMsg('issueMsg', errText(err), 'err'); });
+  });
+
+  /* maintenance request: saved here, then passed to Maintenance Tools by the server (it files a problem and emails maintenance) */
+  var MREQ = { sev: 'Running with a problem' };
+  $('maintBtn').addEventListener('click', function () {
+    if (!S.press) { setMsg('msg', 'Pick your press first, then tap Maintenance request.', 'err'); return; }
+    setMsg('maintMsg', ''); $('maintText').value = ''; $('maintText').removeAttribute('aria-invalid');
+    MREQ.sev = 'Running with a problem';
+    Array.prototype.forEach.call($('maintSev').children, function (b) { b.classList.toggle('on', b.getAttribute('data-v') === MREQ.sev); });
+    $('maintAttach').textContent = issueAttachText();
+    show('maintSheet', true); $('maintText').focus();
+  });
+  segPick('maintSev', function (v) { MREQ.sev = v; });
+  $('maintCancel').addEventListener('click', function () { show('maintSheet', false); });
+  $('maintSheet').addEventListener('click', function (e) { if (e.target === this) show('maintSheet', false); });
+  $('maintForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var text = $('maintText').value.trim();
+    if (text.length < 3) { $('maintText').setAttribute('aria-invalid', 'true'); setMsg('maintMsg', 'Type what is wrong.', 'err'); return; }
+    $('maintText').removeAttribute('aria-invalid');
+    $('maintSend').disabled = true; setMsg('maintMsg', 'Sending to maintenance…');
+    srv('maintRequest', [text, MREQ.sev, S.press || ''], function (r) {
+      $('maintSend').disabled = false;
+      if (r.sent) $('maintText').value = '';
+      setMsg('maintMsg', r.message, r.sent ? 'ok' : 'err');
+    }, function (err) { $('maintSend').disabled = false; setMsg('maintMsg', errText(err), 'err'); });
   });
 
   /* =====================================================================
