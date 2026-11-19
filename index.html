@@ -1189,9 +1189,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.026';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.027';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.027', '11/19/2026', 'Maintenance requests now reach Maintenance Tools: your phone passes the request straight on, so no extra Google approval is needed.'],
     ['2.026', '11/19/2026', 'Maintenance request on the Operator screen: pick how bad it is (Press down, Running with a problem, Minor) and type what\'s wrong. It goes straight to Maintenance Tools as a problem on that press, with the job attached, and emails Taylor.'],
     ['2.025', '11/19/2026', 'Report an issue on the Operator screen: type what\'s wrong, and the time, your name, the press and its assigned job are added for you. Management reads them under Manage → Reports → Issues and marks them handled.'],
     ['2.024', '11/19/2026', 'Manage → Resources has a Printable forms list (first: the Training Acknowledgment Form). Forms added under Management Forms show only there, not on the operator\'s Resources tab.'],
@@ -2195,10 +2196,21 @@
     if (text.length < 3) { $('maintText').setAttribute('aria-invalid', 'true'); setMsg('maintMsg', 'Type what is wrong.', 'err'); return; }
     $('maintText').removeAttribute('aria-invalid');
     $('maintSend').disabled = true; setMsg('maintMsg', 'Sending to maintenance…');
+    // saved here first, then this page passes it to Maintenance Tools (no extra Google permission), then the answer is recorded
     srv('maintRequest', [text, MREQ.sev, S.press || ''], function (r) {
-      $('maintSend').disabled = false;
-      if (r.sent) $('maintText').value = '';
-      setMsg('maintMsg', r.message, r.sent ? 'ok' : 'err');
+      function done(problem, message) {
+        srv('maintResult', [r.id, problem, message], function (d) {
+          $('maintSend').disabled = false;
+          if (d.sent) $('maintText').value = '';
+          setMsg('maintMsg', d.message, d.sent ? 'ok' : 'err');
+        }, function (err) { $('maintSend').disabled = false; setMsg('maintMsg', errText(err), 'err'); });
+      }
+      var opts = { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: 'pressRequest', args: [r.id] }) };
+      if (window.AbortSignal && AbortSignal.timeout) opts.signal = AbortSignal.timeout(30000);
+      fetch(r.url, opts).then(function (res) { return res.json(); }).then(function (j) {
+        if (j && j.value && j.value.id) done(j.value.id, j.value.message || '');
+        else done('', (j && j.error) || 'No answer from Maintenance Tools');
+      }).catch(function (e) { done('', 'Could not reach Maintenance Tools: ' + (e && e.message ? e.message : e)); });
     }, function (err) { $('maintSend').disabled = false; setMsg('maintMsg', errText(err), 'err'); });
   });
 
