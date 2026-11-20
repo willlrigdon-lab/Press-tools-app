@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "1.014", KEY = "mt-site-reloaded";
+    var BUILT = "1.015", KEY = "mt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -272,6 +272,9 @@
     .mlook .seg button { padding: 9px 4px; }
     .mhint { margin: 6px 2px 0; }
     .mchanges { margin: 12px 0 0; }
+    .news { list-style: none; padding-left: 0; margin: 4px 0 8px; } .news li { margin: 0 0 12px; }
+    .sgitem .sgtext { white-space: pre-wrap; margin: 4px 0; }
+    .sgnote { margin-top: 4px; padding: 6px 10px; border-left: 3px solid var(--accent); font-size: 14px; }
     :root { --navh: 64px; }
     .navin button { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
       font-size: 11.5px; font-weight: 700; letter-spacing: 0; text-transform: none; }
@@ -520,6 +523,7 @@
   <div class="msheet-card">
     <h2 id="meTitle"></h2>
     <p id="meSub" class="muted"></p>
+    <button id="menuSuggest" type="button" class="mrow">💡 Suggest an improvement</button>
     <div class="mrow mlook"><span id="lookLabel">Look</span>
       <div class="seg" id="lookSeg" role="radiogroup" aria-labelledby="lookLabel">
         <button type="button" role="radio" data-v="dark">Dark</button><button type="button" role="radio" data-v="light">Light</button><button type="button" role="radio" data-v="auto">Auto</button>
@@ -531,12 +535,39 @@
     <button id="meClose" type="button" class="wide">Close</button>
   </div>
 </div>
+<!-- ===================== SUGGEST AN IMPROVEMENT (name menu, 1.015) ===================== -->
+<div id="sugSheet" class="msheet hidden" role="dialog" aria-modal="true" aria-labelledby="sugTitle">
+  <form id="sugForm" class="msheet-card" aria-labelledby="sugTitle" novalidate>
+    <h2 id="sugTitle">Suggest an improvement</h2>
+    <p class="muted" style="margin-top:0">Anything that would make the app better or easier, big or small. The admins read every one.</p>
+    <label for="sugArea">Which part of the app?</label>
+    <select id="sugArea"></select>
+    <label for="sugText">Your idea</label>
+    <textarea id="sugText" rows="4" maxlength="1000" placeholder="e.g. Photos of the part on its card"></textarea>
+    <div class="row2"><button id="sugCancel" type="button" class="wide">Close</button><button id="sugSend" type="submit" class="primary wide">Send</button></div>
+    <div id="sugMsg" class="msg" role="status"></div>
+    <h2 style="margin-top:18px">My suggestions</h2>
+    <div id="sugMine"></div>
+  </form>
+</div>
+
+<!-- ===================== WHAT'S NEW (once per version on each device, 1.015) ===================== -->
+<div id="newsSheet" class="msheet hidden" role="dialog" aria-modal="true" aria-labelledby="newsTitle">
+  <div class="msheet-card">
+    <h2 id="newsTitle">What's new</h2>
+    <ol id="newsList" class="news"></ol>
+    <p class="muted">Got an idea? Tap your name at the top → Suggest an improvement.</p>
+    <button id="newsOk" type="button" class="primary wide">Got it</button>
+  </div>
+</div>
+
 <div id="toasts" aria-live="polite"><div id="msg" class="msg"></div></div>
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '1.014';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '1.015';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   var APP_CHANGES = [
+    ['1.015', '11/20/2026', 'Suggest an improvement: tap your name at the top and send an idea. It goes to the admins with everyone\'s ideas from both apps, and you can see its status under My suggestions. After each update, a short What\'s new card shows once on each device. Errors on people\'s phones are noted so they get fixed.'],
     ['1.014', '11/20/2026', 'New layout: a one-row top bar with your name. Tap it for Look (Dark, Light or Auto, saved on this device and shared with Press Tools), What\'s new and Switch user. Bottom bar with icons and bigger labels. Problems page: Report a problem comes right after the call buttons.'],
     ['1.013', '11/20/2026', 'Faster and steadier: badge and notice checks pause while the screen is off and run less often; if a list fails to load on weak wifi it tries once more by itself; "Busy right now" instead of Google\'s error text. The GitHub page keeps a copy of itself so it opens even on weak wifi, and shows "New version ready · Tap to update" after an update. Sharper logo.'],
     ['1.012', '11/20/2026', 'Behind the scenes: Press Tools can now print its SOPs, guides and forms straight from the app (this app hands it the document).'],
@@ -570,7 +601,20 @@
     clearTimeout(TOAST_T);
     if (text && !/…$/.test(text)) TOAST_T = setTimeout(function () { m.textContent = ''; }, kind === 'err' ? 9000 : Math.min(9000, 3500 + text.length * 40));
   }
-  window.addEventListener('error', function (e) { setMsg('Something went wrong: ' + (e.message || 'unknown error') + '. Reload and try again.', 'err'); });
+  window.addEventListener('error', function (e) {
+    setMsg('Something went wrong: ' + (e.message || 'unknown error') + '. Reload and try again.', 'err');
+    errLog(e.message, (e.filename ? String(e.filename).split('/').pop() : '') + (e.lineno ? ':' + e.lineno + ':' + (e.colno || 0) : ''));
+  });
+  /* 1.015: page errors also go to the App Errors tab (Press Tools → Admin → App health): at most 5 per page load, only when logged in */
+  var ERRLOG = { n: 0 };
+  function errLog(message, where) {
+    try {
+      if (!A.token || ERRLOG.n >= 5) return;
+      ERRLOG.n++;
+      google.script.run.withSuccessHandler(noop).withFailureHandler(noop)
+        .api(A.token, 'appError', [String(message || 'unknown error'), where || '', V.current, APP_VERSION, navigator.userAgent]);
+    } catch (x) { /* never let logging cause another error */ }
+  }
   Array.prototype.forEach.call(document.querySelectorAll('.appver'), function (el) {
     el.textContent = 'Version ' + APP_VERSION;
     el.insertAdjacentHTML('afterend', '<details class="changes"><summary>Update history</summary><ol>' + APP_CHANGES.map(function (c) {
@@ -586,7 +630,8 @@
    * (tools/build-site.js) also uses this list: reads give up after 30 s, saves after 90 s.
    */
   var READS = { me: 1, counts: 1, noticesList: 1, machinesList: 1, drawingGet: 1, drawingImage: 1, partsAll: 1, partGet: 1,
-    partLastCount: 1, stockList: 1, ordersList: 1, problemsList: 1, oncallMine: 1, resourcesList: 1, usersList: 1, auditList: 1, setupStatus: 1 };
+    partLastCount: 1, stockList: 1, ordersList: 1, problemsList: 1, oncallMine: 1, resourcesList: 1, usersList: 1, auditList: 1, setupStatus: 1,
+    suggestMine: 1 };
   window.APP_READS = READS;
   var TRANSIENT = /^Busy right now|^No connection to the server|server error occurred|wait a bit and try again/i;
   function srv(name, args, ok, fail, retried) {
@@ -653,6 +698,7 @@
     touch();
     var last = store('mt_view');
     go(last && A.roles.some(function (r) { return r.key === last; }) ? last : A.roles[0].key);
+    newsCheck();
   }
   function logout(why) {
     menuClose();
@@ -662,8 +708,26 @@
   $('navBtns').addEventListener('click', function (e) { var b = e.target.closest('button[data-role]'); if (b) go(b.getAttribute('data-role')); });
   $('switchBtn').addEventListener('click', function () { logout(''); });
 
-  /* ---- name menu (1.014): look, what's new, switch user. Back, Esc, Close or a tap outside closes it. ---- */
-  var MENU = { open: false };
+  /* ---- pop-ups (name menu, suggestions, what's new): one at a time; Back, Esc, Close or a tap outside closes them ---- */
+  var MODAL = { id: null };
+  function modalOpen(id) {
+    if (MODAL.id === id) return;
+    if (MODAL.id) show(MODAL.id, false);   // swap on the same Back step
+    else { try { history.pushState({ mtMenu: 1 }, ''); } catch (e) {} }
+    MODAL.id = id; show(id, true);
+    $('meBtn').setAttribute('aria-expanded', id === 'meSheet' ? 'true' : 'false');
+  }
+  function modalClose(fromBack) {
+    if (!MODAL.id) return;
+    show(MODAL.id, false); MODAL.id = null; $('meBtn').setAttribute('aria-expanded', 'false');
+    if (!fromBack) { try { if (history.state && history.state.mtMenu) history.back(); } catch (e) {} }
+  }
+  window.addEventListener('popstate', function () { if (MODAL.id) modalClose(true); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && MODAL.id) { modalClose(); $('meBtn').focus(); } });
+  ['meSheet', 'sugSheet', 'newsSheet'].forEach(function (id) { $(id).addEventListener('click', function (e) { if (e.target === this) modalClose(); }); });
+  function menuClose() { modalClose(); }
+
+  /* ---- name menu (1.014): suggest, look, what's new, switch user ---- */
   function menuOpen() {
     $('meTitle').textContent = A.name;
     $('meSub').textContent = 'Level ' + A.level + ' · Maintenance Tools ' + APP_VERSION;
@@ -674,20 +738,56 @@
       }).join('');
     }
     lookDraw();
-    show('meSheet', true); MENU.open = true; $('meBtn').setAttribute('aria-expanded', 'true');
-    try { history.pushState({ mtMenu: 1 }, ''); } catch (e) {}
+    modalOpen('meSheet');
     $('meClose').focus();
   }
-  function menuClose(fromBack) {
-    if (!MENU.open) return;
-    MENU.open = false; show('meSheet', false); $('meBtn').setAttribute('aria-expanded', 'false');
-    if (!fromBack) { try { if (history.state && history.state.mtMenu) history.back(); } catch (e) {} }
-  }
   $('meBtn').addEventListener('click', menuOpen);
-  $('meClose').addEventListener('click', function () { menuClose(); $('meBtn').focus(); });
-  $('meSheet').addEventListener('click', function (e) { if (e.target === this) menuClose(); });
-  window.addEventListener('popstate', function () { if (MENU.open) menuClose(true); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && MENU.open) { menuClose(); $('meBtn').focus(); } });
+  $('meClose').addEventListener('click', function () { modalClose(); $('meBtn').focus(); });
+
+  /* ---- Suggest an improvement (1.015): written to the Press Tools Sheet; admins sort them in Press Tools → Admin ---- */
+  var SUG_AREAS = ['Machines and drawings', 'Parts', 'Stock and counts', 'Orders', 'Problems', 'On call', 'Resources', 'Admin', 'Something else'];
+  var SUG_FROM = { machines: 'Machines and drawings', parts: 'Parts', stock: 'Stock and counts', problems: 'Problems', resources: 'Resources', admin: 'Admin' };
+  var SUG_KIND = { New: 'blue', Planned: 'yellow', Done: 'green', 'Not doing': 'gray' };
+  function sugMineShow(list) {
+    $('sugMine').innerHTML = list.length ? list.map(function (x) {
+      return '<div class="item sgitem"><div><div class="s">' + esc(x.time) + ' · ' + esc(x.app) + (x.area ? ' · ' + esc(x.area) : '') + '</div>' +
+        '<div class="sgtext">' + esc(x.text) + '</div>' + (x.note ? '<div class="sgnote">' + esc(x.note) + '</div>' : '') + '</div>' +
+        '<div>' + badge(SUG_KIND[x.status] || 'gray', x.status) + '</div></div>';
+    }).join('') : '<p class="muted">None yet.</p>';
+  }
+  $('menuSuggest').addEventListener('click', function () {
+    $('sugArea').innerHTML = SUG_AREAS.map(function (a) { return opt(a, a, a === (SUG_FROM[V.current] || 'Something else')); }).join('');
+    $('sugMsg').textContent = ''; $('sugMsg').className = 'msg'; $('sugSend').disabled = false;
+    $('sugMine').innerHTML = '<p class="muted">Loading…</p>';
+    modalOpen('sugSheet');
+    $('sugText').focus();
+    srv('suggestMine', [], function (d) { sugMineShow(d.mine); }, function (x) { $('sugMine').innerHTML = '<p class="muted">' + esc(errText(x)) + '</p>'; });
+  });
+  function sugMsg(t, kind) { $('sugMsg').textContent = t; $('sugMsg').className = 'msg' + (kind ? ' ' + kind : ''); }
+  $('sugForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var text = $('sugText').value.trim();
+    if (text.length < 3) { sugMsg('Type your idea first.', 'err'); $('sugText').focus(); return; }
+    $('sugSend').disabled = true; sugMsg('Sending…');
+    srv('suggestAdd', [text, $('sugArea').value], function (d) {
+      $('sugSend').disabled = false; $('sugText').value = ''; sugMsg(d.message, 'ok'); sugMineShow(d.mine);
+    }, function (x) { $('sugSend').disabled = false; sugMsg(errText(x), 'err'); });
+  });
+  $('sugCancel').addEventListener('click', function () { modalClose(); });
+
+  /* ---- What's new (1.015): once per version on each device ---- */
+  function newsCheck() {
+    var seen = store('mt_seen_ver');
+    if (seen === APP_VERSION) return;
+    store('mt_seen_ver', APP_VERSION);
+    var fresh = [];
+    for (var i = 0; i < APP_CHANGES.length && fresh.length < 3 && APP_CHANGES[i][0] !== seen; i++) fresh.push(APP_CHANGES[i]);
+    if (!fresh.length) return;
+    $('newsTitle').textContent = "What's new in version " + APP_VERSION;
+    $('newsList').innerHTML = fresh.map(function (c) { return '<li><b>' + esc(c[0]) + '</b> <span class="muted">· ' + esc(c[1]) + '</span><br>' + esc(c[2]) + '</li>'; }).join('');
+    modalOpen('newsSheet');
+  }
+  $('newsOk').addEventListener('click', function () { modalClose(); });
 
   /* Look: Dark (default) · Light · Auto (follows the phone). Saved on this device; the same key as Press Tools. */
   var LOOK_MQ = window.matchMedia ? matchMedia('(prefers-color-scheme: light)') : null;

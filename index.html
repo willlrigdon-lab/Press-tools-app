@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.032", KEY = "pt-site-reloaded";
+    var BUILT = "2.033", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -612,6 +612,16 @@
       .item.qitem { grid-template-columns: 1fr; }
       .item.qitem > .acts { justify-content: flex-start; }
     }
+    /* ---- 2.033: suggestions, what's new, badge on the Admin button ---- */
+    .navin button { position: relative; }
+    .navin button .cnt { position: absolute; top: 5px; left: calc(50% + 5px); margin: 0; }
+    .news { list-style: none; padding-left: 0; margin: 4px 0 8px; } .news li { margin: 0 0 12px; }
+    .sgitem .sgtext { white-space: pre-wrap; margin: 4px 0; }
+    .sgitem .sgset { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; gap: 6px; margin-top: 6px; }
+    .sgitem .sgset select, .sgitem .sgset input { font-size: 15px; padding: 8px; margin: 0; }
+    .sgitem .sgset button { padding: 8px 12px; font-size: 15px; margin: 0; }
+    .sgnote { margin-top: 4px; padding: 6px 10px; border-left: 3px solid var(--accent); color: var(--text); font-size: 14px; }
+    @media (max-width: 559px) { .sgitem .sgset { grid-template-columns: 1fr auto; } .sgitem .sgset input { grid-column: 1 / -1; grid-row: 2; } }
     /* ---- Light look (2.032): chosen per device in the name menu; Dark stays the default. Printing is unchanged. ---- */
     :root[data-look="light"] {
       color-scheme: light;
@@ -1261,6 +1271,12 @@
       <div id="userList"></div>
     </div>
     <div class="card">
+      <div class="cardhead"><h2>Suggestions <span class="cnt" id="sgNew"></span></h2>
+        <label class="check" style="margin:0"><input type="checkbox" id="sgShowAll"> Show done</label></div>
+      <p class="muted" style="margin-top:4px">Ideas from everyone, both apps. The sender sees the status and your note under My suggestions.</p>
+      <div id="sgList"></div>
+    </div>
+    <div class="card">
       <h2>Backups</h2>
       <p class="muted" style="margin-top:0">A copy of every tab every night. The last 14 days are kept as separate spreadsheets in your Google Drive.</p>
       <button id="backupBtn" class="wide">Turn on nightly backup</button>
@@ -1322,6 +1338,7 @@
     <div class="sheet-card menu-card">
       <h2 id="meTitle"></h2>
       <p id="meSub" class="muted"></p>
+      <button id="menuSuggest" type="button" class="mrow">💡 Suggest an improvement</button>
       <button id="menuLow" type="button" class="mrow">Report a low supply</button>
       <div id="pressDefRow" class="mrow mlook"><span id="pressDefLabel">Open to press</span>
         <div class="seg" id="pressDefSeg" role="radiogroup" aria-labelledby="pressDefLabel">
@@ -1338,6 +1355,35 @@
       <details class="changes mchanges"><summary>What's new in version <span id="meVer"></span></summary><ol id="meChanges"></ol></details>
       <button id="switchBtn" type="button" class="mrow danger">Switch user</button>
       <button id="meClose" type="button" class="wide">Close</button>
+    </div>
+  </div>
+
+  <!-- ===================== SUGGEST AN IMPROVEMENT (name menu, 2.033) ===================== -->
+  <div id="sugSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="sugTitle">
+    <form id="sugForm" class="sheet-card" aria-labelledby="sugTitle" novalidate>
+      <h2 id="sugTitle">Suggest an improvement</h2>
+      <p class="muted" style="margin-top:0">Anything that would make the app better or easier, big or small. The admins read every one.</p>
+      <label for="sugArea">Which part of the app?</label>
+      <select id="sugArea"></select>
+      <label for="sugText">Your idea</label>
+      <textarea id="sugText" rows="4" maxlength="1000" style="font-family:inherit;resize:vertical" placeholder="e.g. Show the next job's inks on the run screen"></textarea>
+      <div class="row2">
+        <button id="sugCancel" type="button" class="wide">Close</button>
+        <button id="sugSend" type="submit" class="primary wide">Send</button>
+      </div>
+      <div id="sugMsg" class="msg" role="status"></div>
+      <h2 style="margin-top:18px">My suggestions</h2>
+      <div id="sugMine"></div>
+    </form>
+  </div>
+
+  <!-- ===================== WHAT'S NEW (once per version on each device, 2.033) ===================== -->
+  <div id="newsSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="newsTitle">
+    <div class="sheet-card">
+      <h2 id="newsTitle">What's new</h2>
+      <ol id="newsList" class="news"></ol>
+      <p class="muted">Got an idea? Tap your name at the top → Suggest an improvement.</p>
+      <button id="newsOk" type="button" class="primary wide">Got it</button>
     </div>
   </div>
 
@@ -1379,9 +1425,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.032';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.033';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.033', '11/20/2026', 'Suggest an improvement: tap your name at the top and send an idea (in Maintenance Tools too). You can see what happens to it under My suggestions. Admins sort them in Admin → Suggestions (New, Planned, Done or Not doing, with a note for the sender). After each update, a short What\'s new card shows once on each device. Errors on people\'s phones are noted for Admin → App health so they get fixed.'],
     ['2.032', '11/20/2026', 'New layout: a one-row top bar with your name. Tap it for Report a low supply, Open to press (your press opens when you log in, on any device; Change press still works), Look (Dark, Light or Auto, saved on this device), What\'s new and Switch user. Report issue, Maintenance and Low supply sit in one slim row on the press card. Bottom bar with icons and bigger labels. On phones, queue jobs use the full width with their buttons underneath.'],
     ['2.031', '11/20/2026', 'Faster and steadier with everyone on it: background checks pause while the screen is off or the app is in the background; the Operator and Manage screens make fewer server calls; if a list fails to load on weak wifi it tries once more by itself; "Busy right now" instead of Google\'s error text. The GitHub page keeps a copy of itself so it opens even on weak wifi, and shows "New version ready · Tap to update" after an update. Admin → App health shows how big the logs are. Sharper logo.'],
     ['2.030', '11/20/2026', 'Print straight from the app: SOPs, Best Practice Guides and forms have a Print button that shows the document and prints it (no downloading). The Training Acknowledgment is filled in with the SOP or guide you pick.'],
@@ -1467,7 +1514,18 @@
   window.addEventListener('error', function (e) {   // show script errors on the phone so they can be reported
     try { setMsg(V.current === 'management' ? 'mMsg' : V.current === 'inventory' ? 'invMsg' : V.current === 'admin' ? 'aMsg' : 'msg',
       'Something went wrong: ' + (e.message || 'unknown error') + '. Reload and try again.', 'err'); } catch (x) { /* nothing else to do */ }
+    errLog(e.message, (e.filename ? String(e.filename).split('/').pop() : '') + (e.lineno ? ':' + e.lineno + ':' + (e.colno || 0) : ''));
   });
+  /* 2.033: page errors are also written to the App Errors tab (Admin → App health): at most 5 per page load, only when logged in */
+  var ERRLOG = { n: 0 };
+  function errLog(message, where) {
+    try {
+      if (!A.token || ERRLOG.n >= 5) return;
+      ERRLOG.n++;
+      google.script.run.withSuccessHandler(noop).withFailureHandler(noop)
+        .api(A.token, 'appError', [String(message || 'unknown error'), where || '', V.current + (M && M.tab && V.current === 'management' ? ' · ' + M.tab : ''), APP_VERSION, navigator.userAgent]);
+    } catch (x) { /* never let logging cause another error */ }
+  }
 
   /* ---- login state; every server request goes through api() with the login token ---- */
   var A = { token: null, name: '', level: 0, roles: [], idleMinutes: 30, press: '' };
@@ -1480,7 +1538,7 @@
   var READS = { me: 1, inkLoad: 1, inkGetRun: 1, wasteRecent: 1, wasteDraft: 1, noticesList: 1, resourcesList: 1, supplyItems: 1,
     issuesList: 1, invStock: 1, invLastCount: 1, aniloxList: 1, queueList: 1, statesList: 1, jobGet: 1, wasteReport: 1,
     supplyRequests: 1, inkNeeded: 1, manageCounts: 1, workOrder: 1, runLogReport: 1, daysOffMine: 1, daysOffMonth: 1,
-    usersList: 1, auditList: 1, appHealth: 1 };
+    usersList: 1, auditList: 1, appHealth: 1, suggestMine: 1, suggestList: 1 };
   window.APP_READS = READS;   // the GitHub page's call shim reads this (tools/build-site.js)
   var TRANSIENT = /^Busy right now|^No connection to the server|server error occurred|wait a bit and try again/i;
   function srv(name, args, ok, fail, retried) {
@@ -2376,6 +2434,8 @@
     touch();
     var last = store('pt_view');   // the area last used on this device, if this person may use it
     go(last && allowed(last) ? last : A.roles[0].key);
+    newsCheck();
+    if (A.level >= 3) srv('suggestList', [false], function (d) { sgBadge(d.counts.New); });
   }
 
   function logout(why) {
@@ -2385,7 +2445,7 @@
     A.token = null; A.name = ''; A.level = 0; A.roles = []; A.press = '';
     store('pt_token', '');
     PIN.value = ''; drawPin();
-    ['lowSheet', 'issueSheet', 'maintSheet', 'meSheet'].forEach(sheetClose);
+    ['lowSheet', 'issueSheet', 'maintSheet', 'meSheet', 'sugSheet', 'newsSheet'].forEach(sheetClose);
     cacheClear();
     go('login');
     setMsg('loginMsg', why || '', why ? 'err' : '');
@@ -2420,6 +2480,83 @@
     if ($('meSheet').classList.contains('hidden')) $('meBtn').setAttribute('aria-expanded', 'false');
   }).observe($('meSheet'), { attributes: true, attributeFilter: ['class'] });
   $('menuLow').addEventListener('click', function () { lowOpen(true); });
+
+  /* ----- Suggest an improvement (2.033): everyone; admins sort them in Admin → Suggestions ----- */
+  var SUG_AREAS = ['Ink run', 'Waste roll', 'Job assignment', 'Ink Inventory', 'Management', 'Reports', 'Days off', 'Resources', 'Admin', 'Something else'];
+  var SUG_FROM = { operator: 'Ink run', inventory: 'Ink Inventory', management: 'Management', admin: 'Admin', daysoff: 'Days off' };
+  var SUG_KIND = { New: 'blue', Planned: 'yellow', Done: 'green', 'Not doing': 'gray' };
+  function sugMineShow(list) {
+    $('sugMine').innerHTML = list.length ? list.map(function (x) {
+      return '<div class="item sgitem"><div><div class="s">' + esc(x.time) + ' · ' + esc(x.app) + (x.area ? ' · ' + esc(x.area) : '') + '</div>' +
+        '<div class="sgtext">' + esc(x.text) + '</div>' + (x.note ? '<div class="sgnote">' + esc(x.note) + '</div>' : '') + '</div>' +
+        '<div class="acts">' + badge(SUG_KIND[x.status] || 'gray', x.status) + '</div></div>';
+    }).join('') : '<p class="muted">None yet.</p>';
+  }
+  $('menuSuggest').addEventListener('click', function () {
+    $('sugArea').innerHTML = SUG_AREAS.map(function (a) { return opt(a, a, a === (SUG_FROM[V.current] || 'Something else')); }).join('');
+    setMsg('sugMsg', ''); $('sugSend').disabled = false;
+    $('sugMine').innerHTML = skel(1);
+    sheetSwap('meSheet', 'sugSheet');
+    $('sugText').focus();
+    srv('suggestMine', [], function (d) { sugMineShow(d.mine); }, function () { $('sugMine').innerHTML = ''; });
+  });
+  $('sugForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var text = $('sugText').value.trim();
+    if (text.length < 3) { setMsg('sugMsg', 'Type your idea first.', 'err'); $('sugText').focus(); return; }
+    $('sugSend').disabled = true; setMsg('sugMsg', 'Sending…');
+    srv('suggestAdd', [text, $('sugArea').value], function (d) {
+      $('sugSend').disabled = false; $('sugText').value = '';
+      setMsg('sugMsg', d.message, 'ok'); sugMineShow(d.mine);
+    }, function (err) { $('sugSend').disabled = false; setMsg('sugMsg', errText(err), 'err'); });
+  });
+  $('sugCancel').addEventListener('click', function () { sheetClose('sugSheet'); });
+  $('sugSheet').addEventListener('click', function (e) { if (e.target === this) sheetClose('sugSheet'); });
+
+  /* ----- What's new (2.033): once per version on each device, the newest changes since the last version seen here ----- */
+  function newsCheck() {
+    var seen = store('pt_seen_ver');
+    if (seen === APP_VERSION) return;
+    store('pt_seen_ver', APP_VERSION);
+    var fresh = [];
+    for (var i = 0; i < APP_CHANGES.length && fresh.length < 3 && APP_CHANGES[i][0] !== seen; i++) fresh.push(APP_CHANGES[i]);
+    if (!fresh.length) return;
+    $('newsTitle').textContent = "What's new in version " + APP_VERSION;
+    $('newsList').innerHTML = fresh.map(function (c) { return '<li><b>' + esc(c[0]) + '</b> <span class="muted">· ' + esc(c[1]) + '</span><br>' + esc(c[2]) + '</li>'; }).join('');
+    sheetOpen('newsSheet');
+  }
+  $('newsOk').addEventListener('click', function () { sheetClose('newsSheet'); });
+  $('newsSheet').addEventListener('click', function (e) { if (e.target === this) sheetClose('newsSheet'); });
+
+  /* ----- Admin → Suggestions ----- */
+  function sgBadge(n) {
+    $('sgNew').textContent = n ? n + ' new' : '';
+    var b = document.querySelector('#navBtns button[data-role="admin"]'); if (!b) return;
+    var c = b.querySelector('.cnt'); if (!c) { c = document.createElement('span'); c.className = 'cnt'; b.appendChild(c); }
+    c.textContent = n ? n : '';
+  }
+  function sgShow(d) {
+    sgBadge(d.counts.New);
+    $('sgList').innerHTML = d.suggestions.length ? d.suggestions.map(function (x) {
+      return '<div class="item sgitem" style="grid-template-columns:1fr"><div>' +
+        '<div class="t">' + esc(x.from) + ' ' + badge(SUG_KIND[x.status] || 'gray', x.status) + '</div>' +
+        '<div class="s">' + esc(x.time) + ' · ' + esc(x.app) + (x.area ? ' · ' + esc(x.area) : '') + (x.updatedBy ? ' · ' + esc(x.status) + ' by ' + esc(x.updatedBy) : '') + '</div>' +
+        '<div class="sgtext">' + esc(x.text) + '</div>' +
+        '<div class="sgset"><select data-sgst="' + esc(x.id) + '" aria-label="Status">' + d.statuses.map(function (st) { return opt(st, st, st === x.status); }).join('') + '</select>' +
+        '<input data-sgnote="' + esc(x.id) + '" value="' + esc(x.note) + '" maxlength="300" placeholder="Note for ' + esc(x.from) + ' (optional)" aria-label="Note">' +
+        '<button type="button" data-sgsave="' + esc(x.id) + '">Save</button></div></div></div>';
+    }).join('') : '<p class="muted">' + ($('sgShowAll').checked ? 'No suggestions yet.' : 'Nothing new or planned.') + '</p>';
+  }
+  function sgLoad() { $('sgList').innerHTML = skel(2); srv('suggestList', [$('sgShowAll').checked], sgShow, aErr); }
+  $('sgShowAll').addEventListener('change', sgLoad);
+  $('sgList').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-sgsave]'); if (!b) return;
+    var id = b.getAttribute('data-sgsave');
+    var st = document.querySelector('[data-sgst="' + id + '"]').value, note = document.querySelector('[data-sgnote="' + id + '"]').value;
+    b.disabled = true; setMsg('aMsg', 'Saving…');
+    srv('suggestSet', [id, st, note, $('sgShowAll').checked], function (d) { sgShow(d); setMsg('aMsg', 'Saved: ' + st + '.', 'ok'); },
+      function (err) { b.disabled = false; aErr(err); });
+  });
   /* Open to press (2.032): saved with the person (Users tab), so it follows them to any device */
   function pressDefDraw() {
     Array.prototype.forEach.call($('pressDefSeg').children, function (b) {
@@ -2570,7 +2707,7 @@
   });
   segPick('maintSev', function (v) { MREQ.sev = v; });
   $('maintCancel').addEventListener('click', function () { sheetClose('maintSheet'); });
-  ['lowSheet', 'issueSheet', 'maintSheet', 'meSheet'].forEach(sheetSwipe);
+  ['lowSheet', 'issueSheet', 'maintSheet', 'meSheet', 'sugSheet', 'newsSheet'].forEach(sheetSwipe);
   $('maintSheet').addEventListener('click', function (e) { if (e.target === this) sheetClose('maintSheet'); });
   $('maintForm').addEventListener('submit', function (e) {
     e.preventDefault();
@@ -3888,6 +4025,7 @@
   function aErr(e) { setMsg('aMsg', errText(e), 'err'); }
   function aLoad() {
     srv('usersList', [], userShow, aErr);
+    sgLoad();
     $('healthList').innerHTML = skel(2);
     srv('appHealth', [], healthShow, function (e) { $('healthList').innerHTML = '<p class="muted">' + esc(errText(e)) + '</p>'; });
   }
@@ -3901,7 +4039,13 @@
       '<div class="item"><div><div class="t">Whole Sheet</div><div class="s">' + h.cells.toLocaleString() + ' cells · ' + h.cellPct + '% of Google\'s limit</div></div>' +
       '<div class="acts">' + badge(h.cellPct >= 80 ? 'red' : h.cellPct >= 50 ? 'yellow' : 'green', h.cellPct >= 50 ? 'Getting big' : 'OK') + '</div></div>' +
       '<div class="item"><div><div class="t">Last nightly backup</div><div class="s">' + esc(h.lastBackup || 'None yet') + '</div></div>' +
-      '<div class="acts">' + badge(h.backupOld ? 'yellow' : 'green', h.backupOld ? (h.lastBackup ? 'Over a day old' : 'Turn on below') : 'OK') + '</div></div>';
+      '<div class="acts">' + badge(h.backupOld ? 'yellow' : 'green', h.backupOld ? (h.lastBackup ? 'Over a day old' : 'Turn on below') : 'OK') + '</div></div>' +
+      '<div class="item"><div><div class="t">Page errors, last 7 days</div><div class="s">' + (h.errors && h.errors.count ? 'On people\'s phones and tablets (both apps). Newest:' : 'None on anyone\'s phone or tablet.') + '</div></div>' +
+      '<div class="acts">' + badge(h.errors && h.errors.count ? 'yellow' : 'green', h.errors && h.errors.count ? String(h.errors.count) : 'OK') + '</div></div>' +
+      (h.errors ? h.errors.latest : []).map(function (x) {
+        return '<div class="item"><div><div class="s">' + esc(x.time) + ' · ' + esc(x.who || '?') + ' · ' + esc(x.app) + ' ' + esc(x.version) + (x.area ? ' · ' + esc(x.area) : '') + '</div>' +
+          '<div style="font-size:14px">' + esc(x.error) + '</div></div><div></div></div>';
+      }).join('');
   }
   function userShow(list) {
     ADM.users = list;
