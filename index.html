@@ -489,6 +489,18 @@
     /* links that look like buttons (Printable forms: Print / download, Open) */
     a.btn { display: inline-block; font-weight: 700; font-size: 15px; padding: 9px 12px; border: 2px solid var(--accent); border-radius: 999px; color: var(--accent); text-decoration: none; text-align: center; }
     a.btn.primary { background: var(--logo-blue); border-color: #2a7ab0; color: #fff; box-shadow: 0 6px 22px var(--accent-glow); }
+    /* 2.029: placeholders while loading, last copy shown while it refreshes, swipe handle on sheets, Undo in pop-ups, balanced headings */
+    h1, h2 { text-wrap: balance; }
+    .skel { display: block; height: 54px; margin: 8px 0; border-radius: 12px; background: linear-gradient(90deg, rgba(255,255,255,.05) 25%, rgba(255,255,255,.12) 37%, rgba(255,255,255,.05) 63%); background-size: 400% 100%; animation: skel 1.4s ease infinite; }
+    @keyframes skel { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+    @media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
+    .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .refreshing { opacity: .6; pointer-events: none; transition: opacity .2s; }
+    .sheet-card::before { content: ""; display: block; width: 44px; height: 5px; border-radius: 3px; background: var(--line); margin: -6px auto 12px; }
+    .sheet-card.dragging { transition: none; }
+    .sheet-card { transition: transform .2s ease; }
+    #toasts .msg .undo { pointer-events: auto; margin-left: 12px; padding: 4px 14px; font-size: 15px; background: transparent; color: #fff; border: 2px solid #fff; border-radius: 999px; }
+    @media print { .skel { display: none; } }
   </style>
 </head>
 <body>
@@ -720,7 +732,7 @@
   <section id="secRes" class="offpane">
     <div class="card">
       <input id="resSearch" type="search" autocomplete="off" placeholder="Search resources" aria-label="Search resources">
-      <div id="resList"><p class="muted">Loading…</p></div>
+      <div id="resList"></div>
     </div>
   </section>
   </section>
@@ -1074,7 +1086,7 @@
     </div>
     <div class="card">
       <h2>My days off</h2>
-      <div id="doMine"><p class="muted">Loading…</p></div>
+      <div id="doMine"></div>
     </div>
   </section>
 
@@ -1192,9 +1204,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.028';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.029';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.029', '11/20/2026', 'Feels faster: lists show what you saw last time right away while they refresh, with gray placeholders on first load. Undo on Shipped/Done, Cancel, Handled and supply changes (no more "are you sure?" for cancels). Swipe a pop-up down or use the phone\'s Back button to close it.'],
     ['2.028', '11/19/2026', 'Printable forms: a Print / download button gets the PDF itself onto your phone, so it prints the whole form instead of just its name.'],
     ['2.027', '11/19/2026', 'Maintenance requests now reach Maintenance Tools: your phone passes the request straight on, so no extra Google approval is needed.'],
     ['2.026', '11/19/2026', 'Maintenance request on the Operator screen: pick how bad it is (Press down, Running with a problem, Minor) and type what\'s wrong. It goes straight to Maintenance Tools as a problem on that press, with the job attached, and emails Taylor.'],
@@ -1302,7 +1315,7 @@
 
   /* resources: links management adds under Manage → Jobs → Resources */
   var RES = { list: null };
-  function resLoad() { if (A.token) srv('resourcesList', [], function (d) { RES.list = d; resShow(); }); }
+  function resLoad() { if (A.token) srvCached('resourcesList', [], function (d) { RES.list = d; resShow(); }, null, 'resList'); }
   function resIsVideo(link) { return /youtube\.com|youtu\.be/i.test(link); }
   /** tel: link for a typed number: 10 digits are US numbers (+1). */
   function telHref(phone) {
@@ -2019,6 +2032,78 @@
     });
   }
   function badge(kind, text) { return '<span class="badge ' + kind + '">' + esc(text) + '</span>'; }
+  /** Gray placeholder blocks while a list loads (instead of "Loading…"). */
+  function skel(n) {
+    var h = ''; for (var i = 0; i < (n || 3); i++) h += '<span class="skel" aria-hidden="true"></span>';
+    return '<div aria-busy="true">' + h + '<span class="sr">Loading</span></div>';
+  }
+  /**
+   * Show the last copy this device saw right away (dimmed and not tappable while it refreshes), then the fresh answer.
+   * Kept per person in this browser only; cleared at logout. Only for lists that are safe to look at while out of date.
+   */
+  var CACHE_PRE = 'ptc:';
+  function srvCached(name, args, ok, fail, holderId) {
+    var k = CACHE_PRE + (A.name || '') + ':' + name + ':' + JSON.stringify(args || []), old = null, el = holderId ? $(holderId) : null;
+    try { old = JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { old = null; }
+    if (old) { try { ok(old, true); } catch (e) { old = null; } }
+    if (el) { if (old) el.classList.add('refreshing'); else el.innerHTML = skel(3); }
+    srv(name, args, function (d) {
+      if (el) el.classList.remove('refreshing');
+      try { var t = JSON.stringify(d); if (t.length < 400000) localStorage.setItem(k, t); } catch (e) {}
+      ok(d, false);
+    }, function (e) { if (el) el.classList.remove('refreshing'); (fail || noop)(e); });
+  }
+  function cacheClear() {
+    try { Object.keys(localStorage).forEach(function (k) { if (k.indexOf(CACHE_PRE) === 0) localStorage.removeItem(k); }); } catch (e) {}
+  }
+  /** A pop-up with an Undo button (8 s), for changes the server can take back. */
+  function undoMsg(id, text, undo) {
+    var m = $(id); clearTimeout(TOAST_T[id]);
+    m.className = 'msg ok'; m.textContent = text;
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'undo'; b.textContent = 'Undo';
+    b.addEventListener('click', function () { clearTimeout(TOAST_T[id]); m.textContent = ''; undo(); });
+    m.appendChild(b);
+    TOAST_T[id] = setTimeout(function () { m.textContent = ''; }, 8000);
+  }
+  /* Bottom sheets: open/close in one place, so the phone's Back button and a swipe down close them too. */
+  var BACK = { close: null, skip: false };
+  function backPush(close) {
+    BACK.close = close;
+    try { history.pushState({ ptBack: 1 }, ''); } catch (e) {}
+  }
+  function backDone() {
+    if (!BACK.close) return;
+    BACK.close = null;
+    try { if (history.state && history.state.ptBack) { BACK.skip = true; history.back(); } } catch (e) {}
+  }
+  window.addEventListener('popstate', function () {
+    if (BACK.skip) { BACK.skip = false; return; }
+    if (BACK.close) { var f = BACK.close; BACK.close = null; f(); }
+  });
+  function sheetOpen(id) { show(id, true); backPush(function () { show(id, false); }); }
+  document.addEventListener('keydown', function (e) {   // Esc closes an open pop-up on a computer, like Back on a phone
+    if (e.key === 'Escape' && BACK.close) { var f = BACK.close; backDone(); f(); }
+  });
+  function sheetClose(id) { if ($(id).classList.contains('hidden')) return; show(id, false); backDone(); }
+  /** Swipe a sheet down to close it (only when its card is scrolled to the top). */
+  function sheetSwipe(id) {
+    var card = $(id).querySelector('.sheet-card'), y0 = null, dy = 0;
+    card.addEventListener('touchstart', function (e) {
+      if (card.scrollTop > 0 || e.touches.length !== 1 || /^(TEXTAREA|INPUT|SELECT)$/.test(e.target.tagName)) { y0 = null; return; }
+      y0 = e.touches[0].clientY; dy = 0; card.classList.add('dragging');
+    }, { passive: true });
+    card.addEventListener('touchmove', function (e) {
+      if (y0 === null) return;
+      dy = Math.max(0, e.touches[0].clientY - y0);
+      card.style.transform = dy ? 'translateY(' + dy + 'px)' : '';
+    }, { passive: true });
+    card.addEventListener('touchend', function () {
+      if (y0 === null) return;
+      card.classList.remove('dragging'); y0 = null;
+      card.style.transform = '';
+      if (dy > 90) sheetClose(id);
+    });
+  }
   var STOCK_BADGE = { Out: 'red', Low: 'yellow', OK: 'green' };
   var FLAG_TEXT = { red: 'Never tracked', yellow: 'Tracking', green: 'Well tracked' };
 
@@ -2075,7 +2160,8 @@
     A.token = null; A.name = ''; A.level = 0; A.roles = [];
     store('pt_token', '');
     PIN.value = ''; drawPin();
-    show('lowSheet', false);
+    ['lowSheet', 'issueSheet', 'maintSheet'].forEach(sheetClose);
+    cacheClear();
     go('login');
     setMsg('loginMsg', why || '', why ? 'err' : '');
   }
@@ -2134,14 +2220,14 @@
   var LOW = { level: 'Low' };
   $('lowBtn').addEventListener('click', function () {
     setMsg('lowMsg', ''); $('lowItem').value = ''; $('lowNote').value = '';
-    show('lowSheet', true);
+    sheetOpen('lowSheet');
     srv('supplyItems', [], function (d) {
       $('lowItems').innerHTML = d.items.map(function (x) { return opt(x.name, x.category); }).join('');
     });
   });
   segPick('lowLevel', function (v) { LOW.level = v; });
-  $('lowCancel').addEventListener('click', function () { show('lowSheet', false); });
-  $('lowSheet').addEventListener('click', function (e) { if (e.target === this) show('lowSheet', false); });
+  $('lowCancel').addEventListener('click', function () { sheetClose('lowSheet'); });
+  $('lowSheet').addEventListener('click', function (e) { if (e.target === this) sheetClose('lowSheet'); });
   $('lowSend').addEventListener('click', function () {
     var item = $('lowItem').value.trim();
     if (!item) { setMsg('lowMsg', 'Pick or type the item that is low.', 'err'); return; }
@@ -2165,10 +2251,10 @@
   $('issueBtn').addEventListener('click', function () {
     setMsg('issueMsg', ''); $('issueText').value = ''; $('issueText').removeAttribute('aria-invalid');
     $('issueAttach').textContent = issueAttachText();
-    show('issueSheet', true); $('issueText').focus();
+    sheetOpen('issueSheet'); $('issueText').focus();
   });
-  $('issueCancel').addEventListener('click', function () { show('issueSheet', false); });
-  $('issueSheet').addEventListener('click', function (e) { if (e.target === this) show('issueSheet', false); });
+  $('issueCancel').addEventListener('click', function () { sheetClose('issueSheet'); });
+  $('issueSheet').addEventListener('click', function (e) { if (e.target === this) sheetClose('issueSheet'); });
   $('issueForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var text = $('issueText').value.trim();
@@ -2189,11 +2275,12 @@
     MREQ.sev = 'Running with a problem';
     Array.prototype.forEach.call($('maintSev').children, function (b) { b.classList.toggle('on', b.getAttribute('data-v') === MREQ.sev); });
     $('maintAttach').textContent = issueAttachText();
-    show('maintSheet', true); $('maintText').focus();
+    sheetOpen('maintSheet'); $('maintText').focus();
   });
   segPick('maintSev', function (v) { MREQ.sev = v; });
-  $('maintCancel').addEventListener('click', function () { show('maintSheet', false); });
-  $('maintSheet').addEventListener('click', function (e) { if (e.target === this) show('maintSheet', false); });
+  $('maintCancel').addEventListener('click', function () { sheetClose('maintSheet'); });
+  ['lowSheet', 'issueSheet', 'maintSheet'].forEach(sheetSwipe);
+  $('maintSheet').addEventListener('click', function (e) { if (e.target === this) sheetClose('maintSheet'); });
   $('maintForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var text = $('maintText').value.trim();
@@ -2256,7 +2343,7 @@
     return h;
   }
   function anxLoad() {
-    $('anxBody').innerHTML = '<p class="muted">Loading…</p>';
+    $('anxBody').innerHTML = skel(3);
     srv('aniloxList', [], anxShow, function (e) { setMsg('invMsg', errText(e), 'err'); });
   }
   function anxShow(d) {
@@ -2293,7 +2380,7 @@
 
   function invLoad() {
     invTab(INV.tab === 'count' ? 'count' : store('invTab') || 'list');
-    setMsg('invMsg', 'Loading…'); srv('invStock', [], invShow, function (e) { setMsg('invMsg', errText(e), 'err'); });
+    srvCached('invStock', [], invShow, function (e) { setMsg('invMsg', errText(e), 'err'); }, 'invList');
   }
   function invShow(d) {
     setMsg('invMsg', '');
@@ -2488,18 +2575,18 @@
   var M = { tab: 'queue', jobs: [], period: 'week', last: {}, sel: {} };
   function mErr(e) { setMsg('mMsg', errText(e), 'err'); }
   var M_LOAD = {
-    queue: function () { srv('queueList', [$('qShowShipped').checked], qShow, mErr); },
+    queue: function () { srvCached('queueList', [$('qShowShipped').checked], qShow, mErr, 'qList'); },
     waste: function () { wReport(); },
-    supplies: function () { srv('supplyRequests', [$('supShowAll').checked], supShow, mErr); },
-    issues: function () { srv('issuesList', [$('issShowAll').checked], issShow, mErr); },
-    stock: function () { srv('invStock', [], minShow, mErr); },
+    supplies: function () { srvCached('supplyRequests', [$('supShowAll').checked], supShow, mErr, 'supList'); },
+    issues: function () { srvCached('issuesList', [$('issShowAll').checked], issShow, mErr, 'issList'); },
+    stock: function () { srvCached('invStock', [], minShow, mErr, 'minList'); },
     order: function () {   // out/low now + needed for queued jobs, on one screen
-      $('orderList').innerHTML = '<p class="muted">Loading…</p>'; $('needList').replaceChildren();
-      srv('invStock', [], orderShow, mErr); srv('inkNeeded', [], needShow, mErr);
+      $('needList').innerHTML = skel(2);
+      srvCached('invStock', [], orderShow, mErr, 'orderList'); srv('inkNeeded', [], needShow, mErr);
     },
     states: function () { srv('statesList', [], statesShow, mErr); },
     notices: function () { srv('noticesList', [], function (d) { noticesShow(d); ntShow(d); }, mErr); },
-    resources: function () { srv('resourcesList', [], rsShow, mErr); },
+    resources: function () { srvCached('resourcesList', [], rsShow, mErr, 'rsList'); },
     jobs: function () { srv('jobGet', [''], jbLists, mErr); },
     daysoff: function () { calLoad(); },
     runlog: function () { rlLoad(); }
@@ -2749,15 +2836,21 @@
   /** Cancel one or several queued jobs in one request (they leave the queue and the press lines; Undo brings one back). */
   function qCancel(ids) {
     var names = ids.map(qName);
-    if (!confirm('Cancel ' + (ids.length === 1 ? names[0] : ids.length + ' jobs:\n' + names.join('\n')) + '?\n\nIt leaves the queue and its press. You can undo it under "Show shipped / done / cancelled".')) return;
     qLock(true); $('qSelCancel').disabled = true;
     setMsg('mMsg', 'Cancelling ' + (ids.length === 1 ? names[0] : ids.length + ' jobs') + '…');
     srv('queueCancel', [ids], function (d) {
       ids.forEach(function (id) { delete M.sel[id]; });
       $('qSelCancel').disabled = false;
       if ($('qShowShipped').checked) M_LOAD.queue(); else qShow(d);
-      setMsg('mMsg', 'Cancelled ' + (d.cancelled.length === 1 ? d.cancelled[0] : d.cancelled.length + ' jobs') + '.' +
-        (d.skipped ? ' ' + d.skipped + ' already closed.' : ''), 'ok');
+      var done = ids.slice();
+      undoMsg('mMsg', 'Cancelled ' + (d.cancelled.length === 1 ? d.cancelled[0] : d.cancelled.length + ' jobs') + '.' +
+        (d.skipped ? ' ' + d.skipped + ' already closed.' : ''), function () {
+        qLock(true); setMsg('mMsg', 'Putting it back…');
+        (function next(i, last) {   // one at a time: each goes back to the end of its press's line
+          if (i >= done.length) { if (last) qShow(last); setMsg('mMsg', 'Back in the queue.', 'ok'); return; }
+          srv('queueShip', [done[i], true, $('qShowShipped').checked], function (d2) { next(i + 1, d2); }, function () { next(i + 1, last); });
+        })(0, null);
+      });
     }, function (err) { qLock(false); $('qSelCancel').disabled = false; mErr(err); });
   }
   $('qSelCancel').addEventListener('click', function () { var ids = Object.keys(M.sel); if (ids.length) qCancel(ids); });
@@ -2808,9 +2901,14 @@
     var ship = b.getAttribute('data-ship'), unship = b.getAttribute('data-unship');
     if (!ship && !unship) return;
     qLock(true);
-    var label = b.textContent;
+    var label = b.textContent, nm = qName(ship || unship);
     srv('queueShip', [ship || unship, !!unship, $('qShowShipped').checked], function (d) {
-      qShow(d); setMsg('mMsg', ship ? (label === 'Done' ? 'Marked done.' : 'Marked shipped.') : 'Back in the queue.', 'ok');
+      qShow(d);
+      if (!ship) { setMsg('mMsg', 'Back in the queue.', 'ok'); return; }
+      undoMsg('mMsg', nm + ': ' + (label === 'Done' ? 'marked done.' : 'marked shipped.'), function () {
+        qLock(true);
+        srv('queueShip', [ship, true, $('qShowShipped').checked], function (d2) { qShow(d2); setMsg('mMsg', 'Back in the queue.', 'ok'); }, mErr);
+      });
     }, mErr);
   });
 
@@ -2934,13 +3032,15 @@
       $('workOrder').setAttribute('aria-hidden', 'false');
       setMsg('mMsg', '');
       document.body.classList.add('wo-open');
+      backPush(woCloseNow);
       $('workOrder').scrollTop = 0;
     }, mErr);
   }
   $('workOrder').addEventListener('click', function (e) {
     if (e.target.id === 'woPrintBtn') window.print();
-    if (e.target.id === 'woClose') { document.body.classList.remove('wo-open'); $('workOrder').setAttribute('aria-hidden', 'true'); }
+    if (e.target.id === 'woClose') { woCloseNow(); backDone(); }
   });
+  function woCloseNow() { document.body.classList.remove('wo-open'); $('workOrder').setAttribute('aria-hidden', 'true'); }
   function woHtml(w) {
     var TYPE = { Order: 'Order', Stock: 'For stock', Note: 'Note' };
     var run = w.type === 'Note' && !w.slips ? '—' : w.slips ? fmt(w.slips, 0) + ' slips' : 'Open-ended';
@@ -2993,7 +3093,9 @@
 
   /* low supplies */
   $('supShowAll').addEventListener('change', function () { M_LOAD.supplies(); });
+  var SUP_LAST = [];
   function supShow(d) {
+    SUP_LAST = d.requests || [];
     mCounts();
     if (!d.requests.length) { $('supList').innerHTML = '<p class="muted">Nothing reported.</p>'; return; }
     var kind = { Open: 'red', Ordered: 'yellow', Received: 'green' };
@@ -3022,12 +3124,25 @@
   $('issList').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-iid]'); if (!b) return;
     b.disabled = true;
-    srv('issueSetStatus', [b.getAttribute('data-iid'), b.getAttribute('data-ist'), $('issShowAll').checked], issShow, function (err) { b.disabled = false; mErr(err); });
+    var iid = b.getAttribute('data-iid'), ist = b.getAttribute('data-ist');
+    srv('issueSetStatus', [iid, ist, $('issShowAll').checked], function (d) {
+      issShow(d);
+      if (ist === 'Handled') undoMsg('mMsg', 'Marked handled.', function () {
+        srv('issueSetStatus', [iid, 'Open', $('issShowAll').checked], function (d2) { issShow(d2); setMsg('mMsg', 'Back to open.', 'ok'); }, mErr);
+      });
+    }, function (err) { b.disabled = false; mErr(err); });
   });
   $('supList').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-sid]'); if (!b) return;
     b.disabled = true;
-    srv('supplySetStatus', [b.getAttribute('data-sid'), b.getAttribute('data-st')], function () { M_LOAD.supplies(); }, mErr);
+    var sid = b.getAttribute('data-sid'), st = b.getAttribute('data-st');
+    var was = (SUP_LAST.filter(function (x) { return x.id === sid; })[0] || {}).status || 'Open';
+    srv('supplySetStatus', [sid, st], function () {
+      M_LOAD.supplies();
+      undoMsg('mMsg', 'Marked ' + st.toLowerCase() + '.', function () {
+        srv('supplySetStatus', [sid, was], function () { M_LOAD.supplies(); setMsg('mMsg', 'Back to ' + was.toLowerCase() + '.', 'ok'); }, mErr);
+      });
+    }, mErr);
   });
 
   /* order list: inks that are out, below keep-at-least, or under the "Order list: under" setting (4) */
