@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "1.017", KEY = "mt-site-reloaded";
+    var BUILT = "1.018", KEY = "mt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -290,6 +290,9 @@
     .notice .x { background: none; border-color: currentColor; }
     .ico { width: 1.15em; height: 1.15em; vertical-align: -0.2em; flex: none; }
     .callbtn .ico { width: 1em; height: 1em; }
+    .countbar button { font-size: 16px; padding: 12px 8px; white-space: nowrap; }
+    .seg button > .cnt.soft { background: var(--accent); color: #061420; }
+    :root[data-look="light"] .seg button > .cnt.soft { color: #fff; }   /* 1.018: "Save counts (12)" stays on one line */
     .notice.crit .nt::before { content: none; }
     .notice .lk { font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
     .mrow .ico { color: var(--accent); margin-right: 4px; }
@@ -410,7 +413,7 @@
       <button data-v="list" class="on">Stock list</button><button data-v="count">Count<span class="cnt soft" id="countN"></span></button><button data-v="receive">Receive</button><button data-v="orders" class="lv2">Orders<span class="cnt" id="ordN"></span></button>
     </div>
     <div data-tab="list count">
-      <div class="findbar"><input id="sFind" type="text" autocomplete="off" placeholder="Find: part #, vendor #, name or bin" aria-label="Find a stock part">
+      <div class="findbar"><input id="sFind" type="text" autocomplete="off" placeholder="Part #, name or bin" aria-label="Find a stock part: part #, vendor #, name or bin">
         <select id="sSort" style="width:auto" aria-label="Sort"><option value="bin">By bin</option><option value="part">By part #</option><option value="name">By name</option></select></div>
     </div>
     <div class="card" data-tab="list">
@@ -587,8 +590,9 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '1.017';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '1.018';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   var APP_CHANGES = [
+    ['1.018', '11/20/2026', 'Polish: Save counts stays on one line; shorter Find box hint on Stock.'],
     ['1.017', '11/20/2026', 'Polish: matching line icons instead of emoji; quieter secondary buttons so the main action stands out; pop-ups slide in smoothly; \'1 sheet\' wording fix.'],
     ['1.016', '11/20/2026', 'New home-screen icon in the app\'s dark look, matching Press Tools, and full-size on Android. If you added the app to your home screen, remove it and add it again to get the new icon.'],
     ['1.015', '11/20/2026', 'Suggest an improvement: tap your name at the top and send an idea. It goes to the admins with everyone\'s ideas from both apps, and you can see its status under My suggestions. After each update, a short What\'s new card shows once on each device. Errors on people\'s phones are noted so they get fixed.'],

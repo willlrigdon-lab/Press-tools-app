@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.036", KEY = "pt-site-reloaded";
+    var BUILT = "2.037", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -1347,6 +1347,15 @@
       <div id="sgList"></div>
     </div>
     <div class="card">
+      <h2>App health</h2>
+      <p class="muted" style="margin-top:0">Tabs that grow every day. Past about 20,000 rows, screens that read them slow down: plan an archive before then.</p>
+      <div id="healthList"></div>
+    </div>
+    <div class="card">
+      <div class="cardhead"><h2>Change log</h2><button id="auditLoad" class="chip">Show</button></div>
+      <div id="auditList"></div>
+    </div>
+    <div class="card">
       <h2>Backups</h2>
       <p class="muted" style="margin-top:0">A copy of every tab every night. The last 14 days are kept as separate spreadsheets in your Google Drive.</p>
       <button id="backupBtn" class="wide">Turn on nightly backup</button>
@@ -1356,15 +1365,6 @@
       <p class="muted" style="margin-top:0">Permanently deletes archived rolls saved before this date. This can't be undone.</p>
       <input id="purgeBefore" type="date">
       <button id="purgeBtn" class="wide danger">Delete archived rolls</button>
-    </div>
-    <div class="card">
-      <div class="cardhead"><h2>Change log</h2><button id="auditLoad" class="chip">Show</button></div>
-      <div id="auditList"></div>
-    </div>
-    <div class="card">
-      <h2>App health</h2>
-      <p class="muted" style="margin-top:0">Tabs that grow every day. Past about 20,000 rows, screens that read them slow down: plan an archive before then.</p>
-      <div id="healthList"></div>
     </div>
     <p class="muted appver" style="text-align:center"></p>
   </section>
@@ -1495,9 +1495,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.036';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.037';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.037', '11/20/2026', 'Polish: Admin shows People, Suggestions and App health first; the change log shows 30 entries at a time; Manage → Crew no longer shows a lone Days off button.'],
     ['2.036', '11/20/2026', 'Polish: pop-up messages are easier to read; numbers on buttons no longer squash them; Ordering and Ink needed fit a phone (one row per ink); one set of matching line icons instead of emoji; quieter secondary buttons so the main action stands out; pop-ups slide in smoothly.'],
     ['2.035', '11/20/2026', 'Rolls and ink runs work together: a roll saved while a run is open on that press joins the run (with no run open it saves on its own, like before). The run screen shows the run\'s rolls with their waste and the roll on the press, with Finish roll. The next roll\'s Starting Counter fills in from the last roll\'s Ending Counter. End Run and the finish screen show the run\'s rolls; a roll still on the press carries on into the next job. Manage → Reports → Waste can group by job, and the Run log shows each run\'s rolls.'],
     ['2.034', '11/20/2026', 'New home-screen icon in the app\'s dark look, matching Maintenance Tools, and full-size on Android. If you added the app to your home screen, remove it and add it again to get the new icon.'],
@@ -3175,6 +3176,7 @@
       b.classList.toggle('on', b.getAttribute('data-t') === t);
       b.classList.toggle('offpane', b.getAttribute('data-g') !== g);
     });
+    show('mTabs', document.querySelectorAll('#mTabs button[data-g="' + g + '"]').length > 1);   // a group with one screen needs no screen buttons
     Object.keys(M_LOAD).forEach(function (k) { show('m_' + k, k === t); });
     M_LOAD[t]();
     mCounts();
@@ -4233,13 +4235,22 @@
     if (!confirm('Permanently delete archived rolls saved before ' + d + '? This cannot be undone.')) return;
     srv('archivePurge', [d], function (r) { setMsg('aMsg', r.deleted + ' archived rolls deleted.', 'ok'); }, aErr);
   });
+  /* Change log (2.037): the newest 30 first, then 30 more at a time (the server sends the last 200) */
+  var AUDIT = { list: [], shown: 0 };
+  function auditDraw() {
+    var list = AUDIT.list.slice(0, AUDIT.shown);
+    $('auditList').innerHTML = AUDIT.list.length ? list.map(function (x) {
+      return '<div class="item"><div><div class="t">' + esc(x.action) + '</div><div class="s">' + esc(x.details) + '</div>' +
+        '<div class="s">' + esc(x.who) + ' · ' + esc(x.time) + '</div></div><div></div></div>';
+    }).join('') + (AUDIT.list.length > AUDIT.shown ? '<button type="button" class="wide" id="auditMore">Show ' +
+      Math.min(30, AUDIT.list.length - AUDIT.shown) + ' more</button>' : '') : '<p class="muted">No changes logged yet.</p>';
+  }
   $('auditLoad').addEventListener('click', function () {
-    srv('auditList', [], function (d) {
-      $('auditList').innerHTML = d.entries.length ? d.entries.map(function (x) {
-        return '<div class="item"><div><div class="t">' + esc(x.action) + '</div><div class="s">' + esc(x.details) + '</div>' +
-          '<div class="s">' + esc(x.who) + ' · ' + esc(x.time) + '</div></div><div></div></div>';
-      }).join('') : '<p class="muted">No changes logged yet.</p>';
-    }, aErr);
+    srv('auditList', [], function (d) { AUDIT.list = d.entries; AUDIT.shown = 30; auditDraw(); }, aErr);
+  });
+  $('auditList').addEventListener('click', function (e) {
+    if (e.target.id !== 'auditMore') return;
+    AUDIT.shown += 30; auditDraw();
   });
 
   /* =====================================================================
