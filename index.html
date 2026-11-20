@@ -501,6 +501,28 @@
     .sheet-card { transition: transform .2s ease; }
     #toasts .msg .undo { pointer-events: auto; margin-left: 12px; padding: 4px 14px; font-size: 15px; background: transparent; color: #fff; border: 2px solid #fff; border-radius: 999px; }
     @media print { .skel { display: none; } }
+    /* 2.030: SOP/guide/form printing inside the app (same full-screen preview as the work order) */
+    .resrow { display: flex; gap: 8px; align-items: center; }
+    .resrow .res { flex: 1; min-width: 0; }
+    .resrow .resprint { padding: 10px 14px; font-size: 15px; white-space: nowrap; }
+    #workOrder .pdfpage { display: block; width: 100%; max-width: 820px; margin: 0 auto 12px; border: 1px solid #ccc; }
+    #workOrder .pdfwait { color: #444; padding: 20px 0; text-align: center; }
+    .tf-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #111; padding-bottom: 6px; margin-bottom: 10px; }
+    .tf-big { font-size: 18pt; font-weight: 800; } .tf-sub { font-size: 10pt; color: #333; margin: 2px 0 12px; }
+    .tf-box { border: 1px solid #111; padding: 8px 10px; margin-bottom: 12px; }
+    .tf-row { display: flex; gap: 10px; align-items: flex-end; margin: 8px 0; } .tf-row b { white-space: nowrap; font-size: 10pt; }
+    .tf-line { flex: 1; border-bottom: 1px solid #111; min-height: 20px; font-size: 11pt; padding: 0 4px; }
+    .tf-check { display: inline-block; width: 12px; height: 12px; border: 1px solid #111; margin: 0 4px -1px 10px; text-align: center; line-height: 11px; font-size: 10px; font-weight: 800; }
+    .tf-ack { font-size: 10pt; margin: 6px 0 10px; }
+    .tf-t { width: 100%; border-collapse: collapse; } .tf-t th, .tf-t td { border: 1px solid #111; padding: 4px 6px; font-size: 10pt; color: #111; text-align: left; }
+    .tf-t th { background: #eee; } .tf-t td { height: 26px; } .tf-t td:first-child, .tf-t th:first-child { width: 6%; text-align: center; }
+    .tf-foot { display: flex; justify-content: space-between; font-size: 8.5pt; color: #444; margin-top: 8px; }
+    @media print {
+      body.wo-open #workOrder.pdfmode { padding: 0; }
+      #workOrder .pdfpage { width: auto; max-width: 100%; max-height: 98vh; margin: 0 auto; border: 0; break-after: page; page-break-after: always; }
+      #workOrder .pdfpage:last-child { break-after: auto; page-break-after: auto; }
+      .tf-t td { height: 34px; } .tf-big { font-size: 20pt; } .tf-box { padding: 10px 12px; } .tf-row { margin: 12px 0; }
+    }
   </style>
 </head>
 <body>
@@ -1026,7 +1048,7 @@
       </div>
       <div class="card">
         <h2>Printable forms</h2>
-        <p class="muted" style="margin-top:0">Print / download saves the PDF on your phone: open the download, then use Print. Add more with Section: Management Forms.</p>
+        <p class="muted" style="margin-top:0">Print opens a preview with its own Print button. The Training Acknowledgment fills in the SOP or guide you pick. Add more forms with Section: Management Forms.</p>
         <div id="rsForms"></div>
       </div>
       <div class="card">
@@ -1204,9 +1226,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.029';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.030';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.030', '11/20/2026', 'Print straight from the app: SOPs, Best Practice Guides and forms have a Print button that shows the document and prints it (no downloading). The Training Acknowledgment is filled in with the SOP or guide you pick.'],
     ['2.029', '11/20/2026', 'Feels faster: lists show what you saw last time right away while they refresh, with gray placeholders on first load. Undo on Shipped/Done, Cancel, Handled and supply changes (no more "are you sure?" for cancels). Swipe a pop-up down or use the phone\'s Back button to close it.'],
     ['2.028', '11/19/2026', 'Printable forms: a Print / download button gets the PDF itself onto your phone, so it prints the whole form instead of just its name.'],
     ['2.027', '11/19/2026', 'Maintenance requests now reach Maintenance Tools: your phone passes the request straight on, so no extra Google approval is needed.'],
@@ -1345,12 +1368,16 @@
     var html = dir ? '<h2 class="ressec">Company Info</h2>' + dir : '', sec = dir ? 'Company Info' : null;
     list.forEach(function (x) {
       if (x.section !== sec) { sec = x.section; html += '<h2 class="ressec">' + esc(sec) + '</h2>'; }
-      html += '<a class="res" target="_blank" rel="noopener" href="' + esc(x.link) + '"><span class="ic">' + (resIsVideo(x.link) ? '▶️' : '📄') + '</span>' +
+      var a = '<a class="res" target="_blank" rel="noopener" href="' + esc(x.link) + '"><span class="ic">' + (resIsVideo(x.link) ? '▶️' : '📄') + '</span>' +
         '<span><span class="t">' + esc(x.title) + '</span>' + (x.note ? '<br><span class="s">' + esc(x.note) + '</span>' : '') + '</span></a>';
+      html += canPrint(x) ? '<div class="resrow">' + a + '<button class="resprint" data-print="' + esc(x.id) + '" data-title="' + esc(x.title) + '">🖨️ Print</button></div>' : a;
     });
     $('resList').innerHTML = html;
   }
   $('resSearch').addEventListener('input', resShow);
+  $('resList').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-print]'); if (b) printDoc(b.getAttribute('data-print'), b.getAttribute('data-title'));
+  });
   $('opTabs').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-v]'); if (b) { opTab(b.getAttribute('data-v')); window.scrollTo(0, 0); }
   });
@@ -2681,14 +2708,27 @@
         '<div class="acts"><button class="danger" data-rsrm="' + esc(x.id) + '">Remove</button></div></div>';
     }).join('') : '<p class="muted">No resources yet.</p>';
     var forms = d.resources.filter(function (x) { return x.section === 'Management Forms'; });
-    // phones can't print Google Drive's preview page (it prints just the file name), so "Print / download" hands over the PDF itself
-    $('rsForms').innerHTML = forms.length ? forms.map(function (x) {
-      var id = driveFileId(x.link), dl = id ? 'https://drive.google.com/uc?export=download&id=' + encodeURIComponent(id) : x.link;
+    // printed in the app: the Training Acknowledgment is built here (document filled in); other forms print their PDF via Maintenance Tools
+    var docs = d.resources.filter(function (x) { return x.section === 'SOPs' || x.section === 'Best Practice Guides'; });
+    var tf = '<div class="item"><div style="flex:1"><div class="t">🖨️ Training Acknowledgment</div>' +
+      '<label for="tfDoc" style="margin-top:6px">For which document?</label><select id="tfDoc"><option value="">Blank (write it in)</option>' +
+      docs.map(function (x) { return '<option value="' + esc(x.id) + '">' + esc((x.section === 'SOPs' ? 'SOP · ' : 'Best Practices · ') + x.title) + '</option>'; }).join('') +
+      '</select></div><div class="acts"><button class="primary" id="tfPrint">Print</button></div></div>';
+    var others = forms.filter(function (x) { return !/training acknowledg/i.test(x.title); });
+    $('rsForms').innerHTML = tf + others.map(function (x) {
       return '<div class="item"><div><div class="t">🖨️ ' + esc(x.title) + '</div>' + (x.note ? '<div class="s">' + esc(x.note) + '</div>' : '') + '</div>' +
-        '<div class="acts"><a class="btn primary" data-formdl target="_blank" rel="noopener" href="' + esc(dl) + '">Print / download</a>' +
+        '<div class="acts">' + (canPrint(x) ? '<button class="primary" data-print="' + esc(x.id) + '" data-title="' + esc(x.title) + '">Print</button>' : '') +
         '<a class="btn" data-formopen target="_blank" rel="noopener" href="' + esc(x.link) + '">Open</a></div></div>';
-    }).join('') : '<p class="muted">No forms yet.</p>';
+    }).join('');
   }
+  $('rsForms').addEventListener('click', function (e) {
+    if (e.target.id === 'tfPrint') {
+      var id = $('tfDoc').value, x = id ? RES.list.resources.filter(function (r) { return r.id === id; })[0] : null;
+      printOpen('Training Acknowledgment' + (x ? ' · ' + x.title : ''), tfHtml(x ? { type: x.section === 'SOPs' ? 'SOP' : 'Best Practices', title: x.title } : {}));
+      return;
+    }
+    var b = e.target.closest('button[data-print]'); if (b) printDoc(b.getAttribute('data-print'), b.getAttribute('data-title'));
+  });
   $('rsAdd').addEventListener('click', function () {
     var title = $('rsTitle').value.trim(), link = $('rsLink').value.trim();
     if (!title) { setMsg('mMsg', 'Type a title.', 'err'); return; }
@@ -3027,19 +3067,94 @@
     setMsg('mMsg', 'Getting the work order for ' + qName(id) + '…');
     srv('workOrder', [id], function (w) {
       // phones only print from a direct tap, so the sheet opens first and its own Print button prints it
-      $('workOrder').innerHTML = '<div class="wo-bar"><span>Work order preview</span>' +
-        '<button class="go" id="woPrintBtn">Print</button><button id="woClose">Close</button></div>' + woHtml(w);
-      $('workOrder').setAttribute('aria-hidden', 'false');
+      printOpen('Work order preview', woHtml(w));
       setMsg('mMsg', '');
-      document.body.classList.add('wo-open');
-      backPush(woCloseNow);
-      $('workOrder').scrollTop = 0;
     }, mErr);
   }
   $('workOrder').addEventListener('click', function (e) {
     if (e.target.id === 'woPrintBtn') window.print();
     if (e.target.id === 'woClose') { woCloseNow(); backDone(); }
   });
+  /** Full-screen white preview with its own Print / Close bar (phones only print from a direct tap). Print stays off until ready. */
+  function printOpen(title, html, waiting) {
+    $('workOrder').className = 'wo';
+    $('workOrder').innerHTML = '<div class="wo-bar"><span>' + esc(title) + '</span>' +
+      '<button class="go" id="woPrintBtn"' + (waiting ? ' disabled' : '') + '>Print</button><button id="woClose">Close</button></div>' + html;
+    $('workOrder').setAttribute('aria-hidden', 'false');
+    document.body.classList.add('wo-open');
+    backPush(woCloseNow);
+    $('workOrder').scrollTop = 0;
+  }
+  /* ---- SOPs, guides and forms printed in the app: Maintenance Tools sends the PDF, pdf.js draws its pages as pictures ---- */
+  var PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+  function pdfLib(ok, fail) {
+    if (window.pdfjsLib) { ok(window.pdfjsLib); return; }
+    var sc = document.createElement('script');
+    sc.src = PDFJS + 'pdf.min.js';
+    sc.onload = function () {
+      if (!window.pdfjsLib) { fail('The PDF viewer did not load.'); return; }
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.js';
+      ok(window.pdfjsLib);
+    };
+    sc.onerror = function () { fail('The PDF viewer could not be loaded. Check the internet connection.'); };
+    document.head.appendChild(sc);
+  }
+  function printDoc(resId, title) {
+    printOpen(title, '<div class="pdfwait" id="pdfWait">Getting ' + esc(title) + '…</div><div id="pdfPages"></div>', true);
+    $('workOrder').classList.add('pdfmode');
+    function fail(m) { if ($('pdfWait')) $('pdfWait').textContent = m + ' You can still open it with its link.'; }
+    var url = RES.list && RES.list.printUrl;
+    if (!url) { fail('Printing isn\'t set up.'); return; }
+    var opts = { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: 'printDoc', args: [resId] }) };
+    if (window.AbortSignal && AbortSignal.timeout) opts.signal = AbortSignal.timeout(60000);
+    fetch(url, opts).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || !j.value || !j.value.pdf) { fail((j && j.error) || 'No answer from Maintenance Tools.'); return; }
+      pdfLib(function (lib) {
+        var raw = atob(j.value.pdf), bytes = new Uint8Array(raw.length);
+        for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+        lib.getDocument({ data: bytes }).promise.then(function (pdf) {
+          var n = 0;
+          (function page(k) {
+            if (k > pdf.numPages) {
+              if ($('pdfWait')) $('pdfWait').remove();
+              var btn = $('woPrintBtn'); if (btn) btn.disabled = false;
+              return;
+            }
+            pdf.getPage(k).then(function (pg) {
+              var v1 = pg.getViewport({ scale: 1 }), vp = pg.getViewport({ scale: 1700 / v1.width });
+              var cv = document.createElement('canvas'); cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+              var cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height);
+              return pg.render({ canvasContext: cx, viewport: vp }).promise.then(function () {
+                if (!$('pdfPages')) return;   // closed meanwhile
+                var img = new Image(); img.className = 'pdfpage'; img.alt = title + ' page ' + k; img.src = cv.toDataURL('image/jpeg', 0.88);
+                $('pdfPages').appendChild(img); n++;
+                if ($('pdfWait')) $('pdfWait').textContent = 'Getting ' + title + '… page ' + k + ' of ' + pdf.numPages;
+                page(k + 1);
+              });
+            }).catch(function () { fail('Page ' + k + ' could not be shown.'); });
+          })(1);
+        }).catch(function () { fail('That file could not be read as a PDF.'); });
+      }, fail);
+    }).catch(function (e) { fail('Could not reach Maintenance Tools (' + (e && e.message ? e.message : e) + ').'); });
+  }
+  /** Can this resource be printed in the app? (Google Drive files and Docs in the printable sections) */
+  var PRINTABLE = ['SOPs', 'Best Practice Guides', 'Management Forms', 'Troubleshooting'];
+  function canPrint(x) { return PRINTABLE.indexOf(x.section) !== -1 && /drive\.google\.com|docs\.google\.com/.test(x.link); }
+  /** Training Acknowledgment, built by the app; doc = {type: 'SOP' | 'Best Practices' | '', title} fills in which document. */
+  function tfHtml(doc) {
+    function chk(t) { return '<span class="tf-check">' + (doc.type === t ? '✓' : '') + '</span>' + (t === 'SOP' ? 'SOP' : 'Best Practices'); }
+    var rows = ''; for (var i = 1; i <= 14; i++) rows += '<tr><td>' + i + '</td><td></td><td></td></tr>';
+    return '<div class="tf-head"><img class="wo-logo" src="' + LOGO + '" alt="Specialty Roll Products"><div class="tf-big">Training Acknowledgment</div></div>' +
+      '<div class="tf-sub">Sign after being trained on a standard operating procedure (SOP) or best practices document.</div>' +
+      '<div class="tf-box"><div class="tf-row"><b>Document type:</b><span>' + chk('SOP') + chk('Best Practices') + '</span></div>' +
+      '<div class="tf-row"><b>Document title:</b><span class="tf-line">' + esc(doc.title || '') + '</span></div>' +
+      '<div class="tf-row"><b>Date:</b><span class="tf-line"></span></div>' +
+      '<div class="tf-row"><b>Trainer (print):</b><span class="tf-line"></span><b>Trainer signature:</b><span class="tf-line"></span></div></div>' +
+      '<p class="tf-ack"><b>Employee acknowledgment.</b> By signing below, I confirm that the trainer named above taught and explained this subject to me, ' +
+      'that I understand it, and that I agree to abide by the SOP or best practices document listed above.</p>' +
+      '<table class="tf-t"><tr><th>#</th><th>Employee name (print)</th><th>Employee signature</th></tr>' + rows + '</table>' +
+      '<div class="tf-foot"><span>Training Acknowledgment Form</span><span>Use a second form if more signature lines are needed</span></div>';
+  }
   function woCloseNow() { document.body.classList.remove('wo-open'); $('workOrder').setAttribute('aria-hidden', 'true'); }
   function woHtml(w) {
     var TYPE = { Order: 'Order', Stock: 'For stock', Note: 'Note' };
