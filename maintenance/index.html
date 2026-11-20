@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "1.015", KEY = "mt-site-reloaded";
+    var BUILT = "1.016", KEY = "mt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -565,8 +565,9 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '1.015';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '1.016';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   var APP_CHANGES = [
+    ['1.016', '11/20/2026', 'New home-screen icon in the app\'s dark look, matching Press Tools, and full-size on Android. If you added the app to your home screen, remove it and add it again to get the new icon.'],
     ['1.015', '11/20/2026', 'Suggest an improvement: tap your name at the top and send an idea. It goes to the admins with everyone\'s ideas from both apps, and you can see its status under My suggestions. After each update, a short What\'s new card shows once on each device. Errors on people\'s phones are noted so they get fixed.'],
     ['1.014', '11/20/2026', 'New layout: a one-row top bar with your name. Tap it for Look (Dark, Light or Auto, saved on this device and shared with Press Tools), What\'s new and Switch user. Bottom bar with icons and bigger labels. Problems page: Report a problem comes right after the call buttons.'],
     ['1.013', '11/20/2026', 'Faster and steadier: badge and notice checks pause while the screen is off and run less often; if a list fails to load on weak wifi it tries once more by itself; "Busy right now" instead of Google\'s error text. The GitHub page keeps a copy of itself so it opens even on weak wifi, and shows "New version ready · Tap to update" after an update. Sharper logo.'],
