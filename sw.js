@@ -16,7 +16,7 @@ self.addEventListener("fetch", function (e) {
   var url = new URL(req.url), scope = new URL(self.registration.scope);
   if (url.origin !== scope.origin || url.pathname.indexOf(scope.pathname) !== 0) return;
   var rest = url.pathname.slice(scope.pathname.length);
-  if ((SKIP && SKIP.test(rest)) || /(^|\/)(version\.json|sw\.js)$/.test(rest)) return;
+  if ((SKIP && SKIP.test(rest)) || /(^|\/)(version\.json|sw\.js)$/.test(rest) || /\.(png|ico|webmanifest)$/.test(rest)) return;
   var key = req.mode === "navigate" ? scope.href : url.origin + url.pathname, stored = null;
   var net = fetch(req, { cache: "no-cache" }).then(function (res) {
     if (res && res.ok && res.type === "basic") {
