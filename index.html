@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.037", KEY = "pt-site-reloaded";
+    var BUILT = "2.038", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -1361,6 +1361,12 @@
       <button id="backupBtn" class="wide">Turn on nightly backup</button>
     </div>
     <div class="card">
+      <h2>Monday ordering email</h2>
+      <p class="muted" style="margin-top:0">Every Monday around 8 AM: ink and supplies to order (not marked Ordered yet) and ink marked Ordered a week or more ago that hasn't come in. Change who gets it in the Settings tab (Weekly report email).</p>
+      <div id="wkStatus"></div>
+      <button id="wkSend" class="wide">Send one now</button>
+    </div>
+    <div class="card">
       <h2>Delete archived waste data</h2>
       <p class="muted" style="margin-top:0">Permanently deletes archived rolls saved before this date. This can't be undone.</p>
       <input id="purgeBefore" type="date">
@@ -1495,9 +1501,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.037';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.038';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.038', '11/20/2026', 'Monday ordering email: every Monday around 8 AM, an email lists the ink and supplies that are low or out and not marked Ordered yet, and any ink marked Ordered a week or more ago that hasn\'t come in. Admin shows who gets it and when it last went, with Send one now.'],
     ['2.037', '11/20/2026', 'Polish: Admin shows People, Suggestions and App health first; the change log shows 30 entries at a time; Manage → Crew no longer shows a lone Days off button.'],
     ['2.036', '11/20/2026', 'Polish: pop-up messages are easier to read; numbers on buttons no longer squash them; Ordering and Ink needed fit a phone (one row per ink); one set of matching line icons instead of emoji; quieter secondary buttons so the main action stands out; pop-ups slide in smoothly.'],
     ['2.035', '11/20/2026', 'Rolls and ink runs work together: a roll saved while a run is open on that press joins the run (with no run open it saves on its own, like before). The run screen shows the run\'s rolls with their waste and the roll on the press, with Finish roll. The next roll\'s Starting Counter fills in from the last roll\'s Ending Counter. End Run and the finish screen show the run\'s rolls; a roll still on the press carries on into the next job. Manage → Reports → Waste can group by job, and the Run log shows each run\'s rolls.'],
@@ -1624,7 +1631,7 @@
   var READS = { me: 1, inkLoad: 1, inkGetRun: 1, wasteRecent: 1, wasteDraft: 1, noticesList: 1, resourcesList: 1, supplyItems: 1,
     issuesList: 1, invStock: 1, invLastCount: 1, aniloxList: 1, queueList: 1, statesList: 1, jobGet: 1, wasteReport: 1,
     supplyRequests: 1, inkNeeded: 1, manageCounts: 1, workOrder: 1, runLogReport: 1, daysOffMine: 1, daysOffMonth: 1,
-    usersList: 1, auditList: 1, appHealth: 1, suggestMine: 1, suggestList: 1 };
+    usersList: 1, auditList: 1, appHealth: 1, suggestMine: 1, suggestList: 1, weeklyReportStatus: 1 };
   window.APP_READS = READS;   // the GitHub page's call shim reads this (tools/build-site.js)
   var TRANSIENT = /^Busy right now|^No connection to the server|server error occurred|wait a bit and try again/i;
   function srv(name, args, ok, fail, retried) {
@@ -4178,6 +4185,19 @@
     sgLoad();
     $('healthList').innerHTML = skel(2);
     srv('appHealth', [], healthShow, function (e) { $('healthList').innerHTML = '<p class="muted">' + esc(errText(e)) + '</p>'; });
+    $('wkStatus').innerHTML = skel(2);
+    srv('weeklyReportStatus', [], wkShow, function (e) { $('wkStatus').innerHTML = '<p class="muted">' + esc(errText(e)) + '</p>'; });
+  }
+  /* Monday ordering email (2.038): who gets it, whether it's on, the last one sent */
+  var WK = { to: '' };
+  function wkShow(w) {
+    WK.to = w.to;
+    var l = w.last;
+    $('wkStatus').innerHTML =
+      '<div class="item"><div><div class="t">Goes to</div><div class="s">' + esc(w.to || 'Nobody: type an address in Settings') + '</div></div>' +
+      '<div class="acts">' + badge(w.on ? 'green' : 'yellow', w.on ? 'On · Mondays' : 'Off') + '</div></div>' +
+      (w.on ? '' : '<p class="muted" style="margin:6px 0">To turn it on: on a computer, open the Apps Script editor, pick weeklyReportSetup and press Run (once).</p>') +
+      '<div class="item"><div><div class="t">Last sent</div><div class="s">' + (l ? esc(l.time) + ' · ' + l.inks + ' inks, ' + l.supplies + ' supplies to order, ' + l.overdue + ' not received' : 'Not sent yet') + '</div></div><div></div></div>';
   }
   /* App health (2.031): rows in the growing tabs, Sheet size, last backup */
   function healthShow(h) {
@@ -4228,6 +4248,12 @@
     $('backupBtn').disabled = true; setMsg('aMsg', 'Turning on backups…');
     srv('backupInstall', [], function (r) { $('backupBtn').disabled = false; setMsg('aMsg', r.message, 'ok'); },
       function (e) { $('backupBtn').disabled = false; aErr(e); });
+  });
+  $('wkSend').addEventListener('click', function () {
+    if (!confirm('Send the ordering email to ' + (WK.to || 'the Settings address') + ' now?')) return;
+    $('wkSend').disabled = true; setMsg('aMsg', 'Sending…');
+    srv('weeklyReportNow', [], function (r) { $('wkSend').disabled = false; wkShow(r); setMsg('aMsg', r.message, 'ok'); },
+      function (e) { $('wkSend').disabled = false; aErr(e); });
   });
   $('purgeBtn').addEventListener('click', function () {
     var d = $('purgeBefore').value;
