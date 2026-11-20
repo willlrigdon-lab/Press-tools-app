@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.038", KEY = "pt-site-reloaded";
+    var BUILT = "2.039", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -1501,9 +1501,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.038';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.039';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.039', '11/20/2026', 'Low supplies: management can change a report from Low to Out with Mark out (Undo puts it back). Reporting a low item again as out also changes it, and says so.'],
     ['2.038', '11/20/2026', 'Monday ordering email: every Monday around 8 AM, an email lists the ink and supplies that are low or out and not marked Ordered yet, and any ink marked Ordered a week or more ago that hasn\'t come in. Admin shows who gets it and when it last went, with Send one now.'],
     ['2.037', '11/20/2026', 'Polish: Admin shows People, Suggestions and App health first; the change log shows 30 entries at a time; Manage → Crew no longer shows a lone Days off button.'],
     ['2.036', '11/20/2026', 'Polish: pop-up messages are easier to read; numbers on buttons no longer squash them; Ordering and Ink needed fit a phone (one row per ink); one set of matching line icons instead of emoji; quieter secondary buttons so the main action stands out; pop-ups slide in smoothly.'],
@@ -3798,7 +3799,8 @@
         : x.status === 'Ordered' ? '<button class="primary" data-sid="' + esc(x.id) + '" data-st="Received">Received</button>' : '';
       return '<div class="item"><div><div class="t">' + esc(x.item) + ' ' + badge(x.level === 'Out' ? 'red' : 'yellow', x.level) + '</div>' +
         '<div class="s">' + esc(x.by || '') + (x.press ? ' · ' + esc(x.press) : '') + ' · ' + esc(x.time) + '</div>' +
-        (x.note ? '<div class="s">“' + esc(x.note) + '”</div>' : '') + '<div>' + badge(kind[x.status], x.status) + '</div></div>' +
+        (x.note ? '<div class="s">“' + esc(x.note) + '”</div>' : '') + '<div>' + badge(kind[x.status], x.status) +
+        (x.status !== 'Received' && x.level !== 'Out' ? ' <button class="chip" data-slevel="' + esc(x.id) + '">Mark out</button>' : '') + '</div></div>' +
         '<div class="acts">' + acts + '</div></div>';
     }).join('');
   }
@@ -3827,6 +3829,18 @@
     }, function (err) { b.disabled = false; mErr(err); });
   });
   $('supList').addEventListener('click', function (e) {
+    var lv = e.target.closest('button[data-slevel]');
+    if (lv) {   // 2.039: a Low report is now Out
+      lv.disabled = true;
+      var lid = lv.getAttribute('data-slevel'), all = $('supShowAll').checked;
+      srv('supplySetLevel', [lid, 'Out', all], function (d) {
+        supShow(d);
+        undoMsg('mMsg', 'Marked out.', function () {
+          srv('supplySetLevel', [lid, 'Low', all], function (d2) { supShow(d2); setMsg('mMsg', 'Back to low.', 'ok'); }, mErr);
+        });
+      }, function (err) { lv.disabled = false; mErr(err); });
+      return;
+    }
     var b = e.target.closest('button[data-sid]'); if (!b) return;
     b.disabled = true;
     var sid = b.getAttribute('data-sid'), st = b.getAttribute('data-st');
