@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "1.013", KEY = "mt-site-reloaded";
+    var BUILT = "1.014", KEY = "mt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -82,6 +82,15 @@
   <base target="_top">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>
+    // Look chosen on this device (1.014): Dark (the default), Light, or Auto (follows the phone). Same setting as Press Tools.
+    (function () {
+      try {
+        var l = localStorage.getItem('srp_look');
+        if (l === 'light' || (l === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches)) document.documentElement.setAttribute('data-look', 'light');
+      } catch (e) { /* no storage: stay dark */ }
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
   <style>
@@ -241,13 +250,67 @@
       body.printing #ordCard { position: absolute; left: 0; top: 0; width: 100%; border: 0; box-shadow: none; }
       .noprint { display: none !important; }
     }
+    /* ---- 1.014: one-row top bar with a name menu, bottom bar with icons ---- */
+    .topbar { flex-wrap: nowrap; }
+    .brand { flex: 1; min-width: 0; }
+    #viewTitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .logo-sm { height: 24px; flex: none; }
+    .chip.me { flex: none; max-width: 44vw; display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; font-size: 15px; font-weight: 700; }
+    .chip.me #whoName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .chip.me .chev { font-size: 11px; color: var(--muted); }
+    .chip.me[aria-expanded="true"] { border-color: var(--accent); }
+    .msheet { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.6); display: flex; align-items: flex-end; justify-content: center; }
+    .msheet-card { width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto; background: var(--bg2); border: 1px solid var(--line);
+      border-radius: 20px 20px 0 0; padding: 18px 16px calc(20px + env(safe-area-inset-bottom)); box-shadow: 0 -12px 40px rgba(0,0,0,.5); }
+    .msheet-card h2 { margin: 0 0 2px; }
+    #meSub { margin: 0 0 4px; }
+    .mrow { display: block; width: 100%; text-align: left; margin-top: 8px; padding: 14px 16px; font-size: 17px; border-radius: 14px;
+      background: var(--field); border: 1px solid var(--line); color: var(--text); }
+    .mrow.danger { color: var(--bad); }
+    .mlook { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 8px 8px 16px; font-weight: 700; }
+    .mlook .seg { flex: 0 1 230px; }
+    .mlook .seg button { padding: 9px 4px; }
+    .mhint { margin: 6px 2px 0; }
+    .mchanges { margin: 12px 0 0; }
+    :root { --navh: 64px; }
+    .navin button { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+      font-size: 11.5px; font-weight: 700; letter-spacing: 0; text-transform: none; }
+    .navin button svg { width: 22px; height: 22px; flex: none; }
+    .navin button.on svg { filter: drop-shadow(0 0 6px var(--accent-glow)); }
+    .navin button .cnt { position: absolute; top: 5px; left: calc(50% + 5px); margin: 0; }
+    /* ---- Light look (1.014): chosen per device in the name menu; Dark stays the default. Printing is unchanged. ---- */
+    :root[data-look="light"] {
+      color-scheme: light;
+      --bg: #eef2f6; --bg2: #ffffff; --card: #ffffff; --field: #f3f6f9;
+      --text: #111827; --muted: #5b6676; --line: #dbe2ea;
+      --logo-blue: #1a6496; --accent: #1a6496; --accent-soft: rgba(26,100,150,.12); --accent-glow: rgba(26,100,150,.22);
+      --good: #15803d; --warn: #c2410c; --bad: #b42318;
+    }
+    :root[data-look="light"] body { background: var(--bg) radial-gradient(900px 520px at 85% -10%, rgba(26,100,150,.12), transparent 60%) fixed no-repeat; }
+    :root[data-look="light"] .card, :root[data-look="light"] .mach { background: #fff; border-color: #e1e7ee; box-shadow: 0 1px 2px rgba(16,24,40,.05), 0 6px 18px rgba(16,24,40,.06); }
+    :root[data-look="light"] .tabs { background: rgba(238,242,246,.9); }
+    :root[data-look="light"] .navbar { background: rgba(255,255,255,.94); }
+    :root[data-look="light"] .msheet { background: rgba(15,20,30,.45); }
+    :root[data-look="light"] .sheet-card, :root[data-look="light"] .msheet-card { box-shadow: 0 -8px 30px rgba(16,24,40,.18); }
+    :root[data-look="light"] .logo img, :root[data-look="light"] .logo-sm { filter: none; }
+    :root[data-look="light"] .badge.red { background: #fde7e7; color: #b42318; } :root[data-look="light"] .badge.yellow { background: #fff4c2; color: #6b4e00; }
+    :root[data-look="light"] .badge.green { background: #dcfce7; color: #15803d; } :root[data-look="light"] .badge.blue { background: #dbeafe; color: #1f4f9a; }
+    :root[data-look="light"] .badge.gray { background: #eef0f3; color: var(--muted); }
+    :root[data-look="light"] .cnt.soft { background: #e5eaf0; color: var(--text); }
+    :root[data-look="light"] .notice.std { background: #fff1e6; color: #7c2d12; border-color: #fdba74; border-left-color: #f97316; }
+    :root[data-look="light"] .notice.crit { background: #fee2e2; color: #7f1d1d; border-color: #f5a3a3; border-left-color: #dc2626; box-shadow: none; }
+    :root[data-look="light"] .callcard { background: #fff5f5; border-color: #f5b5b5; }
+    :root[data-look="light"] .mach.locked { background: #fff1f1; border-color: #f5a3a3; }
+    :root[data-look="light"] .lockline { color: #b42318; }
+    :root[data-look="light"] .pc-form { background: var(--field); }
+    :root[data-look="light"] button.primary, :root[data-look="light"] .seg button.on { box-shadow: 0 4px 12px var(--accent-glow); }
   </style>
 </head>
 <body>
 <div class="wrap" id="wrap">
   <header id="topBar" class="topbar hidden">
     <div class="brand"><img id="logoSm" class="logo-sm" alt="Specialty Roll Products"><span id="viewTitle">Maintenance</span></div>
-    <div class="who"><span id="whoName"></span><button id="switchBtn" class="chip">Switch user</button></div>
+    <button id="meBtn" type="button" class="chip me" aria-haspopup="dialog" aria-controls="meSheet" aria-expanded="false"><span id="whoName"></span><span class="chev" aria-hidden="true">▾</span></button>
   </header>
   <div id="notices" class="hidden" role="status" aria-live="polite"></div>
 
@@ -362,6 +425,23 @@
 
   <!-- ===================== PROBLEMS ===================== -->
   <section id="problemsView" class="hidden">
+    <div class="card callcard hidden" id="prCallCard">
+      <h3 style="margin-top:0">Critical problem?</h3>
+      <div id="prCalls"></div>
+      <div id="prNoCall" class="hidden"><p style="margin:0;font-weight:700">Nobody from maintenance is on call right now.</p><p class="muted" id="prNext" style="margin:4px 0 0"></p>
+        <p class="muted" style="margin:6px 0 0">If it's unsafe: stop the machine, lock it out and tell your lead. Report it below so it's waiting for maintenance.</p></div>
+      <p class="muted" id="prCallHint" style="margin:8px 0 0">For anything unsafe or a machine that's down. Then report it below so it's logged.</p>
+    </div>
+    <div class="card">
+      <h2>Report a problem</h2>
+      <label for="prMachine">Machine</label><select id="prMachine"></select>
+      <label>How bad</label>
+      <div class="seg wrapseg" id="prSev"></div>
+      <label for="prType">Kind</label><select id="prType"></select>
+      <div id="prEmailBox" class="hidden"><label for="prEmail">Send email to</label><select id="prEmail"></select></div>
+      <label for="prDesc">What's wrong</label><textarea id="prDesc" maxlength="1000" placeholder="What happened, where on the machine, anything already tried"></textarea>
+      <button class="primary wide" id="prSend">Send</button>
+    </div>
     <div class="card lv2" id="ntCard">
       <details id="ntBox"><summary><b>+ Post a notice</b> <span class="muted">for everyone, e.g. a lockout</span></summary>
         <label>Level</label>
@@ -373,13 +453,6 @@
         <button class="primary wide" id="ntPost">Post notice</button>
       </details>
     </div>
-    <div class="card callcard hidden" id="prCallCard">
-      <h3 style="margin-top:0">Critical problem?</h3>
-      <div id="prCalls"></div>
-      <div id="prNoCall" class="hidden"><p style="margin:0;font-weight:700">Nobody from maintenance is on call right now.</p><p class="muted" id="prNext" style="margin:4px 0 0"></p>
-        <p class="muted" style="margin:6px 0 0">If it's unsafe: stop the machine, lock it out and tell your lead. Report it below so it's waiting for maintenance.</p></div>
-      <p class="muted" id="prCallHint" style="margin:8px 0 0">For anything unsafe or a machine that's down. Then report it below so it's logged.</p>
-    </div>
     <div class="card hidden" id="ocCard">
       <details id="ocBox"><summary><b>My on-call hours</b> <span class="muted" id="ocNow"></span></summary>
         <p class="muted">The app only offers to call you during these hours, and not while you're off. Problem emails still come to you.</p>
@@ -388,16 +461,6 @@
         <label for="ocAway">Off until (vacation, sick, done for the day)</label><input id="ocAway" type="datetime-local">
         <div class="row2"><button class="wide" id="ocBack">I'm back now</button><button class="primary wide" id="ocSave">Save</button></div>
       </details>
-    </div>
-    <div class="card">
-      <h2>Report a problem</h2>
-      <label for="prMachine">Machine</label><select id="prMachine"></select>
-      <label>How bad</label>
-      <div class="seg wrapseg" id="prSev"></div>
-      <label for="prType">Kind</label><select id="prType"></select>
-      <div id="prEmailBox" class="hidden"><label for="prEmail">Send email to</label><select id="prEmail"></select></div>
-      <label for="prDesc">What's wrong</label><textarea id="prDesc" maxlength="1000" placeholder="What happened, where on the machine, anything already tried"></textarea>
-      <button class="primary wide" id="prSend">Send</button>
     </div>
     <div class="card">
       <div class="cardhead"><h2>Problems</h2>
@@ -452,12 +515,29 @@
 <!-- part card: floats over the drawing (bottom sheet on phones, beside it on wide screens) -->
 <div class="sheet hidden" id="pcSheet"><div class="sheet-card" id="pcCard" role="dialog" aria-label="Part"></div></div>
 
+<!-- ===================== NAME MENU (top bar) ===================== -->
+<div id="meSheet" class="msheet hidden" role="dialog" aria-modal="true" aria-labelledby="meTitle">
+  <div class="msheet-card">
+    <h2 id="meTitle"></h2>
+    <p id="meSub" class="muted"></p>
+    <div class="mrow mlook"><span id="lookLabel">Look</span>
+      <div class="seg" id="lookSeg" role="radiogroup" aria-labelledby="lookLabel">
+        <button type="button" role="radio" data-v="dark">Dark</button><button type="button" role="radio" data-v="light">Light</button><button type="button" role="radio" data-v="auto">Auto</button>
+      </div>
+    </div>
+    <p class="muted mhint">Saved on this device (Press Tools too). Auto follows the phone's light or dark setting.</p>
+    <details class="changes mchanges"><summary>What's new in version <span id="meVer"></span></summary><ol id="meChanges"></ol></details>
+    <button id="switchBtn" type="button" class="mrow danger">Switch user</button>
+    <button id="meClose" type="button" class="wide">Close</button>
+  </div>
+</div>
 <div id="toasts" aria-live="polite"><div id="msg" class="msg"></div></div>
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '1.013';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '1.014';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   var APP_CHANGES = [
+    ['1.014', '11/20/2026', 'New layout: a one-row top bar with your name. Tap it for Look (Dark, Light or Auto, saved on this device and shared with Press Tools), What\'s new and Switch user. Bottom bar with icons and bigger labels. Problems page: Report a problem comes right after the call buttons.'],
     ['1.013', '11/20/2026', 'Faster and steadier: badge and notice checks pause while the screen is off and run less often; if a list fails to load on weak wifi it tries once more by itself; "Busy right now" instead of Google\'s error text. The GitHub page keeps a copy of itself so it opens even on weak wifi, and shows "New version ready · Tap to update" after an update. Sharper logo.'],
     ['1.012', '11/20/2026', 'Behind the scenes: Press Tools can now print its SOPs, guides and forms straight from the app (this app hands it the document).'],
     ['1.011', '11/19/2026', 'Maintenance requests from Press Tools: operators send them from the Operator screen, and they arrive here as problems on that press (with the job and who sent it), emailed to Taylor.'],
@@ -525,6 +605,18 @@
   var V = { current: 'login' };
   var VIEWS = { login: 'loginView', machines: 'machinesView', parts: 'partsView', stock: 'stockView', problems: 'problemsView', resources: 'resourcesView', admin: 'adminView' };
   var TITLES = { machines: 'Machines', parts: 'Parts', stock: 'Stock', problems: 'Problems', resources: 'Resources', admin: 'Admin' };
+  /* Bottom bar icons (1.014): simple line drawings above each label */
+  var NAV_ICON = {
+    machines: '<circle cx="12" cy="12" r="3.5"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
+    parts: '<path d="M12 2.8l8 4.6v9.2l-8 4.6-8-4.6V7.4z"/><circle cx="12" cy="12" r="3"/>',
+    stock: '<path d="M3.5 7.5 12 3.5l8.5 4v9L12 20.5l-8.5-4z"/><path d="M3.5 7.5 12 11.5l8.5-4M12 11.5v9"/>',
+    problems: '<path d="M12 3.5 2.5 20h19z"/><path d="M12 10v4.5M12 17.5v.5"/>',
+    resources: '<path d="M4 4.5h6a2 2 0 0 1 2 2V20a2 2 0 0 0-2-2H4zM20 4.5h-6a2 2 0 0 0-2 2V20a2 2 0 0 1 2-2h6z"/>',
+    admin: '<path d="M12 3 19.5 6v5.5c0 4.6-3.2 7.8-7.5 9-4.3-1.2-7.5-4.4-7.5-9V6z"/><path d="M9 12l2 2 4-4"/>'
+  };
+  function navIcon(k) {
+    return NAV_ICON[k] ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + NAV_ICON[k] + '</svg>' : '';
+  }
   var BADGE = { problems: 'navProb', stock: 'navStock' };
   function go(view) {
     V.current = view;
@@ -532,7 +624,11 @@
     var inApp = view !== 'login';
     show('topBar', inApp); show('navBar', inApp);
     cardClose();
-    Array.prototype.forEach.call($('navBtns').children, function (b) { b.classList.toggle('on', b.getAttribute('data-role') === view); });
+    Array.prototype.forEach.call($('navBtns').children, function (b) {
+      var on = b.getAttribute('data-role') === view;
+      b.classList.toggle('on', on);
+      if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    });
     $('viewTitle').textContent = TITLES[view] || 'Maintenance';
     document.body.classList.remove('counting');
     if (inApp) store('mt_view', view);
@@ -551,7 +647,7 @@
     COUNTS.at = 0; NTL.at = 0;   // a new login gets fresh badges and notices
     $('whoName').textContent = A.name;
     $('navBtns').innerHTML = A.roles.map(function (r) {
-      return '<button data-role="' + r.key + '">' + esc(r.label) + (BADGE[r.key] ? '<span class="cnt" id="' + BADGE[r.key] + '"></span>' : '') + '</button>';
+      return '<button data-role="' + r.key + '">' + navIcon(r.key) + '<span>' + esc(r.label) + '</span>' + (BADGE[r.key] ? '<span class="cnt" id="' + BADGE[r.key] + '"></span>' : '') + '</button>';
     }).join('');
     Array.prototype.forEach.call(document.querySelectorAll('.lv2'), function (el) { el.classList.toggle('hidden', A.level < 2); });
     touch();
@@ -559,11 +655,61 @@
     go(last && A.roles.some(function (r) { return r.key === last; }) ? last : A.roles[0].key);
   }
   function logout(why) {
+    menuClose();
     A.token = null; A.roles = []; store('mt_token', ''); PIN.value = ''; drawPin(); go('login');
     $('loginMsg').textContent = why || ''; $('loginMsg').className = 'msg' + (why ? ' err' : '');
   }
   $('navBtns').addEventListener('click', function (e) { var b = e.target.closest('button[data-role]'); if (b) go(b.getAttribute('data-role')); });
   $('switchBtn').addEventListener('click', function () { logout(''); });
+
+  /* ---- name menu (1.014): look, what's new, switch user. Back, Esc, Close or a tap outside closes it. ---- */
+  var MENU = { open: false };
+  function menuOpen() {
+    $('meTitle').textContent = A.name;
+    $('meSub').textContent = 'Level ' + A.level + ' · Maintenance Tools ' + APP_VERSION;
+    $('meVer').textContent = APP_VERSION;
+    if (!$('meChanges').children.length) {
+      $('meChanges').innerHTML = APP_CHANGES.slice(0, 12).map(function (c) {
+        return '<li><b>' + esc(c[0]) + '</b> <span class="muted">· ' + esc(c[1]) + '</span><br>' + esc(c[2]) + '</li>';
+      }).join('');
+    }
+    lookDraw();
+    show('meSheet', true); MENU.open = true; $('meBtn').setAttribute('aria-expanded', 'true');
+    try { history.pushState({ mtMenu: 1 }, ''); } catch (e) {}
+    $('meClose').focus();
+  }
+  function menuClose(fromBack) {
+    if (!MENU.open) return;
+    MENU.open = false; show('meSheet', false); $('meBtn').setAttribute('aria-expanded', 'false');
+    if (!fromBack) { try { if (history.state && history.state.mtMenu) history.back(); } catch (e) {} }
+  }
+  $('meBtn').addEventListener('click', menuOpen);
+  $('meClose').addEventListener('click', function () { menuClose(); $('meBtn').focus(); });
+  $('meSheet').addEventListener('click', function (e) { if (e.target === this) menuClose(); });
+  window.addEventListener('popstate', function () { if (MENU.open) menuClose(true); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && MENU.open) { menuClose(); $('meBtn').focus(); } });
+
+  /* Look: Dark (default) · Light · Auto (follows the phone). Saved on this device; the same key as Press Tools. */
+  var LOOK_MQ = window.matchMedia ? matchMedia('(prefers-color-scheme: light)') : null;
+  function lookGet() { var l = store('srp_look'); return l === 'light' || l === 'auto' ? l : 'dark'; }
+  function lookApply() {
+    var l = lookGet(), light = l === 'light' || (l === 'auto' && LOOK_MQ && LOOK_MQ.matches);
+    if (light) document.documentElement.setAttribute('data-look', 'light'); else document.documentElement.removeAttribute('data-look');
+    var tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.content = light ? '#eef2f6' : '#080b10';
+  }
+  function lookDraw() {
+    var l = lookGet();
+    Array.prototype.forEach.call($('lookSeg').children, function (b) {
+      var on = b.getAttribute('data-v') === l; b.classList.toggle('on', on); b.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+  }
+  $('lookSeg').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-v]'); if (!b) return;
+    store('srp_look', b.getAttribute('data-v')); lookApply(); lookDraw();
+  });
+  if (LOOK_MQ) { try { LOOK_MQ.addEventListener('change', lookApply); } catch (e) { if (LOOK_MQ.addListener) LOOK_MQ.addListener(lookApply); } }
+  window.addEventListener('storage', function (e) { if (e.key === 'srp_look') { lookApply(); lookDraw(); } });
+  lookApply();
   /* Badge numbers (1.013): at most once a minute when switching areas, at once after a save that changes them,
      and every 3 minutes only while the page is on screen. */
   var COUNTS = { at: 0 };

@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.031", KEY = "pt-site-reloaded";
+    var BUILT = "2.032", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -82,6 +82,15 @@
   <base target="_top">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>
+    // Look chosen on this device (2.032): Dark (the default), Light, or Auto (follows the phone's light/dark setting). Set before the page draws.
+    (function () {
+      try {
+        var l = localStorage.getItem('srp_look');
+        if (l === 'light' || (l === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches)) document.documentElement.setAttribute('data-look', 'light');
+      } catch (e) { /* no storage: stay dark */ }
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
   <style>
@@ -570,6 +579,76 @@
       #workOrder .pdfpage:last-child { break-after: auto; page-break-after: auto; }
       .tf-t td { height: 34px; } .tf-big { font-size: 20pt; } .tf-box { padding: 10px 12px; } .tf-row { margin: 12px 0; }
     }
+    /* ---- 2.032: one-row top bar with a name menu, slim report buttons, bottom bar with icons, queue rows on phones ---- */
+    .topbar { flex-wrap: nowrap; margin-bottom: 10px; }
+    .brand { flex: 1; min-width: 0; font-size: 18px; }
+    #viewTitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .logo-sm { height: 24px; flex: none; }
+    .chip.me { flex: none; max-width: 44vw; display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; font-size: 15px; font-weight: 700; }
+    .chip.me #whoName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .chip.me .chev { font-size: 11px; color: var(--muted); }
+    .chip.me[aria-expanded="true"] { border-color: var(--accent); }
+    #meSub { margin: 0 0 4px; }
+    .mrow { display: block; width: 100%; text-align: left; margin-top: 8px; padding: 14px 16px; font-size: 17px; font-weight: 700; border-radius: 14px;
+      background: var(--field); border: 1px solid var(--line); color: var(--text); box-shadow: none; }
+    .mrow.danger { color: var(--bad); }
+    .mlook { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 8px 8px 16px; }
+    .mlook .seg { flex: 0 1 230px; margin: 0; }
+    #pressDefSeg { flex-basis: 250px; }
+    .mlook .seg button { padding: 9px 4px; font-size: 15px; }
+    .menu-card .hint { margin: 6px 2px 0; }
+    .mchanges { margin: 12px 0 0; }
+    #meClose { margin-top: 12px; }
+    .reports { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+    .reports button { margin: 0; padding: 8px 4px; font-size: 14px; font-weight: 700; min-height: 42px; border-width: 1.5px; box-shadow: none; }
+    .reports #lowBtn { color: var(--warn); border-color: var(--warn); }
+    :root { --navh: 64px; }
+    .navin button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+      font-size: 12px; font-weight: 700; letter-spacing: 0; text-transform: none; }
+    .navin button svg { width: 22px; height: 22px; flex: none; }
+    .navin button.on svg { filter: drop-shadow(0 0 6px var(--accent-glow)); }
+    .stat .k { font-size: 11.5px; letter-spacing: .1em; }
+    @media (max-width: 559px) {   /* queue on phones: the text gets the full width, the buttons go underneath */
+      .item.qitem { grid-template-columns: 1fr; }
+      .item.qitem > .acts { justify-content: flex-start; }
+    }
+    /* ---- Light look (2.032): chosen per device in the name menu; Dark stays the default. Printing is unchanged. ---- */
+    :root[data-look="light"] {
+      color-scheme: light;
+      --bg: #eef2f6; --bg2: #ffffff; --card: #ffffff; --field: #f3f6f9;
+      --text: #111827; --muted: #5b6676; --line: #dbe2ea;
+      --logo-blue: #1a6496; --accent: #1a6496; --accent-soft: rgba(26,100,150,.12); --accent-glow: rgba(26,100,150,.22);
+      --good: #15803d; --good-soft: #dcfce7; --warn: #c2410c; --warn-soft: #ffedd5; --bad: #b42318;
+    }
+    :root[data-look="light"] body { background: var(--bg) radial-gradient(900px 520px at 85% -10%, rgba(26,100,150,.12), transparent 60%) fixed no-repeat; }
+    :root[data-look="light"] .card { background: #fff; border-color: #e1e7ee; box-shadow: 0 1px 2px rgba(16,24,40,.05), 0 6px 18px rgba(16,24,40,.06);
+      backdrop-filter: none; -webkit-backdrop-filter: none; }
+    :root[data-look="light"] .optabs, :root[data-look="light"] .mhead { background: rgba(238,242,246,.88); }
+    :root[data-look="light"] .navbar { background: rgba(255,255,255,.94); border-top-color: var(--line); }
+    :root[data-look="light"] .sheet { background: rgba(15,20,30,.45); }
+    :root[data-look="light"] .logo::before, :root[data-look="light"] .brand::before { display: none; }
+    :root[data-look="light"] .logo img, :root[data-look="light"] .logo-sm { filter: none; }
+    :root[data-look="light"] .badge.blue { background: #dbeafe; color: #1f4f9a; }
+    :root[data-look="light"] .badge.red { background: #fde7e7; color: #b42318; }
+    :root[data-look="light"] .badge.yellow, :root[data-look="light"] .badge.unv { background: #fff4c2; color: #6b4e00; }
+    :root[data-look="light"] .badge.green, :root[data-look="light"] .badge.ok { background: #dcfce7; color: #15803d; }
+    :root[data-look="light"] .badge.gray { background: #eef0f3; color: var(--muted); }
+    :root[data-look="light"] .banner, :root[data-look="light"] .notice, :root[data-look="light"] .push.yellow { background: #fff8db; color: #5c4400; border-color: #f2d36b; }
+    :root[data-look="light"] .notice { border-left-color: #e0b100; }
+    :root[data-look="light"] .notice .nby { color: #7a6420; }
+    :root[data-look="light"] .notice.crit { background: #fee2e2; color: #7f1d1d; border-color: #f5a3a3; border-left-color: #dc2626; box-shadow: none; }
+    :root[data-look="light"] .notice.crit .nby { color: #991b1b; }
+    :root[data-look="light"] .stale { color: #b45309; }
+    :root[data-look="light"] .push.red { background: #fde7e7; color: #8f1d1d; }
+    :root[data-look="light"] .cnt.soft { background: #e5eaf0; color: var(--text); }
+    :root[data-look="light"] tr.ordered td { background: #eef5fb; }
+    :root[data-look="light"] .qselbar { background: #fdecec; border-color: #f2b8b8; }
+    :root[data-look="light"] .stat.hot { background: linear-gradient(160deg, rgba(26,100,150,.16), rgba(26,100,150,.04)); border-color: rgba(26,100,150,.35); }
+    :root[data-look="light"] .stat.hot .k { color: #1a6496; }
+    :root[data-look="light"] .skel { background-image: linear-gradient(90deg, rgba(0,0,0,.04) 25%, rgba(0,0,0,.09) 37%, rgba(0,0,0,.04) 63%); }
+    :root[data-look="light"] .t-off { background: #e5e7eb; } :root[data-look="light"] .t-pto { background: #dbeafe; } :root[data-look="light"] .t-sick { background: #ffedd5; }
+    :root[data-look="light"] button.primary, :root[data-look="light"] .seg button.on, :root[data-look="light"] .tabs button.on,
+    :root[data-look="light"] .ink .plus, :root[data-look="light"] .pal .plus, :root[data-look="light"] .keypad button.primary { box-shadow: 0 4px 12px var(--accent-glow); }
   </style>
 </head>
 <body>
@@ -577,10 +656,7 @@
   <!-- ===================== TOP BAR (after login) ===================== -->
   <header id="topBar" class="topbar hidden">
     <div class="brand"><img id="logoSm" class="logo-sm" alt="Specialty Roll Products"><span id="viewTitle">Press Tools</span></div>
-    <div class="who"><span id="whoName"></span>
-      <button id="lowBtn" class="chip low hidden">Low supply</button>
-      <button id="switchBtn" class="chip">Switch user</button>
-    </div>
+    <button id="meBtn" type="button" class="chip me" aria-haspopup="dialog" aria-controls="meSheet" aria-expanded="false"><span id="whoName"></span><span class="chev" aria-hidden="true">▾</span></button>
   </header>
   <!-- shop notices from management, shown on every area -->
   <div id="notices" class="hidden" role="status"></div>
@@ -615,9 +691,10 @@
       <div class="pn">Press<b id="pressName"></b></div>
       <button id="pressChange" class="chip">Change press</button>
     </div>
-    <div class="row2" style="margin-top:10px">
-      <button id="issueBtn" type="button" class="wide" style="margin-top:0">Report an issue</button>
-      <button id="maintBtn" type="button" class="wide" style="margin-top:0">Maintenance request</button>
+    <div class="reports" role="group" aria-label="Report a problem">
+      <button id="issueBtn" type="button">Report issue</button>
+      <button id="maintBtn" type="button">Maintenance</button>
+      <button id="lowBtn" type="button">Low supply</button>
     </div>
   </div>
 
@@ -1240,6 +1317,30 @@
     </form>
   </div>
 
+  <!-- ===================== NAME MENU (top bar) ===================== -->
+  <div id="meSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="meTitle">
+    <div class="sheet-card menu-card">
+      <h2 id="meTitle"></h2>
+      <p id="meSub" class="muted"></p>
+      <button id="menuLow" type="button" class="mrow">Report a low supply</button>
+      <div id="pressDefRow" class="mrow mlook"><span id="pressDefLabel">Open to press</span>
+        <div class="seg" id="pressDefSeg" role="radiogroup" aria-labelledby="pressDefLabel">
+          <button type="button" role="radio" data-v="">None</button><button type="button" role="radio" data-v="MA1">MA1</button><button type="button" role="radio" data-v="MA2">MA2</button><button type="button" role="radio" data-v="MA3">MA3</button>
+        </div>
+      </div>
+      <p id="pressDefHint" class="hint">Your press opens when you log in, on any device. Change press still works anytime.</p>
+      <div class="mrow mlook"><span id="lookLabel">Look</span>
+        <div class="seg" id="lookSeg" role="radiogroup" aria-labelledby="lookLabel">
+          <button type="button" role="radio" data-v="dark">Dark</button><button type="button" role="radio" data-v="light">Light</button><button type="button" role="radio" data-v="auto">Auto</button>
+        </div>
+      </div>
+      <p class="hint">Saved on this device. Auto follows the phone's light or dark setting.</p>
+      <details class="changes mchanges"><summary>What's new in version <span id="meVer"></span></summary><ol id="meChanges"></ol></details>
+      <button id="switchBtn" type="button" class="mrow danger">Switch user</button>
+      <button id="meClose" type="button" class="wide">Close</button>
+    </div>
+  </div>
+
   <!-- ===================== REPORT LOW SUPPLY ===================== -->
   <div id="lowSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="lowTitle">
     <div class="sheet-card">
@@ -1278,9 +1379,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.031';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.032';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.032', '11/20/2026', 'New layout: a one-row top bar with your name. Tap it for Report a low supply, Open to press (your press opens when you log in, on any device; Change press still works), Look (Dark, Light or Auto, saved on this device), What\'s new and Switch user. Report issue, Maintenance and Low supply sit in one slim row on the press card. Bottom bar with icons and bigger labels. On phones, queue jobs use the full width with their buttons underneath.'],
     ['2.031', '11/20/2026', 'Faster and steadier with everyone on it: background checks pause while the screen is off or the app is in the background; the Operator and Manage screens make fewer server calls; if a list fails to load on weak wifi it tries once more by itself; "Busy right now" instead of Google\'s error text. The GitHub page keeps a copy of itself so it opens even on weak wifi, and shows "New version ready · Tap to update" after an update. Admin → App health shows how big the logs are. Sharper logo.'],
     ['2.030', '11/20/2026', 'Print straight from the app: SOPs, Best Practice Guides and forms have a Print button that shows the document and prints it (no downloading). The Training Acknowledgment is filled in with the SOP or guide you pick.'],
     ['2.029', '11/20/2026', 'Feels faster: lists show what you saw last time right away while they refresh, with gray placeholders on first load. Undo on Shipped/Done, Cancel, Handled and supply changes (no more "are you sure?" for cancels). Swipe a pop-up down or use the phone\'s Back button to close it.'],
@@ -1368,7 +1470,7 @@
   });
 
   /* ---- login state; every server request goes through api() with the login token ---- */
-  var A = { token: null, name: '', level: 0, roles: [], idleMinutes: 30 };
+  var A = { token: null, name: '', level: 0, roles: [], idleMinutes: 30, press: '' };
   var LOGIN_ERR = /log in again|timed out/i;
   /*
    * Requests that only read (2.031): if one fails because the wifi blinked or the server was busy, it is asked once more
@@ -2215,7 +2317,18 @@
      ===================================================================== */
   var V = { current: 'login' };
   var VIEWS = { login: 'loginView', operator: 'operatorView', inventory: 'inventoryView', management: 'manageView', admin: 'adminView', daysoff: 'daysOffView' };
-  var TITLES = { operator: 'Operator', inventory: 'Ink Inventory', management: 'Management', admin: 'Admin', daysoff: 'Days off' };
+  var TITLES = { operator: 'Operator', inventory: 'Inventory', management: 'Management', admin: 'Admin', daysoff: 'Days off' };
+  /* Bottom bar icons (2.032): simple line drawings above each label */
+  var NAV_ICON = {
+    operator: '<circle cx="9" cy="10" r="6"/><circle cx="9" cy="10" r="2"/><path d="M9 16h12"/>',
+    inventory: '<path d="M3.5 7.5 12 3.5l8.5 4v9L12 20.5l-8.5-4z"/><path d="M3.5 7.5 12 11.5l8.5-4M12 11.5v9"/>',
+    management: '<rect x="5" y="4.5" width="14" height="16.5" rx="2"/><path d="M9 3h6v3H9zM8.5 11h7M8.5 15h7"/>',
+    admin: '<path d="M12 3 19.5 6v5.5c0 4.6-3.2 7.8-7.5 9-4.3-1.2-7.5-4.4-7.5-9V6z"/><path d="M9 12l2 2 4-4"/>',
+    daysoff: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>'
+  };
+  function navIcon(k) {
+    return NAV_ICON[k] ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + NAV_ICON[k] + '</svg>' : '';
+  }
   var NAV_LABEL = { operator: 'Operator', inventory: 'Inventory', management: 'Manage', admin: 'Admin', daysoff: 'Days off' };
 
   function deviceId() {
@@ -2229,11 +2342,15 @@
     V.current = view;
     Object.keys(VIEWS).forEach(function (k) { show(VIEWS[k], k === view); });
     var inApp = view !== 'login';
-    show('topBar', inApp); show('lowBtn', inApp); show('navBar', inApp);
+    show('topBar', inApp); show('navBar', inApp);
     if (inApp) noticesLoad(); else show('notices', false);
     TOASTS.forEach(function (id) { setMsg(id, ''); });
     document.body.classList.remove('counting');
-    Array.prototype.forEach.call($('navBtns').children, function (b) { b.classList.toggle('on', b.getAttribute('data-role') === view); });
+    Array.prototype.forEach.call($('navBtns').children, function (b) {
+      var on = b.getAttribute('data-role') === view;
+      b.classList.toggle('on', on);
+      if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    });
     $('viewTitle').textContent = TITLES[view] || 'Press Tools';
     if (inApp) store('pt_view', view);
     window.scrollTo(0, 0);
@@ -2245,12 +2362,16 @@
   }
 
   function startSession(sess, reopened) {
+    A.press = sess.press || '';
+    if (!reopened && A.press && S.press !== A.press) {   // a fresh login opens this person's press (Change press still works)
+      S.press = A.press; S.pressOpen = false; store('inkPress', A.press);
+    }
     A.token = sess.token || A.token; A.name = sess.name; A.level = sess.level;
     A.roles = sess.roles || []; A.idleMinutes = sess.idleMinutes || 30;
     store('pt_token', A.token);
     $('whoName').textContent = A.name;
     $('navBtns').innerHTML = A.roles.map(function (r) {
-      return '<button data-role="' + r.key + '">' + esc(NAV_LABEL[r.key] || r.label) + '</button>';
+      return '<button data-role="' + r.key + '">' + navIcon(r.key) + '<span>' + esc(NAV_LABEL[r.key] || r.label) + '</span></button>';
     }).join('');
     touch();
     var last = store('pt_view');   // the area last used on this device, if this person may use it
@@ -2261,10 +2382,10 @@
     if (WD.timer) wDraftSend();
     WD.press = null;              // load this press's entries again after the next login
     M.countsAt = 0;               // the next login counts afresh
-    A.token = null; A.name = ''; A.level = 0; A.roles = [];
+    A.token = null; A.name = ''; A.level = 0; A.roles = []; A.press = '';
     store('pt_token', '');
     PIN.value = ''; drawPin();
-    ['lowSheet', 'issueSheet', 'maintSheet'].forEach(sheetClose);
+    ['lowSheet', 'issueSheet', 'maintSheet', 'meSheet'].forEach(sheetClose);
     cacheClear();
     go('login');
     setMsg('loginMsg', why || '', why ? 'err' : '');
@@ -2274,6 +2395,71 @@
     var b = e.target.closest('button[data-role]'); if (b && b.getAttribute('data-role') !== V.current) go(b.getAttribute('data-role'));
   });
   $('switchBtn').addEventListener('click', function () { logout(''); });
+
+  /* ----- name menu (2.032): low supply, look, what's new, switch user ----- */
+  function meOpen() {
+    $('meTitle').textContent = A.name;
+    $('meSub').textContent = 'Level ' + A.level + ' · Press Tools ' + APP_VERSION;
+    $('meVer').textContent = APP_VERSION;
+    if (!$('meChanges').children.length) {
+      $('meChanges').innerHTML = APP_CHANGES.slice(0, 12).map(function (c) {
+        return '<li><b>' + esc(c[0]) + '</b> <span class="muted">· ' + esc(c[1]) + '</span><br>' + esc(c[2]) + '</li>';
+      }).join('');
+    }
+    lookDraw();
+    show('pressDefRow', allowed('operator')); show('pressDefHint', allowed('operator'));
+    $('pressDefHint').textContent = 'Your press opens when you log in, on any device. Change press still works anytime.';
+    pressDefDraw();
+    $('meBtn').setAttribute('aria-expanded', 'true');
+    sheetOpen('meSheet');
+  }
+  $('meBtn').addEventListener('click', meOpen);
+  $('meClose').addEventListener('click', function () { sheetClose('meSheet'); });
+  $('meSheet').addEventListener('click', function (e) { if (e.target === this) sheetClose('meSheet'); });
+  new MutationObserver(function () {   // however it closes (Back, Esc, swipe, a choice), the button shows it closed
+    if ($('meSheet').classList.contains('hidden')) $('meBtn').setAttribute('aria-expanded', 'false');
+  }).observe($('meSheet'), { attributes: true, attributeFilter: ['class'] });
+  $('menuLow').addEventListener('click', function () { lowOpen(true); });
+  /* Open to press (2.032): saved with the person (Users tab), so it follows them to any device */
+  function pressDefDraw() {
+    Array.prototype.forEach.call($('pressDefSeg').children, function (b) {
+      var on = b.getAttribute('data-v') === (A.press || ''); b.classList.toggle('on', on); b.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+  }
+  $('pressDefSeg').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-v]'); if (!b) return;
+    var v = b.getAttribute('data-v');
+    $('pressDefHint').textContent = 'Saving…';
+    srv('mePress', [v], function (d) {
+      A.press = d.press; pressDefDraw();
+      $('pressDefHint').textContent = d.press ? 'Saved: ' + d.press + ' opens when you log in.' : 'Saved: no set press; this device opens the last press used on it.';
+      if (d.press && !S.press) { S.press = d.press; store('inkPress', d.press); if (V.current === 'operator') { renderPresses(); load(); } }
+    }, function (err) { $('pressDefHint').textContent = errText(err); pressDefDraw(); });
+  });
+  /** Swap one open pop-up for another on the same Back step (closing then opening would race the browser's history). */
+  function sheetSwap(from, to) { show(from, false); show(to, true); BACK.close = function () { show(to, false); }; }
+
+  /* Look: Dark (default) · Light · Auto (follows the phone). Saved on this device; the same key in Maintenance Tools. */
+  var LOOK_MQ = window.matchMedia ? matchMedia('(prefers-color-scheme: light)') : null;
+  function lookGet() { var l = store('srp_look'); return l === 'light' || l === 'auto' ? l : 'dark'; }
+  function lookApply() {
+    var l = lookGet(), light = l === 'light' || (l === 'auto' && LOOK_MQ && LOOK_MQ.matches);
+    if (light) document.documentElement.setAttribute('data-look', 'light'); else document.documentElement.removeAttribute('data-look');
+    var tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.content = light ? '#eef2f6' : '#080b10';
+  }
+  function lookDraw() {
+    var l = lookGet();
+    Array.prototype.forEach.call($('lookSeg').children, function (b) {
+      var on = b.getAttribute('data-v') === l; b.classList.toggle('on', on); b.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+  }
+  $('lookSeg').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-v]'); if (!b) return;
+    store('srp_look', b.getAttribute('data-v')); lookApply(); lookDraw();
+  });
+  if (LOOK_MQ) { try { LOOK_MQ.addEventListener('change', lookApply); } catch (e) { if (LOOK_MQ.addListener) LOOK_MQ.addListener(lookApply); } }
+  window.addEventListener('storage', function (e) { if (e.key === 'srp_look') { lookApply(); lookDraw(); } });
+  lookApply();
 
   /* ----- PIN pad ----- */
   var PIN = { value: '' };
@@ -2322,13 +2508,14 @@
      REPORT LOW SUPPLY (every screen)
      ===================================================================== */
   var LOW = { level: 'Low' };
-  $('lowBtn').addEventListener('click', function () {
+  function lowOpen(fromMenu) {
     setMsg('lowMsg', ''); $('lowItem').value = ''; $('lowNote').value = '';
-    sheetOpen('lowSheet');
+    if (fromMenu === true) sheetSwap('meSheet', 'lowSheet'); else sheetOpen('lowSheet');
     srv('supplyItems', [], function (d) {
       $('lowItems').innerHTML = d.items.map(function (x) { return opt(x.name, x.category); }).join('');
     });
-  });
+  }
+  $('lowBtn').addEventListener('click', lowOpen);
   segPick('lowLevel', function (v) { LOW.level = v; });
   $('lowCancel').addEventListener('click', function () { sheetClose('lowSheet'); });
   $('lowSheet').addEventListener('click', function (e) { if (e.target === this) sheetClose('lowSheet'); });
@@ -2383,7 +2570,7 @@
   });
   segPick('maintSev', function (v) { MREQ.sev = v; });
   $('maintCancel').addEventListener('click', function () { sheetClose('maintSheet'); });
-  ['lowSheet', 'issueSheet', 'maintSheet'].forEach(sheetSwipe);
+  ['lowSheet', 'issueSheet', 'maintSheet', 'meSheet'].forEach(sheetSwipe);
   $('maintSheet').addEventListener('click', function (e) { if (e.target === this) sheetClose('maintSheet'); });
   $('maintForm').addEventListener('submit', function (e) {
     e.preventDefault();
@@ -2928,7 +3115,7 @@
       var info = qLine(q) + (shipped ? (qLine(q) ? ' · ' : '') + q.status.toLowerCase() + ' ' + esc(q.shipped) : '');
       var tick = shipped ? '' : '<input type="checkbox" class="qsel" data-qsel="' + esc(q.id) + '"' + (M.sel[q.id] ? ' checked' : '') +
         ' aria-label="Select ' + esc(q.job || q.note) + '">';
-      return '<div class="item"><div><div class="t">' + tick + title + '</div>' +
+      return '<div class="item qitem"><div><div class="t">' + tick + title + '</div>' +
         (info ? '<div class="s">' + info + '</div>' : '') +
         (q.job && q.note ? '<div class="s">“' + esc(q.note) + '”</div>' : '') +
         '<div>' + typeBadge + (q.job ? badge(q.flag, FLAG_TEXT[q.flag] + (q.runs ? ' (' + q.runs + ')' : '')) : '') + '</div></div>' +
