@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.034", KEY = "pt-site-reloaded";
+    var BUILT = "2.035", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -622,6 +622,14 @@
     .sgitem .sgset button { padding: 8px 12px; font-size: 15px; margin: 0; }
     .sgnote { margin-top: 4px; padding: 6px 10px; border-left: 3px solid var(--accent); color: var(--text); font-size: 14px; }
     @media (max-width: 559px) { .sgitem .sgset { grid-template-columns: 1fr auto; } .sgitem .sgset input { grid-column: 1 / -1; grid-row: 2; } }
+    /* ---- 2.035: rolls and ink runs together ---- */
+    .rollnow { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+    .rollnow .rn { min-width: 0; }
+    .rollnow button { margin: 0; flex: none; padding: 10px 16px; }
+    #runRollsList .item { padding: 8px 0; }
+    .wlink { margin: 0 0 10px; background: rgba(95,168,216,.14); color: #cfe6f7; border: 1px solid rgba(95,168,216,.45); }
+    .wfill { color: var(--accent); }
+    :root[data-look="light"] .wlink { background: #e8f2fa; color: #12476e; border-color: #9cc6e4; }
     /* ---- Light look (2.032): chosen per device in the name menu; Dark stays the default. Printing is unchanged. ---- */
     :root[data-look="light"] {
       color-scheme: light;
@@ -750,6 +758,12 @@
           </details>
         </div>
 
+        <div class="card" id="runRollsCard">
+          <div class="cardhead"><h2>Rolls</h2><span class="muted" id="runRollsSum"></span></div>
+          <div id="runRollsList"></div>
+          <div id="rollNow" class="rollnow"></div>
+        </div>
+
         <div class="card">
           <h2>Pallets sent out</h2>
           <div class="pal">
@@ -809,6 +823,7 @@
         <h2>End run</h2>
         <p class="muted" style="margin-top:0">How much is left in the last bottle opened of each ink?</p>
         <div id="endInks"></div>
+        <p id="endRolls" class="muted hidden"></p>
         <label for="slips">Slips printed</label>
         <input id="slips" inputmode="numeric" placeholder="Can be filled in later">
         <div class="hint" id="slipsHint"></div>
@@ -832,6 +847,7 @@
   <section class="opcol offpane" id="secWaste">
     <h2 class="colhead">Waste roll</h2>
       <div class="card">
+        <div id="w_link" class="push wlink hidden"></div>
         <label for="w_rollNumber" style="margin-top:0">Roll Number</label>
         <input id="w_rollNumber" autocomplete="off" autocapitalize="characters">
 
@@ -841,7 +857,8 @@
         <div class="row2">
           <div>
             <label for="w_startCounter">Starting Counter</label>
-            <input id="w_startCounter" inputmode="decimal">
+            <input id="w_startCounter" inputmode="decimal" aria-describedby="w_startHint">
+            <div id="w_startHint" class="hint wfill hidden"></div>
           </div>
           <div>
             <label for="w_endCounter">Ending Counter</label>
@@ -1053,7 +1070,7 @@
           </div>
           <label>Group totals by</label>
           <div class="seg" id="wPeriod">
-            <button data-v="day">Day</button><button data-v="week" class="on">Week</button><button data-v="month">Month</button><button data-v="year">Year</button>
+            <button data-v="day">Day</button><button data-v="week" class="on">Week</button><button data-v="month">Month</button><button data-v="year">Year</button><button data-v="job">Job</button>
           </div>
         </div>
         <p class="muted" id="wFilters" style="margin:10px 0 0"></p>
@@ -1425,9 +1442,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.034';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.035';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.035', '11/20/2026', 'Rolls and ink runs work together: a roll saved while a run is open on that press joins the run (with no run open it saves on its own, like before). The run screen shows the run\'s rolls with their waste and the roll on the press, with Finish roll. The next roll\'s Starting Counter fills in from the last roll\'s Ending Counter. End Run and the finish screen show the run\'s rolls; a roll still on the press carries on into the next job. Manage → Reports → Waste can group by job, and the Run log shows each run\'s rolls.'],
     ['2.034', '11/20/2026', 'New home-screen icon in the app\'s dark look, matching Maintenance Tools, and full-size on Android. If you added the app to your home screen, remove it and add it again to get the new icon.'],
     ['2.033', '11/20/2026', 'Suggest an improvement: tap your name at the top and send an idea (in Maintenance Tools too). You can see what happens to it under My suggestions. Admins sort them in Admin → Suggestions (New, Planned, Done or Not doing, with a note for the sender). After each update, a short What\'s new card shows once on each device. Errors on people\'s phones are noted for Admin → App health so they get fixed.'],
     ['2.032', '11/20/2026', 'New layout: a one-row top bar with your name. Tap it for Report a low supply, Open to press (your press opens when you log in, on any device; Change press still works), Look (Dark, Light or Auto, saved on this device), What\'s new and Switch user. Report issue, Maintenance and Low supply sit in one slim row on the press card. Bottom bar with icons and bigger labels. On phones, queue jobs use the full width with their buttons underneath.'],
@@ -1654,7 +1672,7 @@
       var left = document.createElement('span');
       left.innerHTML = '<strong></strong><br><span class="when"></span>';
       left.querySelector('strong').textContent = r.rollNumber;
-      left.querySelector('.when').textContent = r.savedAt + (r.press ? ' · ' + r.press : '') + (r.operator ? ' · ' + r.operator : '');
+      left.querySelector('.when').textContent = r.savedAt + (r.press ? ' · ' + r.press : '') + (r.operator ? ' · ' + r.operator : '') + (r.job ? ' · ' + r.job : '');
       var right = document.createElement('span');
       right.textContent = fmt(r.wasteFt, 2) + ' ft · ' + fmt(r.wastePct * 100, 2) + '%';
       li.appendChild(left); li.appendChild(right);
@@ -1674,14 +1692,28 @@
       wBusy(false);
       wShowResult(res.saved, true);
       wShowRecent(res.recent);
-      wMsg('Roll ' + res.saved.rollNumber + ' saved.', 'ok');
+      if (res.lastEnd) WD.lastEnd = res.lastEnd;
+      if (res.run) S.rolls = { runId: res.run.runId, data: res.run.rolls };
+      if (S.run && res.run && res.run.runId === S.run.runId) renderRolls();
+      wMsg('Roll ' + res.saved.rollNumber + ' saved' + (res.run ? ' to the ' + res.run.job + ' run.' : '.'), 'ok');
       if (S.run && S.run.press === S.press && S.run.stale) { S.run.stale = null; show('staleNote', false); }   // a roll counts as an update
     }, wError);
   });
 
   /* Typed entries are kept until "Clear for next roll": in the Sheet for the press (survives time-outs,
      reloads and other devices) and on this device as a backup. */
-  var WD = { timer: null, sent: '' };
+  var WD = { timer: null, sent: '', lastEnd: null };
+  /* 2.035: the machine counter keeps counting from roll to roll, so an empty Starting Counter is filled from the
+     last roll saved on this press (the operator can change it). */
+  function wPrefillStart() {
+    var e = WD.lastEnd, box = $('w_startCounter');
+    if (!e || !e.end || String(box.value).trim()) return false;
+    box.value = e.end;
+    $('w_startHint').textContent = 'From ' + (e.roll || 'the last roll') + '\'s ending counter';
+    show('w_startHint', true);
+    return true;
+  }
+  $('w_startCounter').addEventListener('input', function () { show('w_startHint', false); });
   function wFields() { var o = {}; W_FIELDS.forEach(function (f) { o[f] = $('w_' + f).value; }); return o; }
   function wHasEntries(o) { return W_FIELDS.some(function (f) { return String(o[f] || '').trim(); }); }
   function wFill(o) { W_FIELDS.forEach(function (f) { $('w_' + f).value = o[f] || ''; }); store('wasteDraft', JSON.stringify(o)); }
@@ -1699,12 +1731,16 @@
     var press = S.press;
     srv('wasteDraft', [press], function (d) {
       if (press !== S.press) return;
+      WD.lastEnd = d.lastEnd || null;
+      show('w_startHint', false);
       if (wHasEntries(d.fields)) {
         wFill(d.fields); WD.sent = JSON.stringify(wFields());
         wMsg('Entries restored for ' + press + (d.savedAt ? ' (typed ' + d.savedAt + (d.by ? ' by ' + d.by : '') + ')' : '') + '.');
       } else if (switched) {
         wFill({}); WD.sent = JSON.stringify(wFields());   // the other press keeps its own entries
       } else if (wHasEntries(wFields())) wDraftSend();
+      if (!$('w_rollNumber').value.trim()) wPrefillStart();   // a new roll starts where the last one ended
+      if (S.run) renderRolls();
     });
   }
   try {
@@ -1713,6 +1749,7 @@
   } catch (e) { /* no saved entries */ }
   W_FIELDS.forEach(function (f) {
     $('w_' + f).addEventListener('input', function () {
+      if (f === 'rollNumber' && S.run) renderRolls();   // the run screen shows the roll on the press
       store('wasteDraft', JSON.stringify(wFields()));
       clearTimeout(WD.timer); WD.timer = setTimeout(wDraftSend, 1500);
     });
@@ -1722,8 +1759,11 @@
 
   $('w_clearBtn').addEventListener('click', function () {
     W_FIELDS.forEach(function (f) { $('w_' + f).value = ''; });
+    show('w_startHint', false);
     store('wasteDraft', '{}');
-    wDraftSend();
+    wDraftSend();      // the saved entries are cleared first...
+    wPrefillStart();   // ...then the next roll's Starting Counter is filled in (kept once something else is typed)
+    if (S.run) renderRolls();
     $('w_resultCard').classList.add('hidden');
     wMsg('');
     $('w_rollNumber').focus();
@@ -1835,6 +1875,7 @@
   });
 
   function route() {
+    if (!S.run) show('w_link', false);
     show('endView', false); show('doneView', false); show('noPressNote', !S.press);
     if (!S.press) { show('setupView', false); show('runView', false); msg('Pick your press to begin.'); return; }
     if (S.run) { show('setupView', false); show('runView', true); renderRun(); }
@@ -1920,6 +1961,7 @@
 
     show('runSetup', assignedKey() !== r.jobKey);   // the assigned job's setup sheet is on the assignment card
     $('runSetupBody').innerHTML = setupHtml(S.jobs.filter(function (j) { return j.key === r.jobKey; })[0], S.assigned && S.assigned.stock);
+    renderRolls();
 
     // stale: no taps or rolls for N work hours, or left open over the weekend. Any update clears it.
     var st = r.stale;
@@ -1969,6 +2011,37 @@
     }
     devRender(log);
   }
+  /* 2.035: this run's rolls. Loads and roll saves send them; taps don't, so they're kept here (like the run log). */
+  function runRolls() {
+    var r = S.run;
+    if (r.rolls) { S.rolls = { runId: r.runId, data: r.rolls }; delete r.rolls; }
+    return S.rolls && S.rolls.runId === r.runId ? S.rolls.data : { count: 0, wastePct: 0, rolls: [] };
+  }
+  function pct(v) { return fmt((v || 0) * 100, 1) + '%'; }
+  function renderRolls() {
+    if (!S.run) return;
+    var d = runRolls(), r = S.run;
+    $('runRollsSum').textContent = d.count ? d.count + (d.count === 1 ? ' roll · ' : ' rolls · ') + pct(d.wastePct) + ' waste' : '';
+    $('runRollsList').innerHTML = d.count ? d.rolls.map(function (x) {
+      return '<div class="item"><div><div class="t">' + esc(x.roll) + '</div><div class="s">Counter ' + fmt(x.start, 0) + ' → ' + fmt(x.end, 0) +
+        (x.by ? ' · ' + esc(x.by) : '') + ' · ' + esc(x.saved) + '</div></div><div class="acts">' + badge('gray', pct(x.wastePct) + ' waste') + '</div></div>';
+    }).join('') : '<p class="muted" style="margin:0">No rolls saved on this run yet. A roll saved on ' + esc(r.press) + ' while this run is open is added here.</p>';
+    var now = $('w_rollNumber').value.trim(), start = $('w_startCounter').value.trim(), sn = Number(start.replace(/,/g, ''));
+    $('rollNow').innerHTML = now
+      ? '<div class="rn"><div class="t">On the press: <b>' + esc(now) + '</b></div><div class="muted">' +
+        (start ? 'From counter ' + (isFinite(sn) ? fmt(sn, 0) : esc(start)) : 'Starting counter not typed yet') + '</div></div>' +
+        '<button type="button" class="primary" id="rollFinish">Finish roll</button>'
+      : '<div class="rn muted">No roll typed in yet.</div><button type="button" id="rollStart">+ Start next roll</button>';
+    $('w_link').innerHTML = '<b>Linked to the open run:</b> ' + esc(r.job) + ' · ' + esc(r.state) + ' on ' + esc(r.press) + '. The roll joins it when you save.';
+    show('w_link', true);
+  }
+  $('rollNow').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    opTab('waste');
+    var f = $(b.id === 'rollFinish' ? (($('w_endCounter').value.trim()) ? 'w_pallet1' : 'w_endCounter') : 'w_rollNumber');
+    f.focus(); f.scrollIntoView({ block: 'center' });
+  });
+
   /** This run's log (mixed lots, deviations). Loads send it with the run; taps don't, so it's kept here. */
   function runLog() {
     var r = S.run;
@@ -2205,6 +2278,10 @@
     $('slipsHint').textContent = fromPallets > 0
       ? 'Filled in from the pallets entered (' + S.run.pallets + ' full + ' + fmt(S.run.partial || 0, 0) + ' partial). Change it if the real count is different.'
       : 'No pallets were entered. You can type the count now or add it on the Runs tab later.';
+    var rd = runRolls(), onPress = $('w_rollNumber').value.trim();
+    $('endRolls').textContent = (rd.count ? 'Rolls on this run: ' + rd.count + ' · ' + pct(rd.wastePct) + ' waste overall.' : 'No rolls were saved on this run.') +
+      (onPress ? ' Roll ' + onPress + ' is still on the press; it carries on into the next job.' : '');
+    show('endRolls', true);
     opTab('ink'); show('runView', false); show('endView', true); msg('');
     $('endView').scrollIntoView();
   });
@@ -2228,9 +2305,10 @@
   });
 
   function renderDone(res) {
-    show('endView', false); show('runView', false); show('setupView', false); show('doneView', true);
+    show('endView', false); show('runView', false); show('setupView', false); show('doneView', true); show('w_link', false);
     $('doneTitle').textContent = 'Run finished: ' + res.job;
-    $('doneMeta').textContent = res.press + (res.slips !== '' ? ' · ' + fmt(res.slips, 0) + ' slips' : ' · slips not entered yet (add them on the Runs tab)');
+    $('doneMeta').textContent = res.press + (res.slips !== '' ? ' · ' + fmt(res.slips, 0) + ' slips' : ' · slips not entered yet (add them on the Runs tab)') +
+      (res.rolls && res.rolls.count ? ' · ' + res.rolls.count + (res.rolls.count === 1 ? ' roll, ' : ' rolls, ') + pct(res.rolls.wastePct) + ' waste' : '');
     var hasPer = res.slips !== '' && res.slips > 0;
     $('doneTable').innerHTML = '<table><tr><th>Ink</th><th class="n">Opened</th><th class="n">Left</th><th class="n">Used</th>' +
       (hasPer ? '<th class="n">For 500K</th>' : '') + '</tr>' + res.summary.map(function (s) {
@@ -3417,7 +3495,7 @@
         return '<tr><td>' + b[0] + esc(r.label) + b[1] + '</td><td class="n">' + r.rolls + '</td><td class="n">' + fmt(r.waste, 0) +
           '</td><td class="n">' + b[0] + fmt(r.wastePct * 100, 2) + '%' + b[1] + '</td></tr>';
       }
-      $('wReport').innerHTML = '<table class="rep"><tr><th>Period</th><th class="n">Rolls</th><th class="n">Waste ft</th><th class="n">Waste %</th></tr>' +
+      $('wReport').innerHTML = '<table class="rep"><tr><th>' + (d.period === 'job' ? 'Job' : 'Period') + '</th><th class="n">Rolls</th><th class="n">Waste ft</th><th class="n">Waste %</th></tr>' +
         d.rows.map(function (r) { return row(r); }).join('') + row(d.total, true) + '</table>';
     }, mErr);
   }
@@ -3427,18 +3505,19 @@
     function n(v, d) { return fmt(v, d || 0); }
     var sum = { p: 0, mc: 0 };
     rolls.forEach(function (r) { sum.p += r.p1 + r.p2 + r.p3; sum.mc += r.machineCount; });
-    $('wRolls').innerHTML = '<table class="rolls rep"><tr><th>Saved</th><th>Press</th><th>Operator</th><th>Roll #</th>' +
+    $('wRolls').innerHTML = '<table class="rolls rep"><tr><th>Saved</th><th>Press</th><th>Operator</th><th>Roll #</th><th>Job</th>' +
       '<th class="n">Package length</th><th class="n">Start counter</th><th class="n">End counter</th>' +
       '<th class="n">Pallet 1</th><th class="n">Pallet 2</th><th class="n">Pallet 3</th>' +
       '<th class="n">Starting footage</th><th class="n">Machine count</th><th class="n">Finished product</th><th class="n">Waste ft</th><th class="n">Waste %</th></tr>' +
       rolls.map(function (r) {
         return '<tr><td>' + esc(r.saved) + '</td><td>' + esc(r.press) + '</td><td>' + esc(r.operator) + '</td><td>' + esc(r.roll) + '</td>' +
+          '<td>' + (r.job ? esc(r.job) + ' <span class="muted">· ' + esc(r.state) + '</span>' : '<span class="muted">—</span>') + '</td>' +
           '<td class="n">' + n(r.packageLength) + '</td><td class="n">' + n(r.startCounter) + '</td><td class="n">' + n(r.endCounter) + '</td>' +
           '<td class="n">' + n(r.p1) + '</td><td class="n">' + n(r.p2) + '</td><td class="n">' + n(r.p3) + '</td>' +
           '<td class="n">' + n(r.startingFootage, 2) + '</td><td class="n">' + n(r.machineCount) + '</td><td class="n">' + n(r.finished, 2) + '</td>' +
           '<td class="n">' + n(r.wasteFt, 2) + '</td><td class="n">' + n(r.wastePct * 100, 2) + '%</td></tr>';
       }).join('') +
-      '<tr class="tot"><td colspan="4">Total · ' + total.rolls + ' roll' + (total.rolls === 1 ? '' : 's') + '</td><td></td><td></td><td></td>' +
+      '<tr class="tot"><td colspan="5">Total · ' + total.rolls + ' roll' + (total.rolls === 1 ? '' : 's') + '</td><td></td><td></td><td></td>' +
       '<td class="n" colspan="3">' + n(sum.p) + ' slips</td><td class="n">' + n(total.start, 2) + '</td><td class="n">' + n(sum.mc) + '</td>' +
       '<td class="n">' + n(total.finished, 2) + '</td><td class="n">' + n(total.waste, 2) + '</td><td class="n">' + n(total.wastePct * 100, 2) + '%</td></tr></table>';
   }
@@ -3478,8 +3557,10 @@
             ? badge('blue', 'Mixed ink') + ' <b>' + esc(x.ink) + '</b> <span class="muted">(' + esc(x.side) + ')</span> · Lot <b>' + esc(x.lot) + '</b>' + (x.details ? ' · ' + esc(x.details) : '')
             : badge('yellow', 'Deviation') + ' ' + (x.ink ? '<b>' + esc(x.ink) + '</b> <span class="muted">(' + esc(x.side) + ')</span>: ' : '') + esc(x.details)) +
             '<div class="s">' + esc(x.by) + ' · ' + esc(x.when) + '</div></div>';
-        }).join('') + '</div>';
-    }).join('') : '<p class="muted">No mixed inks or deviations logged for these filters.</p>';
+        }).join('') +
+        (g.rolls && g.rolls.count ? '<div class="rlentry">' + badge('gray', 'Rolls') + ' <b>' + g.rolls.count + '</b> · ' + pct(g.rolls.wastePct) + ' waste overall' +
+          '<div class="s">' + g.rolls.list.map(function (x) { return esc(x.roll) + ' ' + pct(x.wastePct); }).join(' · ') + '</div></div>' : '') + '</div>';
+    }).join('') : '<p class="muted">Nothing logged for these filters.</p>';
   }
   ['rlFrom', 'rlTo', 'rlJob'].forEach(function (id) { $(id).addEventListener('change', rlLoad); });
   $('rlState').addEventListener('change', function () { $('rlJob').value = ''; rlJobs(); rlLoad(); });
