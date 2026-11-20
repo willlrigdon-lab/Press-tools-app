@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "1.018", KEY = "mt-site-reloaded";
+    var BUILT = "1.019", KEY = "mt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -590,8 +590,9 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '1.018';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '1.019';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   var APP_CHANGES = [
+    ['1.019', '11/20/2026', 'Tap points: parts whose number starts with 0 (like 02109400 on the slitter) open again, with their name and where they\'re used. A part that really isn\'t in the parts list says so in the card instead of staying on Loading.'],
     ['1.018', '11/20/2026', 'Polish: Save counts stays on one line; shorter Find box hint on Stock.'],
     ['1.017', '11/20/2026', 'Polish: matching line icons instead of emoji; quieter secondary buttons so the main action stands out; pop-ups slide in smoothly; \'1 sheet\' wording fix.'],
     ['1.016', '11/20/2026', 'New home-screen icon in the app\'s dark look, matching Press Tools, and full-size on Android. If you added the app to your home screen, remove it and add it again to get the new icon.'],
@@ -1164,8 +1165,15 @@
   function cardOpen(part, ctx) {
     C.part = part; C.ctx = ctx || {}; C.form = '';
     show('pcSheet', true); $('wrap').classList.add('withcard');
-    $('pcCard').innerHTML = '<div class="grip"></div><div class="pc-head"><div><div class="n">' + (C.ctx.balloon ? 'Balloon ' + esc(C.ctx.balloon.n) + ' · ' : '') + esc(part) + '</div><div class="nm">Loading…</div></div><button class="chip" data-x="close">✕</button></div>';
-    srv('partGet', [part], function (p) { if (C.part === part) { C.p = p; cardRender(); } });
+    var head = '<div class="grip"></div><div class="pc-head"><div><div class="n">' + (C.ctx.balloon ? 'Balloon ' + esc(C.ctx.balloon.n) + ' · ' : '') + esc(part) + '</div>';
+    $('pcCard').innerHTML = head + '<div class="nm">Loading…</div></div><button class="chip" data-x="close">✕</button></div>' + cardNav();
+    srv('partGet', [part], function (p) { if (C.part === part) { C.p = p; cardRender(); } }, function (e) {
+      if (C.part !== part) return;   // 1.019: say what went wrong in the card instead of leaving it on "Loading…"
+      var b = C.ctx.balloon, t = errText(e), missing = /not in the parts list/i.test(t);
+      $('pcCard').innerHTML = head + '<div class="nm">' + (missing ? 'Not in the parts list' : 'Could not load this part') + '</div></div><button class="chip" data-x="close">✕</button></div>' +
+        (b && (b.item || b.qty) ? '<p class="muted" style="margin:6px 0">' + (b.item ? 'Manual item ' + esc(b.item) : '') + (b.item && b.qty ? ' · ' : '') + (b.qty ? 'qty ' + num(b.qty) : '') + '</p>' : '') +
+        '<p class="muted" style="margin:6px 0">' + esc(missing ? 'Part ' + part + ' is on this drawing but not on the Parts tab. Add it there (Part # and name) to track it.' : t) + '</p>' + cardNav();
+    });
   }
   function cardRender() {
     var p = C.p, b = C.ctx.balloon;
