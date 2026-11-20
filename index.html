@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.035", KEY = "pt-site-reloaded";
+    var BUILT = "2.036", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -630,6 +630,59 @@
     .wlink { margin: 0 0 10px; background: rgba(95,168,216,.14); color: #cfe6f7; border: 1px solid rgba(95,168,216,.45); }
     .wfill { color: var(--accent); }
     :root[data-look="light"] .wlink { background: #e8f2fa; color: #12476e; border-color: #9cc6e4; }
+    /* ---- 2.036 polish: readable pop-ups, numbers on buttons, quiet secondary buttons, phone table rows, icons, motion, focus ---- */
+    #toasts .msg.ok { background: #13734a; color: #fff; }          /* white text at 5.9:1 (the bright green was about 2:1) */
+    #toasts .msg.err { background: #a3261d; color: #fff; }         /* 7.4:1 */
+    .optabs button, .mgroups button { white-space: nowrap; }
+    .seg { grid-auto-columns: minmax(0, 1fr); }
+    .seg button { position: relative; }
+    .seg button > .cnt { position: absolute; top: -7px; right: -2px; margin: 0; font-size: 12px; line-height: 18px; min-width: 20px; padding: 0 6px;
+      box-shadow: 0 0 0 2px var(--bg); }
+    .seg button > .cnt.soft { background: var(--accent); color: #061420; }
+    :root[data-look="light"] .seg button > .cnt.soft { color: #fff; }
+    .tabs button .cnt { font-size: 12px; line-height: 17px; min-width: 18px; padding: 0 6px; margin-left: 5px; }
+    #countBar button { font-size: 16px; padding: 12px 8px; white-space: nowrap; }
+    button { background: var(--field); border-color: var(--line); color: var(--accent); }   /* secondary: quiet; the main action stays filled blue */
+    button.danger { background: var(--field); border-color: var(--line); color: var(--bad); }
+    .reports #lowBtn { border-color: var(--line); color: var(--warn); }
+    a.btn { background: var(--field); border-color: var(--line); }
+    a.btn.primary { background: var(--logo-blue); border-color: #2a7ab0; }
+    .notice .x { background: transparent; }
+    .ico { width: 1.15em; height: 1.15em; vertical-align: -0.2em; flex: none; }
+    a.res .ic, details.dir summary .ic { color: var(--accent); display: inline-flex; justify-content: center; }
+    a.res .ic .ico, details.dir summary .ic .ico { width: 22px; height: 22px; }
+    .notice.crit .nt::before { content: none; }
+    .notice .lk { font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+    .mrow .ico { color: var(--accent); margin-right: 4px; }
+    :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    @media screen and (max-width: 559px) {   /* Ordering and Ink needed on phones: one stacked row per ink instead of a squeezed table */
+      table.stack, table.stack tbody { display: block; }
+      table.stack tr:first-child { display: none; }
+      table.stack tr { display: grid; grid-template-columns: auto auto auto 1fr auto; column-gap: 14px; row-gap: 3px; align-items: center;
+        padding: 10px 0; border-top: 1px solid var(--line); }
+      table.stack tr:nth-child(2) { border-top: 0; }
+      table.stack td { border: 0; padding: 0; text-align: left; }
+      table.stack td[data-l]::before { content: attr(data-l) " "; color: var(--muted); font-size: 13px; font-weight: 600; }
+      table.order.stack td:nth-child(1) { grid-column: 1 / 5; grid-row: 1; }
+      table.order.stack td:nth-child(4) { grid-column: 5; grid-row: 1; justify-self: end; }
+      table.order.stack td:nth-child(2) { grid-column: 1; grid-row: 2; }
+      table.order.stack td:nth-child(3) { grid-column: 2; grid-row: 2; }
+      table.order.stack td:nth-child(5) { grid-column: 5; grid-row: 2; justify-self: end; }
+      table.need.stack td:nth-child(1) { grid-column: 1 / 5; grid-row: 1; }
+      table.need.stack td:nth-child(5) { grid-column: 5; grid-row: 1; justify-self: end; }
+      table.need.stack td:nth-child(2) { grid-column: 1; grid-row: 2; }
+      table.need.stack td:nth-child(3) { grid-column: 2; grid-row: 2; }
+      table.need.stack td:nth-child(4) { grid-column: 3; grid-row: 2; }
+      table.need.stack td:nth-child(6) { grid-column: 5; grid-row: 2; justify-self: end; }
+    }
+    @media (prefers-reduced-motion: no-preference) {   /* pop-ups slide up, messages fade in */
+      .sheet:not(.hidden) { animation: pt-fade .18s ease-out; }
+      .sheet:not(.hidden) .sheet-card { animation: pt-up .22s cubic-bezier(.2, .8, .2, 1); }
+      #toasts .msg:not(:empty) { animation: pt-toast .2s ease-out; }
+    }
+    @keyframes pt-fade { from { opacity: 0; } }
+    @keyframes pt-up { from { transform: translateY(28px); opacity: .6; } }
+    @keyframes pt-toast { from { transform: translateY(8px); opacity: 0; } }
     /* ---- Light look (2.032): chosen per device in the name menu; Dark stays the default. Printing is unchanged. ---- */
     :root[data-look="light"] {
       color-scheme: light;
@@ -1224,9 +1277,9 @@
     <div id="m_daysoff" class="mpane hidden">
       <div class="card">
         <div class="cardhead">
-          <button id="calPrev" class="chip" aria-label="Previous month">◀</button>
+          <button id="calPrev" class="chip" aria-label="Previous month">‹</button>
           <h2 id="calTitle" style="flex:1;text-align:center"></h2>
-          <button id="calNext" class="chip" aria-label="Next month">▶</button>
+          <button id="calNext" class="chip" aria-label="Next month">›</button>
         </div>
         <div class="callegend"><span class="dname t-off">Day off</span><span class="dname t-pto">PTO</span><span class="dname t-sick">Sick day</span></div>
         <div class="cal" id="calGrid"></div>
@@ -1355,7 +1408,7 @@
     <div class="sheet-card menu-card">
       <h2 id="meTitle"></h2>
       <p id="meSub" class="muted"></p>
-      <button id="menuSuggest" type="button" class="mrow">💡 Suggest an improvement</button>
+      <button id="menuSuggest" type="button" class="mrow"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/></svg> Suggest an improvement</button>
       <button id="menuLow" type="button" class="mrow">Report a low supply</button>
       <div id="pressDefRow" class="mrow mlook"><span id="pressDefLabel">Open to press</span>
         <div class="seg" id="pressDefSeg" role="radiogroup" aria-labelledby="pressDefLabel">
@@ -1442,9 +1495,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.035';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.036';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.036', '11/20/2026', 'Polish: pop-up messages are easier to read; numbers on buttons no longer squash them; Ordering and Ink needed fit a phone (one row per ink); one set of matching line icons instead of emoji; quieter secondary buttons so the main action stands out; pop-ups slide in smoothly.'],
     ['2.035', '11/20/2026', 'Rolls and ink runs work together: a roll saved while a run is open on that press joins the run (with no run open it saves on its own, like before). The run screen shows the run\'s rolls with their waste and the roll on the press, with Finish roll. The next roll\'s Starting Counter fills in from the last roll\'s Ending Counter. End Run and the finish screen show the run\'s rolls; a roll still on the press carries on into the next job. Manage → Reports → Waste can group by job, and the Run log shows each run\'s rolls.'],
     ['2.034', '11/20/2026', 'New home-screen icon in the app\'s dark look, matching Maintenance Tools, and full-size on Android. If you added the app to your home screen, remove it and add it again to get the new icon.'],
     ['2.033', '11/20/2026', 'Suggest an improvement: tap your name at the top and send an idea (in Maintenance Tools too). You can see what happens to it under My suggestions. Admins sort them in Admin → Suggestions (New, Planned, Done or Not doing, with a note for the sender). After each update, a short What\'s new card shows once on each device. Errors on people\'s phones are noted for Admin → App health so they get fixed.'],
@@ -1524,6 +1578,18 @@
     });
   }
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+  /* Line icons (2.036): one drawing style everywhere, instead of emoji that look different on every phone */
+  var ICONS = {
+    doc: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',
+    play: '<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5z" fill="currentColor"/>',
+    print: '<path d="M7 9V3h10v6M7 17H4v-7h16v7h-3"/><path d="M7 14h10v7H7z"/>',
+    phone: '<path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 5a2 2 0 0 1 2-2z"/>',
+    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    alert: '<path d="M12 3.5 2.5 20h19z"/><path d="M12 10v4.5M12 17.5v.5"/>'
+  };
+  function icon(k) {
+    return '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[k] || '') + '</svg>';
+  }
   function fmt(n, d) { return Number(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }); }
   function errText(e) {
     var t = (e && e.message ? e.message : 'Something went wrong. Try again.').replace(/^Error:\s*/, '');
@@ -1601,7 +1667,7 @@
     var people = dir.filter(function (p) { return !q || 'company directory phone'.indexOf(q) !== -1 ||
       (p.name + ' ' + p.role + ' ' + p.phone + ' ' + p.notes).toLowerCase().indexOf(q) !== -1; });
     if (!people.length) return '';
-    return '<details class="dir"' + (q ? ' open' : '') + '><summary><span class="ic">📞</span><span><span class="t">Company Directory</span>' +
+    return '<details class="dir"' + (q ? ' open' : '') + '><summary><span class="ic">' + icon('phone') + '</span><span><span class="t">Company Directory</span>' +
       '<br><span class="s">Tap a number to call</span></span></summary>' + people.map(function (p) {
         return '<div class="dirrow"><div><b>' + esc(p.name) + '</b>' + (p.role ? '<br><span class="s">' + esc(p.role) + '</span>' : '') +
           (p.notes ? '<br><span class="s">' + esc(p.notes) + '</span>' : '') + '</div>' +
@@ -1619,9 +1685,9 @@
     var html = dir ? '<h2 class="ressec">Company Info</h2>' + dir : '', sec = dir ? 'Company Info' : null;
     list.forEach(function (x) {
       if (x.section !== sec) { sec = x.section; html += '<h2 class="ressec">' + esc(sec) + '</h2>'; }
-      var a = '<a class="res" target="_blank" rel="noopener" href="' + esc(x.link) + '"><span class="ic">' + (resIsVideo(x.link) ? '▶️' : '📄') + '</span>' +
+      var a = '<a class="res" target="_blank" rel="noopener" href="' + esc(x.link) + '"><span class="ic">' + icon(resIsVideo(x.link) ? 'play' : 'doc') + '</span>' +
         '<span><span class="t">' + esc(x.title) + '</span>' + (x.note ? '<br><span class="s">' + esc(x.note) + '</span>' : '') + '</span></a>';
-      html += canPrint(x) ? '<div class="resrow">' + a + '<button class="resprint" data-print="' + esc(x.id) + '" data-title="' + esc(x.title) + '">🖨️ Print</button></div>' : a;
+      html += canPrint(x) ? '<div class="resrow">' + a + '<button class="resprint" data-print="' + esc(x.id) + '" data-title="' + esc(x.title) + '">' + icon('print') + ' Print</button></div>' : a;
     });
     $('resList').innerHTML = html;
   }
@@ -3153,7 +3219,7 @@
     var list = (d && d.notices) || [], crit = (d && d.critical) || [];
     show('notices', list.length + crit.length > 0);
     $('notices').innerHTML = crit.map(function (n) {   // lockouts from Maintenance Tools: red, first, can't be removed here
-      return '<div class="notice crit"><div class="nt">' + (n.machine ? '<b>' + esc(n.machine) + ':</b> ' : '') + esc(n.message) + '</div>' +
+      return '<div class="notice crit"><div class="nt">' + icon('lock') + ' <span class="lk">Lockout</span> · ' + (n.machine ? '<b>' + esc(n.machine) + ':</b> ' : '') + esc(n.message) + '</div>' +
         '<div class="nby">From maintenance · ' + esc(n.by || '') + ' · ' + esc(n.posted) + (n.until ? ' · until ' + esc(n.until) : '') + '</div></div>';
     }).join('') + list.map(function (n) {
       return '<div class="notice">' + esc(n.message) + '<div class="nby">From ' + esc(n.by || 'management') + ' · ' + esc(n.posted) +
@@ -3206,20 +3272,20 @@
   function rsShow(d) {
     RES.list = d;
     $('rsList').innerHTML = d.resources.length ? d.resources.map(function (x) {
-      return '<div class="item"><div><div class="t">' + (resIsVideo(x.link) ? '▶️ ' : '📄 ') + esc(x.title) + '</div><div class="s">' + esc(x.section) +
+      return '<div class="item"><div><div class="t">' + icon(resIsVideo(x.link) ? 'play' : 'doc') + ' ' + esc(x.title) + '</div><div class="s">' + esc(x.section) +
         (x.note ? ' · ' + esc(x.note) : '') + '<br><a href="' + esc(x.link) + '" target="_blank" rel="noopener">Open link</a></div></div>' +
         '<div class="acts"><button class="danger" data-rsrm="' + esc(x.id) + '">Remove</button></div></div>';
     }).join('') : '<p class="muted">No resources yet.</p>';
     var forms = d.resources.filter(function (x) { return x.section === 'Management Forms'; });
     // printed in the app: the Training Acknowledgment is built here (document filled in); other forms print their PDF via Maintenance Tools
     var docs = d.resources.filter(function (x) { return x.section === 'SOPs' || x.section === 'Best Practice Guides'; });
-    var tf = '<div class="item"><div style="flex:1"><div class="t">🖨️ Training Acknowledgment</div>' +
+    var tf = '<div class="item"><div style="flex:1"><div class="t">' + icon('print') + ' Training Acknowledgment</div>' +
       '<label for="tfDoc" style="margin-top:6px">For which document?</label><select id="tfDoc"><option value="">Blank (write it in)</option>' +
       docs.map(function (x) { return '<option value="' + esc(x.id) + '">' + esc((x.section === 'SOPs' ? 'SOP · ' : 'Best Practices · ') + x.title) + '</option>'; }).join('') +
       '</select></div><div class="acts"><button class="primary" id="tfPrint">Print</button></div></div>';
     var others = forms.filter(function (x) { return !/training acknowledg/i.test(x.title); });
     $('rsForms').innerHTML = tf + others.map(function (x) {
-      return '<div class="item"><div><div class="t">🖨️ ' + esc(x.title) + '</div>' + (x.note ? '<div class="s">' + esc(x.note) + '</div>' : '') + '</div>' +
+      return '<div class="item"><div><div class="t">' + icon('print') + ' ' + esc(x.title) + '</div>' + (x.note ? '<div class="s">' + esc(x.note) + '</div>' : '') + '</div>' +
         '<div class="acts">' + (canPrint(x) ? '<button class="primary" data-print="' + esc(x.id) + '" data-title="' + esc(x.title) + '">Print</button>' : '') +
         '<a class="btn" data-formopen target="_blank" rel="noopener" href="' + esc(x.link) + '">Open</a></div></div>';
     }).join('');
@@ -3296,7 +3362,7 @@
   }
   function qOffHtml(op, packers, off) {
     var t = qOffText(op, packers, off);
-    return t ? '<div class="push yellow qoff">⚠ ' + esc(t) + '</div>' : '';
+    return t ? '<div class="push yellow qoff">' + icon('alert') + ' ' + esc(t) + '</div>' : '';
   }
   function qShow(d) {
     M.jobs = d.jobs; M.queue = d.queue;
@@ -3459,12 +3525,12 @@
       $('needList').innerHTML = '<p class="muted">No unshipped jobs for active games. Add jobs under Jobs → Queue.</p>'; return;
     }
     var notes = false;
-    $('needList').innerHTML = '<table class="rep"><tr><th>Ink</th><th class="n">Need</th><th class="n">On hand</th><th class="n">Keep</th><th class="n">Order</th><th>Ordered</th></tr>' +
+    $('needList').innerHTML = '<table class="rep need stack"><tr><th>Ink</th><th class="n">Need</th><th class="n">On hand</th><th class="n">Keep</th><th class="n">Order</th><th>Ordered</th></tr>' +
       d.inks.map(function (x) {
         var mark = x.noData ? ' *' : x.estimated ? ' ~' : '';
         if (mark) notes = true;
-        return '<tr' + (x.ordered ? ' class="ordered"' : '') + '><td>' + esc(x.ink) + mark + (x.color ? ' <span class="muted">' + esc(x.color) + '</span>' : '') + '</td><td class="n">' + fmt(x.need, 1) +
-          '</td><td class="n">' + fmt(x.onHand, x.onHand % 1 ? 2 : 0) + '</td><td class="n">' + x.min + '</td><td class="n"><b>' + x.toOrder + '</b></td><td>' + ordBox(x) + '</td></tr>';
+        return '<tr' + (x.ordered ? ' class="ordered"' : '') + '><td>' + esc(x.ink) + mark + (x.color ? ' <span class="muted">' + esc(x.color) + '</span>' : '') + '</td><td class="n" data-l="Need">' + fmt(x.need, 1) +
+          '</td><td class="n" data-l="Have">' + fmt(x.onHand, x.onHand % 1 ? 2 : 0) + '</td><td class="n" data-l="Keep">' + x.min + '</td><td class="n" data-l="Order"><b>' + x.toOrder + '</b></td><td>' + ordBox(x) + '</td></tr>';
       }).join('') + '</table>' +
       (notes ? '<p class="muted">* no tracked runs yet for this ink: only the startup bottle is counted. ~ estimated from this ink on other jobs.</p>' : '') +
       '<h3>Jobs included</h3>' + d.jobs.map(function (j) {
@@ -3778,13 +3844,13 @@
       (rows.length - nOrd) + ' to order' + (nOrd ? ', ' + nOrd + ' ordered' : '') + ' · ' + new Date().toLocaleDateString();
     if (!rows.length) { $('orderList').innerHTML = '<p class="muted">Nothing to order. Every ink has enough.</p>'; return; }
     var LABEL = { Out: 'Out', Low: 'Low', Under: 'Under ' + under, OnOrder: 'OK now' }, KIND = { Out: 'red', Low: 'yellow', Under: 'yellow', OnOrder: 'green' };
-    $('orderList').innerHTML = '<table class="order"><tr><th>Ink · Color · Item #</th><th class="n">Have</th><th class="n">Keep</th><th></th><th>Ordered</th></tr>' +
+    $('orderList').innerHTML = '<table class="order stack"><tr><th>Ink · Color · Item #</th><th class="n">Have</th><th class="n">Keep</th><th></th><th>Ordered</th></tr>' +
       rows.map(function (r) {
         var x = r.x;
         return '<tr' + (x.ordered ? ' class="ordered"' : '') + '><td><b>' + esc(x.ink) + '</b>' + (x.color ? ' · ' + esc(x.color) : '') +
           (x.item ? ' · ' + esc(x.item) : ' <span class="muted">· no item #</span>') +
           (x.lastCounted ? '' : '<div class="muted" style="font-size:13px">never counted</div>') + '</td>' +
-          '<td class="n">' + fmt(x.onHand, x.onHand % 1 ? 2 : 0) + '</td><td class="n">' + (x.min ? fmt(x.min, x.min % 1 ? 2 : 0) : '—') + '</td>' +
+          '<td class="n" data-l="Have">' + fmt(x.onHand, x.onHand % 1 ? 2 : 0) + '</td><td class="n" data-l="Keep">' + (x.min ? fmt(x.min, x.min % 1 ? 2 : 0) : '—') + '</td>' +
           '<td>' + badge(KIND[r.why], LABEL[r.why]) + '</td><td>' + ordBox(x) + '</td></tr>';
       }).join('') + '</table>';
   }
