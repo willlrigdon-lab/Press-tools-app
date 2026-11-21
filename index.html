@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.041", KEY = "pt-site-reloaded";
+    var BUILT = "2.042", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -778,6 +778,7 @@
     </div>
   </div>
 
+  <div id="takeOver" class="banner takeover hidden" role="status"></div>
   <div id="assignCard" class="card assign hidden">
     <h2 id="assignTitle">Job assignment</h2>
     <div id="assignNow"></div>
@@ -814,7 +815,6 @@
           <h2 id="runTitle"></h2>
           <div id="runMeta" class="muted"></div>
           <div id="runTeam" class="runteam"></div>
-          <div id="takeOver" class="banner takeover hidden" role="status"></div>
           <div id="staleNote" class="stale hidden"></div>
           <details class="setupbox" id="runSetup">
             <summary>Setup sheet: position, ink, anilox</summary>
@@ -1153,7 +1153,7 @@
     <div id="m_runlog" class="mpane hidden">
       <div class="card" id="runlogCard">
         <div class="cardhead"><h2>Job history</h2><button id="rlPrint" class="noprint">Print / PDF</button></div>
-        <p class="muted noprint" style="margin-top:0">Every ink run: who ran it (with handoffs and packers), issues and maintenance requests sent during it, rolls, mixed-ink lots and deviations.</p>
+        <p class="muted noprint" style="margin-top:0">Every work order: who had it (with handoffs and packers), its ink runs, the issues and maintenance requests sent while it was the press's job, rolls, mixed-ink lots and deviations. Runs started without a work order are listed too.</p>
         <div class="noprint">
           <div class="row2">
             <div><label for="rlState">State</label><select id="rlState"></select></div>
@@ -1409,7 +1409,7 @@
   <!-- ===================== HAND OFF A RUN (2.040) ===================== -->
   <div id="handSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="handTitle">
     <form id="handForm" class="sheet-card" aria-labelledby="handTitle" novalidate>
-      <h2 id="handTitle">Hand off run</h2>
+      <h2 id="handTitle">Hand off</h2>
       <p id="handAttach" class="muted" style="margin-top:0"></p>
       <label for="handTo">Who's taking over?</label>
       <select id="handTo" required></select>
@@ -1418,7 +1418,7 @@
       <select id="handPkAdd" aria-label="Add a packer" style="margin-top:6px"></select>
       <label for="handNote">Note for the next operator (optional)</label>
       <textarea id="handNote" rows="3" style="font-family:inherit;resize:vertical" maxlength="300" placeholder="e.g. 2 pallets done, R-123 on the press"></textarea>
-      <div class="hint">The run carries on as it is. Pallets and bottles stay the same; the handoff goes on the run's record.</div>
+      <div class="hint">The job carries on as it is. Pallets and bottles stay the same; the handoff goes on the work order's record (and the run's, if one is open).</div>
       <div class="row2">
         <button id="handCancel" type="button" class="wide">Close</button>
         <button id="handSave" type="submit" class="primary wide">Hand off</button>
@@ -1543,9 +1543,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.041';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.042';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.042', '11/21/2026', 'Work orders at the center: Job history now lists each work order (job, slips ordered, due, press) with who had it, every handoff, its ink runs and the issues and maintenance requests sent while it was the press\'s job; runs started without a work order are listed too. Hand off is on the job assignment card, run or no run, and changes the work order\'s operator and packers. "Taking over?" now shows under the press card.'],
     ['2.041', '11/21/2026', 'The screen stays on while the Operator screen is open with a press picked, so a paper change or web break doesn\'t mean waking the tablet and logging in again (turn it off per device in the name menu: Keep screen on). Logouts after no use are now 3 hours instead of 30 minutes.'],
     ['2.040', '11/21/2026', 'Job history (Manage → Reports, was Run log): every ink run with who ran it, including handoffs and packers, the issues and maintenance requests sent during it, rolls, lots and deviations. Search by job, dates, press or person. On the run screen, Hand off run passes a run to the next operator (and packers) mid-run; someone else who logs in on that press is asked "Taking over?". Issues and maintenance requests now go with the run open on the press.'],
     ['2.039', '11/20/2026', 'Low supplies: management can change a report from Low to Out with Mark out (Undo puts it back). Reporting a low item again as out also changes it, and says so.'],
@@ -1962,6 +1963,7 @@
   function renderAssign() {
     var a = S.assigned;
     show('assignCard', !!(S.press && a && a.current));   // nothing assigned: no card
+    renderTakeOver();
     if (!S.press || !a || !a.current) return;
     $('assignTitle').textContent = 'Job assignment · ' + S.press;
     var c = a.current;
@@ -1971,8 +1973,9 @@
     $('assignNow').innerHTML = '<div class="muted">Now</div><div class="now">' + esc(c.job || c.note) + '</div>' +
       (sub ? '<div class="nowsub">' + sub + '</div>' : '') +
       (c.job && c.note ? '<div class="nowsub" style="color:var(--text)">' + esc(c.note) + '</div>' : '') +
-      (c.operator || c.packers ? '<div class="crew">' + (c.operator ? 'Operator: <b>' + esc(c.operator) + '</b>' : '') +
-        (c.operator && c.packers ? ' · ' : '') + (c.packers ? 'Packers: <b>' + esc(c.packers) + '</b>' : '') + '</div>' : '') +
+      '<div class="runteam"><div class="crew">' + (c.operator ? 'Operator: <b>' + esc(c.operator) + '</b>' : '<span class="muted">No operator yet</span>') +
+        (c.packers ? ' · Packers: <b>' + esc(c.packers) + '</b>' : '') + '</div>' +
+        '<button type="button" data-hand="1">Hand off</button></div>' +
       (canPick ? '<button id="assignPick" class="wide">Pick this job below</button>' : '') +
       (cj ? '<details class="setupbox" id="assignSetup"' + (store('assignSetupOpen') === '1' ? ' open' : '') + '>' +
         '<summary>Setup sheet: position, ink, anilox</summary>' + setupHtml(cj, a.stock) + '</details>' : '');
@@ -1987,6 +1990,7 @@
     if (e.target.id === 'assignSetup') store('assignSetupOpen', e.target.open ? '1' : '0');
   }, true);
   $('assignNow').addEventListener('click', function (e) {
+    if (e.target.closest('[data-hand]')) { handOpen(); return; }   // 2.042: hand off the work order, run or no run
     if (e.target.id !== 'assignPick') return;
     var c = S.assigned.current;
     $('stateSel').value = c.state; store('inkState', c.state); renderJobs();
@@ -2001,6 +2005,7 @@
     if (!S.press) { show('setupView', false); show('runView', false); msg('Pick your press to begin.'); return; }
     if (S.run) { show('setupView', false); show('runView', true); renderRun(); }
     else { show('runView', false); show('setupView', true); renderSetup(); }
+    renderTakeOver();
   }
 
   /* ----- setup ----- */
@@ -2133,38 +2138,55 @@
     }
     devRender(log);
   }
-  /* 2.040: who has the run now, and the hand-off. Someone else logged in on this press is asked "Taking over?". */
+  /*
+   * 2.040 / 2.042: who has the job on this press, and the hand-off. The job is the press's work order (Manage → Queue) and/or
+   * the ink run open on it; one hand-off changes both. Someone else logged in on this press is asked "Taking over?".
+   */
   function renderTeam() {
     var r = S.run, op = r.operator || r.startedBy || '';
     $('runTeam').innerHTML = '<div><span class="muted">Operator</span> <b>' + esc(op || '—') + '</b>' +
       (r.packers ? ' <span class="muted">· Packers</span> ' + esc(r.packers) : '') + '</div>' +
       '<button type="button" id="handBtn">Hand off run</button>';
-    var mine = !op || op.toLowerCase() === String(A.name || '').toLowerCase(), notNow = store('pt_notnow') === r.runId + '|' + op;
-    show('takeOver', !mine && !notNow);
-    $('takeOver').innerHTML = mine || notNow ? '' : '<span>This run is under <b>' + esc(op) + '</b>. Taking over?</span>' +
-      '<span class="acts"><button type="button" class="primary" id="takeBtn">Take over</button><button type="button" id="notNowBtn">Not now</button></span>';
+    renderTakeOver();
   }
-  function handDone(run) {
-    S.run = withPending(run); renderRun();
-    msg('Run handed to ' + run.operator + (run.packers ? ' · packers ' + run.packers : '') + '.', 'ok');
+  function jobHolder() {   // the open run's operator, else the work order's
+    var r = S.run, c = S.assigned && S.assigned.current;
+    if (r) return { op: r.operator || r.startedBy || '', job: r.job, key: 'run:' + r.runId, packers: r.packers || '', what: r.job + ' · ' + r.state };
+    if (c) return { op: c.operator || '', job: c.job || c.note || 'Note', key: 'wo:' + c.id, packers: c.packers || '',
+      what: c.job ? c.job + ' · ' + c.state : (c.note || 'Note') };
+    return null;
   }
-  $('runView').addEventListener('click', function (e) {
-    var b = e.target.closest('button'); if (!b || !S.run) return;
-    if (b.id === 'handBtn') handOpen();
-    else if (b.id === 'notNowBtn') { store('pt_notnow', S.run.runId + '|' + (S.run.operator || S.run.startedBy || '')); show('takeOver', false); }
+  function renderTakeOver() {
+    var h = S.press ? jobHolder() : null;
+    var ask = !!(h && h.op && h.op.toLowerCase() !== String(A.name || '').toLowerCase() && store('pt_notnow') !== h.key + '|' + h.op);
+    show('takeOver', ask);
+    $('takeOver').innerHTML = ask ? '<span>' + esc(S.press) + '\'s job (' + esc(h.job) + ') is under <b>' + esc(h.op) + '</b>. Taking over?</span>' +
+      '<span class="acts"><button type="button" class="primary" id="takeBtn">Take over</button><button type="button" id="notNowBtn">Not now</button></span>' : '';
+  }
+  function handDone(res) {
+    S.assigned = res.assigned; renderAssign();
+    if (res.run) { S.run = withPending(res.run); renderRun(); }
+    renderTakeOver();
+    msg(res.message, 'ok');
+  }
+  $('runView').addEventListener('click', function (e) { if (e.target.closest('#handBtn')) handOpen(); });
+  $('takeOver').addEventListener('click', function (e) {
+    var b = e.target.closest('button'), h = jobHolder(); if (!b || !h) return;
+    if (b.id === 'notNowBtn') { store('pt_notnow', h.key + '|' + h.op); show('takeOver', false); }
     else if (b.id === 'takeBtn') {
       b.disabled = true; msg('Taking over…');
-      srv('runHandoff', [S.run.runId, A.name, null, ''], handDone, function (err) { b.disabled = false; msg(errText(err), 'err'); });
+      srv('jobHandoff', [S.press, A.name, null, ''], handDone, function (err) { b.disabled = false; msg(errText(err), 'err'); });
     }
   });
   function handOpen() {
-    var r = S.run, crew = S.crew || { operators: [], packers: [] }, op = r.operator || r.startedBy || '';
-    $('handAttach').textContent = r.job + ' · ' + r.state + ' on ' + r.press + ' · operator now: ' + (op || 'nobody');
-    var people = crew.operators.filter(function (n) { return n !== op; });
-    if (A.name && A.name !== op && people.indexOf(A.name) === -1) people.unshift(A.name);   // a manager can take it too
-    $('handTo').innerHTML = opt('', 'Pick who is taking over', true) + people.map(function (n) { return opt(n, n === A.name && A.name !== op ? n + ' (me)' : n, false); }).join('');
+    var h = jobHolder(); if (!h) return;
+    var crew = S.crew || { operators: [], packers: [] };
+    $('handAttach').textContent = h.what + ' on ' + S.press + ' · operator now: ' + (h.op || 'nobody');
+    var people = crew.operators.filter(function (n) { return n !== h.op; });
+    if (A.name && A.name !== h.op && people.indexOf(A.name) === -1) people.unshift(A.name);   // a manager can take it too
+    $('handTo').innerHTML = opt('', 'Pick who is taking over', true) + people.map(function (n) { return opt(n, n === A.name && A.name !== h.op ? n + ' (me)' : n, false); }).join('');
     $('handTo').removeAttribute('aria-invalid');
-    $('handPackers').value = r.packers || '';
+    $('handPackers').value = h.packers;
     $('handPkAdd').innerHTML = opt('', '+ packer', true) + crew.packers.map(function (n) { return opt(n, n, false); }).join('');
     show('handPkAdd', crew.packers.length > 0);
     $('handNote').value = ''; setMsg('handMsg', '');
@@ -2184,8 +2206,8 @@
     if (!to) { $('handTo').setAttribute('aria-invalid', 'true'); setMsg('handMsg', 'Pick who is taking over.', 'err'); return; }
     $('handTo').removeAttribute('aria-invalid');
     $('handSave').disabled = true; setMsg('handMsg', 'Saving…');
-    srv('runHandoff', [S.run.runId, to, $('handPackers').value.trim(), $('handNote').value.trim()], function (run) {
-      $('handSave').disabled = false; sheetClose('handSheet'); handDone(run);
+    srv('jobHandoff', [S.press, to, $('handPackers').value.trim(), $('handNote').value.trim()], function (res) {
+      $('handSave').disabled = false; sheetClose('handSheet'); handDone(res);
     }, function (err) { $('handSave').disabled = false; setMsg('handMsg', errText(err), 'err'); });
   });
 
@@ -3757,18 +3779,68 @@
     var keep = $(id).value;
     $(id).innerHTML = opt('', all, !keep) + list.map(function (v) { return opt(v, v, v === keep); }).join('');
   }
-  function rlTeam(g) {
-    var h = '<div class="jhteam"><div><span class="muted">Started by</span> <b>' + esc(g.startedBy || '—') + '</b>' +
-      (g.startPackers ? ' <span class="muted">· packers</span> ' + esc(g.startPackers) : '') +
-      (g.assigned && g.assigned !== g.startedBy ? ' <span class="muted">· assigned:</span> ' + esc(g.assigned) : '') + '</div>';
-    g.team.forEach(function (x) {
+  /* 2.042: the crew it started with, then every handoff */
+  function rlTeam(startLabel, startOp, startPk, team) {
+    var h = '<div class="jhteam"><div>' + (startOp ? '<span class="muted">' + startLabel + '</span> <b>' + esc(startOp) + '</b>' : '<span class="muted">No operator assigned</span>') +
+      (startPk ? ' <span class="muted">· packers</span> ' + esc(startPk) : '') + '</div>';
+    team.forEach(function (x) {
       var took = x.by === x.to;
-      h += '<div>→ ' + (took ? '<b>' + esc(x.to) + '</b> took over' : esc(x.from) + ' handed to <b>' + esc(x.to) + '</b>') +
+      h += '<div>→ ' + (took ? '<b>' + esc(x.to) + '</b> took over' : !x.from ? 'Handed to <b>' + esc(x.to) + '</b>' + (x.by ? ' by ' + esc(x.by) : '')
+        : esc(x.from) + ' handed to <b>' + esc(x.to) + '</b>') +
         ' <span class="muted">' + esc(x.when) + '</span>' +
         (x.packers !== x.packersBefore ? ' <span class="muted">· packers</span> ' + esc(x.packers || 'none') : '') +
         (x.note ? ' · “' + esc(x.note) + '”' : '') + '</div>';
     });
     return h + '</div>';
+  }
+  function rlNotes(h) {   // issues and maintenance requests
+    return h.issues.map(function (x) {
+      return '<div class="rlentry">' + badge(x.status === 'Handled' ? 'green' : 'red', x.status === 'Handled' ? 'Issue · handled' : 'Issue') + ' ' + esc(x.text) +
+        '<div class="s">' + esc(x.by) + ' · ' + esc(x.when) + (x.handledBy ? ' · handled by ' + esc(x.handledBy) : '') + '</div></div>';
+    }).join('') + h.requests.map(function (x) {
+      return '<div class="rlentry">' + badge('yellow', 'Maintenance · ' + (x.severity || 'request')) + ' ' + esc(x.text) +
+        '<div class="s">' + esc(x.by) + ' · ' + esc(x.when) + ' · ' + esc(x.problem ? 'filed as ' + x.problem : (x.status || 'Sending')) + '</div></div>';
+    }).join('');
+  }
+  function rlRunLine(g) { return esc(g.press) + ' · ' + esc(g.started) + (g.ended ? ' → ' + esc(g.ended) : '') + (g.hours ? ' · ' + fmt(g.hours, 1) + ' h' : '') + (g.slips ? ' · ' + fmt(g.slips, 0) + ' slips' : ''); }
+  function rlRunBadge(g) { return g.status === 'Cancelled' ? ' ' + badge('gray', 'Run cancelled') : g.status === 'Open' ? ' ' + badge('blue', 'Running') : ''; }
+  function rlFold(g) {   // rolls, lots and deviations of one run
+    var n = g.entries.length;
+    if (!n && !(g.rolls && g.rolls.count)) return '';
+    return '<details class="jhmore"><summary>Rolls, lots and deviations (' + (g.rolls.count ? g.rolls.count + (g.rolls.count === 1 ? ' roll' : ' rolls') : '') +
+      (g.rolls.count && n ? ', ' : '') + (n ? n + (n === 1 ? ' entry' : ' entries') : '') + ')</summary>' +
+      g.entries.map(function (x) {
+        return '<div class="rlentry">' + (x.kind === 'Mixed ink'
+          ? badge('blue', 'Mixed ink') + ' <b>' + esc(x.ink) + '</b> <span class="muted">(' + esc(x.side) + ')</span> · Lot <b>' + esc(x.lot) + '</b>' + (x.details ? ' · ' + esc(x.details) : '')
+          : badge('yellow', 'Deviation') + ' ' + (x.ink ? '<b>' + esc(x.ink) + '</b> <span class="muted">(' + esc(x.side) + ')</span>: ' : '') + esc(x.details)) +
+          '<div class="s">' + esc(x.by) + ' · ' + esc(x.when) + '</div></div>';
+      }).join('') +
+      (g.rolls && g.rolls.count ? '<div class="rlentry">' + badge('gray', 'Rolls') + ' <b>' + g.rolls.count + '</b> · ' + pct(g.rolls.wastePct) + ' waste overall' +
+        '<div class="s">' + g.rolls.list.map(function (x) { return esc(x.roll) + ' ' + pct(x.wastePct); }).join(' · ') + '</div></div>' : '') +
+      '</details>';
+  }
+  var RL_STATUS = { Open: 'blue', Shipped: 'green', Done: 'green', Cancelled: 'gray' };
+  var RL_TYPE = { Order: 'Order', Stock: 'For stock', Note: 'Note' };
+  function rlOrder(o) {
+    var title = o.job ? esc(o.job) + ' <span class="muted">· ' + esc(o.state) + '</span>' : esc(o.note || 'Note');
+    var sub = [o.press || 'no press', RL_TYPE[o.type] || o.type, o.slips ? fmt(o.slips, 0) + ' slips ordered' : '', o.due ? 'due ' + o.due : '',
+      o.runs.length ? fmt(o.printed, 0) + ' printed' : '', o.added ? 'added ' + o.added + (o.addedBy ? ' by ' + o.addedBy : '') : '',
+      o.closed ? (o.status === 'Cancelled' ? 'cancelled ' : 'closed ') + o.closed : ''].filter(Boolean).map(esc).join(' · ');
+    return '<div class="rlrun"><div class="t">' + title + ' ' + badge(RL_STATUS[o.status] || 'gray', o.status) + '</div>' +
+      '<div class="s">' + sub + '</div>' +
+      (o.job && o.note ? '<div class="s">“' + esc(o.note) + '”</div>' : '') +
+      rlTeam('Assigned to', o.startOperator, o.startPackers, o.team) +
+      o.runs.map(function (g) {
+        return '<div class="rlentry">' + badge('gray', 'Ink run') + ' ' + rlRunLine(g) + rlRunBadge(g) +
+          '<div class="s">started by ' + esc(g.startedBy || '—') + '</div>' + rlFold(g) + '</div>';
+      }).join('') +
+      (o.runs.length ? '' : '<div class="s">No ink run started on it.</div>') +
+      rlNotes(o) + '</div>';
+  }
+  function rlLoose(g) {
+    return '<div class="rlrun"><div class="t">' + esc(g.job) + ' <span class="muted">· ' + esc(g.state) + '</span> ' + badge('gray', 'No work order') + rlRunBadge(g) + '</div>' +
+      '<div class="s">' + rlRunLine(g) + '</div>' +
+      rlTeam('Started by', g.startedBy, g.startPackers, g.team) + rlNotes(g) + rlFold(g) + '</div>';
   }
   function rlShow(d) {
     setMsg('mMsg', '');
@@ -3781,35 +3853,10 @@
     $('rlFilters').textContent = ($('rlState').value || 'All states') + ' · ' + ($('rlJob').value || 'all jobs') + ' · ' +
       ($('rlPress').value || 'all presses') + ($('rlOp').value ? ' · ' + $('rlOp').value : '') + ' · ' +
       (d.from || d.to ? (md(d.from) || 'start') + ' – ' + (md(d.to) || 'today') : 'all dates') + ' · ' +
-      d.runs.length + (d.runs.length === 1 ? ' run' : ' runs') + ' · ' + fmt(d.slips, 0) + ' slips' +
-      (d.issues ? ' · ' + d.issues + (d.issues === 1 ? ' issue or request' : ' issues and requests') : '');
-    $('rlList').innerHTML = d.runs.length ? d.runs.map(function (g) {
-      var more = g.entries.length + (g.rolls && g.rolls.count ? 1 : 0);
-      return '<div class="rlrun"><div class="t">' + esc(g.job) + ' <span class="muted">· ' + esc(g.state) + '</span> ' +
-        (g.status === 'Cancelled' ? badge('gray', 'Run cancelled') : g.status === 'Open' ? badge('blue', 'Running') : '') + '</div>' +
-        '<div class="s">' + esc(g.press) + ' · ' + esc(g.started) + (g.ended ? ' → ' + esc(g.ended) : '') +
-        (g.hours ? ' · ' + fmt(g.hours, 1) + ' h' : '') + (g.slips ? ' · ' + fmt(g.slips, 0) + ' slips' : '') + '</div>' +
-        rlTeam(g) +
-        g.issues.map(function (x) {
-          return '<div class="rlentry">' + badge(x.status === 'Handled' ? 'green' : 'red', x.status === 'Handled' ? 'Issue · handled' : 'Issue') + ' ' + esc(x.text) +
-            '<div class="s">' + esc(x.by) + ' · ' + esc(x.when) + (x.handledBy ? ' · handled by ' + esc(x.handledBy) : '') + '</div></div>';
-        }).join('') +
-        g.requests.map(function (x) {
-          return '<div class="rlentry">' + badge('yellow', 'Maintenance · ' + (x.severity || 'request')) + ' ' + esc(x.text) +
-            '<div class="s">' + esc(x.by) + ' · ' + esc(x.when) + ' · ' + esc(x.problem ? 'filed as ' + x.problem : (x.status || 'Sending')) + '</div></div>';
-        }).join('') +
-        (more ? '<details class="jhmore"><summary>Rolls, lots and deviations (' + (g.rolls.count ? g.rolls.count + (g.rolls.count === 1 ? ' roll' : ' rolls') : '') +
-          (g.rolls.count && g.entries.length ? ', ' : '') + (g.entries.length ? g.entries.length + (g.entries.length === 1 ? ' entry' : ' entries') : '') + ')</summary>' +
-          g.entries.map(function (x) {
-            return '<div class="rlentry">' + (x.kind === 'Mixed ink'
-              ? badge('blue', 'Mixed ink') + ' <b>' + esc(x.ink) + '</b> <span class="muted">(' + esc(x.side) + ')</span> · Lot <b>' + esc(x.lot) + '</b>' + (x.details ? ' · ' + esc(x.details) : '')
-              : badge('yellow', 'Deviation') + ' ' + (x.ink ? '<b>' + esc(x.ink) + '</b> <span class="muted">(' + esc(x.side) + ')</span>: ' : '') + esc(x.details)) +
-              '<div class="s">' + esc(x.by) + ' · ' + esc(x.when) + '</div></div>';
-          }).join('') +
-          (g.rolls && g.rolls.count ? '<div class="rlentry">' + badge('gray', 'Rolls') + ' <b>' + g.rolls.count + '</b> · ' + pct(g.rolls.wastePct) + ' waste overall' +
-            '<div class="s">' + g.rolls.list.map(function (x) { return esc(x.roll) + ' ' + pct(x.wastePct); }).join(' · ') + '</div></div>' : '') +
-          '</details>' : '') + '</div>';
-    }).join('') : '<p class="muted">No runs for these filters.</p>';
+      d.orders + (d.orders === 1 ? ' work order' : ' work orders') + (d.loose ? ' · ' + d.loose + (d.loose === 1 ? ' run' : ' runs') + ' without one' : '') +
+      ' · ' + fmt(d.slips, 0) + ' slips' + (d.issues ? ' · ' + d.issues + (d.issues === 1 ? ' issue or request' : ' issues and requests') : '');
+    $('rlList').innerHTML = d.cards.length ? d.cards.map(function (c) { return c.order ? rlOrder(c.order) : rlLoose(c.run); }).join('')
+      : '<p class="muted">Nothing for these filters.</p>';
   }
   ['rlFrom', 'rlTo', 'rlJob', 'rlPress', 'rlOp'].forEach(function (id) { $(id).addEventListener('change', rlLoad); });
   $('rlState').addEventListener('change', function () { $('rlJob').value = ''; rlJobs(); rlLoad(); });
