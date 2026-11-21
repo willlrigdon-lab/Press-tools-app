@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.040", KEY = "pt-site-reloaded";
+    var BUILT = "2.041", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -1464,6 +1464,12 @@
         </div>
       </div>
       <p class="hint">Saved on this device. Auto follows the phone's light or dark setting.</p>
+      <div id="wakeRow" class="mrow mlook"><span id="wakeLabel">Keep screen on</span>
+        <div class="seg" id="wakeSeg" role="radiogroup" aria-labelledby="wakeLabel">
+          <button type="button" role="radio" data-v="on">On</button><button type="button" role="radio" data-v="off">Off</button>
+        </div>
+      </div>
+      <p id="wakeHint" class="hint">While the Operator screen is open with a press picked, so the tablet doesn't sleep during a paper change or web break. Saved on this device.</p>
       <details class="changes mchanges"><summary>What's new in version <span id="meVer"></span></summary><ol id="meChanges"></ol></details>
       <button id="switchBtn" type="button" class="mrow danger">Switch user</button>
       <button id="meClose" type="button" class="wide">Close</button>
@@ -1537,9 +1543,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.040';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.041';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.041', '11/21/2026', 'The screen stays on while the Operator screen is open with a press picked, so a paper change or web break doesn\'t mean waking the tablet and logging in again (turn it off per device in the name menu: Keep screen on). Logouts after no use are now 3 hours instead of 30 minutes.'],
     ['2.040', '11/21/2026', 'Job history (Manage → Reports, was Run log): every ink run with who ran it, including handoffs and packers, the issues and maintenance requests sent during it, rolls, lots and deviations. Search by job, dates, press or person. On the run screen, Hand off run passes a run to the next operator (and packers) mid-run; someone else who logs in on that press is asked "Taking over?". Issues and maintenance requests now go with the run open on the press.'],
     ['2.039', '11/20/2026', 'Low supplies: management can change a report from Low to Out with Mark out (Undo puts it back). Reporting a low item again as out also changes it, and says so.'],
     ['2.038', '11/20/2026', 'Monday ordering email: every Monday around 8 AM, an email lists the ink and supplies that are low or out and not marked Ordered yet, and any ink marked Ordered a week or more ago that hasn\'t come in. Admin shows who gets it and when it last went, with Send one now.'],
@@ -1659,7 +1666,7 @@
   }
 
   /* ---- login state; every server request goes through api() with the login token ---- */
-  var A = { token: null, name: '', level: 0, roles: [], idleMinutes: 30, press: '' };
+  var A = { token: null, name: '', level: 0, roles: [], idleMinutes: 180, press: '' };
   var LOGIN_ERR = /log in again|timed out/i;
   /*
    * Requests that only read (2.031): if one fails because the wifi blinked or the server was busy, it is asked once more
@@ -1921,6 +1928,7 @@
     var picking = !S.press || S.pressOpen;
     show('pressPick', picking); show('pressShow', !picking);
     $('pressName').textContent = S.press || '';
+    wakeSync();
   }
   $('pressSeg').addEventListener('click', function (e) {
     var p = e.target.getAttribute('data-p');
@@ -2666,6 +2674,7 @@
     if (view === 'management') mOpen(M.tab);
     if (view === 'admin') aLoad();
     if (view === 'daysoff') doLoad();
+    wakeSync();
   }
 
   function startSession(sess, reopened) {
@@ -2674,7 +2683,7 @@
       S.press = A.press; S.pressOpen = false; store('inkPress', A.press);
     }
     A.token = sess.token || A.token; A.name = sess.name; A.level = sess.level;
-    A.roles = sess.roles || []; A.idleMinutes = sess.idleMinutes || 30;
+    A.roles = sess.roles || []; A.idleMinutes = sess.idleMinutes || 180;
     store('pt_token', A.token);
     $('whoName').textContent = A.name;
     $('navBtns').innerHTML = A.roles.map(function (r) {
@@ -2715,7 +2724,7 @@
         return '<li><b>' + esc(c[0]) + '</b> <span class="muted">· ' + esc(c[1]) + '</span><br>' + esc(c[2]) + '</li>';
       }).join('');
     }
-    lookDraw();
+    lookDraw(); wakeDraw();
     show('pressDefRow', allowed('operator')); show('pressDefHint', allowed('operator'));
     $('pressDefHint').textContent = 'Your press opens when you log in, on any device. Change press still works anytime.';
     pressDefDraw();
@@ -2842,6 +2851,37 @@
   $('lookSeg').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-v]'); if (!b) return;
     store('srp_look', b.getAttribute('data-v')); lookApply(); lookDraw();
+  });
+  /*
+   * 2.041: keep the screen awake while the Operator screen is open with a press picked (press tablets), so a paper change or
+   * web break doesn't mean waking the tablet and logging in again. Per device: name menu → Keep screen on (default On).
+   * The browser drops it whenever the page is hidden; it's asked for again when the page comes back. Where it isn't
+   * allowed (old browsers, battery saver, inside the Google page) the screen just sleeps as before.
+   */
+  var WAKE = { lock: null, pending: false };
+  function wakeOn() { return store('pt_wake') !== 'off'; }
+  function wakeSync() {
+    if (!navigator.wakeLock) return;
+    var want = wakeOn() && !!A.token && V.current === 'operator' && !!S.press && !document.hidden;
+    if (want && !WAKE.lock && !WAKE.pending) {
+      WAKE.pending = true;
+      navigator.wakeLock.request('screen').then(function (l) {
+        WAKE.pending = false; WAKE.lock = l;
+        l.addEventListener('release', function () { if (WAKE.lock === l) WAKE.lock = null; });
+        wakeSync();   // things may have changed while it was being asked for
+      }, function () { WAKE.pending = false; });
+    } else if (!want && WAKE.lock) { var l = WAKE.lock; WAKE.lock = null; l.release().catch(function () {}); }
+  }
+  function wakeDraw() {
+    show('wakeRow', !!navigator.wakeLock); show('wakeHint', !!navigator.wakeLock);
+    var v = wakeOn() ? 'on' : 'off';
+    Array.prototype.forEach.call($('wakeSeg').children, function (b) {
+      var on = b.getAttribute('data-v') === v; b.classList.toggle('on', on); b.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+  }
+  $('wakeSeg').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-v]'); if (!b) return;
+    store('pt_wake', b.getAttribute('data-v')); wakeDraw(); wakeSync();
   });
   if (LOOK_MQ) { try { LOOK_MQ.addEventListener('change', lookApply); } catch (e) { if (LOOK_MQ.addListener) LOOK_MQ.addListener(lookApply); } }
   window.addEventListener('storage', function (e) { if (e.key === 'srp_look') { lookApply(); lookDraw(); } });
@@ -3337,6 +3377,7 @@
   setInterval(function () { if (!document.hidden && A.token && V.current !== 'login') noticesLoad(); }, 5 * 60000);
   var PAGE = { hiddenAt: 0 };
   document.addEventListener('visibilitychange', function () {
+    wakeSync();   // 2.041: the screen-on hold is dropped while hidden; ask again on return
     if (document.hidden) { PAGE.hiddenAt = Date.now(); return; }
     if (!A.token || V.current === 'login' || Date.now() - PAGE.hiddenAt < 30000) return;   // back after a while: catch up once
     noticesLoad();
