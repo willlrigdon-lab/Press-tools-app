@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.042", KEY = "pt-site-reloaded";
+    var BUILT = "2.043", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -273,6 +273,15 @@
     .badge.gray { background: #eef0f3; color: var(--muted); }
     .push { margin-top: 10px; padding: 10px 12px; border-radius: 10px; font-weight: 600; font-size: 15px; }
     .push.red { background: #fde7e7; color: var(--bad); }
+    .push.green { background: #e3f5ea; color: #13734a; }
+    /* 2.043: slips sent out vs the work order's target (native <progress>, colored with accent-color) */
+    .tgline { margin-top: 12px; font-size: 15px; }
+    progress.tgbar { display: block; inline-size: 100%; block-size: 10px; margin-top: 6px; accent-color: var(--logo-blue, #1A6496); border: 0; border-radius: 99px; overflow: hidden; background: var(--line, #2a3340); }
+    progress.tgbar::-webkit-progress-bar { background: var(--line, #2a3340); border-radius: 99px; }
+    progress.tgbar::-webkit-progress-value { background: var(--logo-blue, #1A6496); border-radius: 99px; }
+    progress.tgbar::-moz-progress-bar { background: var(--logo-blue, #1A6496); border-radius: 99px; }
+    progress.tgbar.done::-webkit-progress-value { background: #22a06b; }
+    progress.tgbar.done::-moz-progress-bar { background: #22a06b; }
     .push.yellow { background: #fff4c2; color: #6b4e00; }
     button.danger { border-color: var(--bad); color: var(--bad); }
     .chip.low { border-color: var(--warn); color: var(--warn); }
@@ -423,6 +432,7 @@
     .notice .nby { color: #d6c27a; }
     .stale { color: #fdba74; }
     .push.red { background: rgba(248,113,113,.14); color: #fca5a5; }
+    .push.green { background: rgba(74,222,128,.14); color: #86efac; }
     .cnt.soft { background: rgba(255,255,255,.14); color: var(--text); }
     tr.ordered td { background: rgba(96,165,250,.08); }
     .qselbar { background: #2a1414; border-color: #5c2626; }
@@ -720,6 +730,7 @@
     :root[data-look="light"] .notice.crit .nby { color: #991b1b; }
     :root[data-look="light"] .stale { color: #b45309; }
     :root[data-look="light"] .push.red { background: #fde7e7; color: #8f1d1d; }
+    :root[data-look="light"] .push.green { background: #e3f5ea; color: #0f5a3a; }
     :root[data-look="light"] .cnt.soft { background: #e5eaf0; color: var(--text); }
     :root[data-look="light"] tr.ordered td { background: #eef5fb; }
     :root[data-look="light"] .qselbar { background: #fdecec; border-color: #f2b8b8; }
@@ -840,6 +851,7 @@
               <button class="plus" id="palPlus">+1 Pallet</button>
             </div>
           </div>
+          <div id="palTarget" class="hidden"></div>
           <label for="partialIn">Last partial pallet (slips)</label>
           <input id="partialIn" inputmode="numeric" placeholder="Only for the last, not-full pallet">
           <button id="partialSave" class="wide" style="margin-top:10px">Save partial pallet</button>
@@ -1406,6 +1418,16 @@
     </form>
   </div>
 
+  <!-- ===================== SLIP TARGET REACHED (2.043) ===================== -->
+  <div id="targetSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="tgTitle">
+    <div class="sheet-card">
+      <h2 id="tgTitle">Target reached</h2>
+      <p id="tgText"></p>
+      <p class="muted">Finish the pallet on the press, then End Run.</p>
+      <button id="tgOk" type="button" class="primary wide">OK</button>
+    </div>
+  </div>
+
   <!-- ===================== HAND OFF A RUN (2.040) ===================== -->
   <div id="handSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="handTitle">
     <form id="handForm" class="sheet-card" aria-labelledby="handTitle" novalidate>
@@ -1543,9 +1565,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.042';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.043';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.043', '11/21/2026', 'Slip targets: the run screen shows the work order\'s slips sent out against the slips ordered, counting every ink run on it (so it carries on after a handoff or on another day). A yellow note says when one more full pallet gets there, and when the target is reached a pop-up (with a beep and a buzz) and a green banner tell the operator. The job assignment card and Manage → Queue show the same count, with a Target reached badge.'],
     ['2.042', '11/21/2026', 'Job history and handoffs. Manage → Reports → Job history (was Run log) lists every work order with who had it, every handoff and packer change, its ink runs (rolls, lots and deviations), and the issues and maintenance requests sent while it was the press\'s job; runs started without a work order are listed too. Search by job, dates, press or person. Hand off on the job assignment card passes the job and packers to the next operator, with or without an ink run open; someone else who logs in on that press is asked "Taking over?". Issues and maintenance requests now go with the job on the press.'],
     ['2.041', '11/21/2026', 'The screen stays on while the Operator screen is open with a press picked, so a paper change or web break doesn\'t mean waking the tablet and logging in again (turn it off per device in the name menu: Keep screen on). Logouts after no use are now 3 hours instead of 30 minutes.'],
     ['2.039', '11/20/2026', 'Low supplies: management can change a report from Low to Out with Mark out (Undo puts it back). Reporting a low item again as out also changes it, and says so.'],
@@ -1975,6 +1998,7 @@
       '<div class="runteam"><div class="crew">' + (c.operator ? 'Operator: <b>' + esc(c.operator) + '</b>' : '<span class="muted">No operator yet</span>') +
         (c.packers ? ' · Packers: <b>' + esc(c.packers) + '</b>' : '') + '</div>' +
         '<button type="button" data-hand="1">Hand off</button></div>' +
+      assignProgress(c) +
       (canPick ? '<button id="assignPick" class="wide">Pick this job below</button>' : '') +
       (cj ? '<details class="setupbox" id="assignSetup"' + (store('assignSetupOpen') === '1' ? ' open' : '') + '>' +
         '<summary>Setup sheet: position, ink, anilox</summary>' + setupHtml(cj, a.stock) + '</details>' : '');
@@ -1982,6 +2006,15 @@
     $('assignNext').innerHTML = n ? '<div class="next">Next: <b>' + esc(n.job || n.note) + '</b> <span class="muted">· ' +
       [n.job ? esc(n.state) : '', qLine(n)].filter(Boolean).join(' · ') + (a.more ? ' · +' + a.more + ' more' : '') + '</span></div>'
       : '<div class="next muted">Nothing assigned after this.</div>';
+  }
+  /** 2.043: slips sent out vs the work order's target (live from the open run when it's this work order). */
+  function assignProgress(c) {
+    var p = c.progress; if (!p) return '';
+    var r = S.run, sent = r && r.target && r.target.queueId === c.id ? targetSent(r) : p.sent;
+    return '<div class="crew" id="assignProg">' + assignProgText(sent, p.ordered) + '</div>';
+  }
+  function assignProgText(sent, ordered) {
+    return 'Sent out: <b>' + fmt(sent, 0) + '</b> of ' + fmt(ordered, 0) + (sent >= ordered ? ' ' + badge('green', 'Target reached') : '');
   }
   /** Job key of this press's current assignment ('' if none). */
   function assignedKey() { var a = S.assigned; return a && a.current && a.current.jobKey || ''; }
@@ -2004,7 +2037,7 @@
     if (!S.press) { show('setupView', false); show('runView', false); msg('Pick your press to begin.'); return; }
     if (S.run) { show('setupView', false); show('runView', true); renderRun(); }
     else { show('runView', false); show('setupView', true); renderSetup(); }
-    renderTakeOver();
+    renderAssign();   // a run started or ended: the assignment card's Pick button and counts follow
   }
 
   /* ----- setup ----- */
@@ -2105,6 +2138,7 @@
     $('palSlips').textContent = fmt(r.pallets * (r.palletSlips || 100000) + (r.partial || 0), 0);
     $('palMinus').disabled = !(r.pallets > 0);
     if (document.activeElement !== $('partialIn')) $('partialIn').value = r.partial ? r.partial : '';
+    renderTarget();
 
     var html = '', log = runLog();
     ['Front', 'Back'].forEach(function (side) {
@@ -2294,6 +2328,62 @@
   });
   $('devList').addEventListener('click', function (e) { var b = e.target.closest('button[data-lrm]'); if (b) logRemove(b.getAttribute('data-lrm')); });
 
+  /*
+   * 2.043: the work order's slip target. The server sends target {queueId, ordered, before (its other closed runs)}; this run's
+   * live pallets and partial (taps still waiting to save included) are added here, so the bar moves on every tap. One more
+   * full pallet to go → yellow heads-up; reached → green banner, and once per work order per device a pop-up (with a beep and
+   * a buzz when a tap here reached it; silent when the device opens a run that was already there, e.g. after a handoff).
+   */
+  var TG = { ctx: null, tapAt: 0 };
+  function targetSent(r) { var t = r && r.target; return t ? t.before + r.pallets * (r.palletSlips || 100000) + (r.partial || 0) : 0; }
+  function renderTarget() {
+    var r = S.run, t = r && r.target;
+    show('palTarget', !!t);
+    if (!t) { $('palTarget').replaceChildren(); return; }
+    var per = r.palletSlips || 100000, sent = targetSent(r), left = t.ordered - sent, done = left <= 0;
+    $('palTarget').innerHTML = '<div class="tgline" id="tgLabel"><span class="muted">Work order target</span> <b>' + fmt(sent, 0) + '</b> of ' + fmt(t.ordered, 0) +
+      (done ? '' : ' · ' + fmt(left, 0) + ' to go') + '</div>' +
+      '<progress class="tgbar' + (done ? ' done' : '') + '" max="' + t.ordered + '" value="' + Math.min(sent, t.ordered) + '" aria-labelledby="tgLabel"></progress>' +
+      '<div role="status">' + (done ? '<div class="push green">Target reached: ' + fmt(t.ordered, 0) + ' slips sent out for this work order. Finish up and End Run.</div>'
+        : left <= per ? '<div class="push yellow">One more full pallet reaches the target.</div>' : '') + '</div>';
+    var c = S.assigned && S.assigned.current;   // the assignment card's count follows the taps too
+    if (c && c.id === t.queueId && $('assignProg')) $('assignProg').innerHTML = assignProgText(sent, t.ordered);
+    if (done) targetReached(t, sent);
+  }
+  function targetReached(t, sent) {
+    var key = 'pt_target_' + t.queueId;
+    if (store(key)) return;   // once per work order per device
+    store(key, '1');
+    $('tgText').textContent = fmt(sent, 0) + ' of ' + fmt(t.ordered, 0) + ' slips are out for ' + S.run.job + ' · ' + S.run.state + ' on ' + S.run.press + '.';
+    sheetOpen('targetSheet');
+    if (Date.now() - TG.tapAt < 15000) {   // reached by a tap on this device: sound and buzz (browsers allow it after a tap)
+      beep();
+      try { if (navigator.vibrate) navigator.vibrate([250, 120, 250]); } catch (e) {}
+    }
+  }
+  function audioUnlock() {   // called from the tap itself, so the beep may play when the answer comes back
+    TG.tapAt = Date.now();
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext; if (!Ctx) return;
+      TG.ctx = TG.ctx || new Ctx();
+      if (TG.ctx.state === 'suspended') TG.ctx.resume();
+    } catch (e) {}
+  }
+  function beep() {
+    window.__tgBeeps = (window.__tgBeeps || 0) + 1;   // counted by the browser test
+    try {
+      var ctx = TG.ctx; if (!ctx) return;
+      [0, 0.4].forEach(function (d) {
+        var o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'square'; o.frequency.value = 880; g.gain.value = 0.2;
+        o.connect(g); g.connect(ctx.destination);
+        o.start(ctx.currentTime + d); o.stop(ctx.currentTime + d + 0.25);
+      });
+    } catch (e) {}
+  }
+  $('tgOk').addEventListener('click', function () { sheetClose('targetSheet'); });
+  $('targetSheet').addEventListener('click', function (e) { if (e.target === this) sheetClose('targetSheet'); });
+
   /* pallets */
   function palTap(q) {
     var r = S.run;
@@ -2304,9 +2394,10 @@
     r.pallets += q; renderRun();           // show it right away
     queueTap({ fn: 'inkPallet', runId: r.runId, qty: q, label: 'pallet ' + (q === 1 ? '+1' : '−1') });
   }
-  $('palPlus').addEventListener('click', function () { palTap(1); });
+  $('palPlus').addEventListener('click', function () { audioUnlock(); palTap(1); });
   $('palMinus').addEventListener('click', function () { palTap(-1); });
   $('partialSave').addEventListener('click', function () {
+    audioUnlock();
     setBusy(true); msg('Saving partial pallet…');
     call('inkSetPartial', [S.run.runId, $('partialIn').value], function (run) {
       setBusy(false); S.run = withPending(run); $('partialIn').blur(); renderRun();
@@ -2724,7 +2815,7 @@
     A.token = null; A.name = ''; A.level = 0; A.roles = []; A.press = '';
     store('pt_token', '');
     PIN.value = ''; drawPin();
-    ['lowSheet', 'issueSheet', 'maintSheet', 'meSheet', 'sugSheet', 'newsSheet', 'handSheet'].forEach(sheetClose);
+    ['lowSheet', 'issueSheet', 'maintSheet', 'meSheet', 'sugSheet', 'newsSheet', 'handSheet', 'targetSheet'].forEach(sheetClose);
     cacheClear();
     go('login');
     setMsg('loginMsg', why || '', why ? 'err' : '');
@@ -3019,7 +3110,7 @@
   });
   segPick('maintSev', function (v) { MREQ.sev = v; });
   $('maintCancel').addEventListener('click', function () { sheetClose('maintSheet'); });
-  ['lowSheet', 'issueSheet', 'maintSheet', 'meSheet', 'sugSheet', 'newsSheet', 'handSheet'].forEach(sheetSwipe);
+  ['lowSheet', 'issueSheet', 'maintSheet', 'meSheet', 'sugSheet', 'newsSheet', 'handSheet', 'targetSheet'].forEach(sheetSwipe);
   $('maintSheet').addEventListener('click', function (e) { if (e.target === this) sheetClose('maintSheet'); });
   $('maintForm').addEventListener('submit', function (e) {
     e.preventDefault();
@@ -3563,13 +3654,15 @@
           d.packers.map(function (n) { return opt(n, n, false); }).join('') + '</select>' : '') + '</div>';
       var title = q.job ? esc(q.job) + ' <span class="muted">· ' + esc(q.state) + '</span>' : esc(q.note);
       var typeBadge = q.type === 'Stock' ? badge('gray', 'For stock') + ' ' : q.type === 'Note' ? badge('gray', 'Note') + ' ' : '';
-      var info = qLine(q) + (shipped ? (qLine(q) ? ' · ' : '') + q.status.toLowerCase() + ' ' + esc(q.shipped) : '');
+      var info = qLine(q) + (shipped ? (qLine(q) ? ' · ' : '') + q.status.toLowerCase() + ' ' + esc(q.shipped) : '') +
+        (q.progress ? (qLine(q) ? ' · ' : '') + fmt(q.progress.sent, 0) + ' of ' + fmt(q.progress.ordered, 0) + ' sent out' : '');   // 2.043
       var tick = shipped ? '' : '<input type="checkbox" class="qsel" data-qsel="' + esc(q.id) + '"' + (M.sel[q.id] ? ' checked' : '') +
         ' aria-label="Select ' + esc(q.job || q.note) + '">';
       return '<div class="item qitem"><div><div class="t">' + tick + title + '</div>' +
         (info ? '<div class="s">' + info + '</div>' : '') +
         (q.job && q.note ? '<div class="s">“' + esc(q.note) + '”</div>' : '') +
-        '<div>' + typeBadge + (q.job ? badge(q.flag, FLAG_TEXT[q.flag] + (q.runs ? ' (' + q.runs + ')' : '')) : '') + '</div></div>' +
+        '<div>' + typeBadge + (q.progress && q.progress.reached ? badge('green', 'Target reached') + ' ' : '') +
+        (q.job ? badge(q.flag, FLAG_TEXT[q.flag] + (q.runs ? ' (' + q.runs + ')' : '')) : '') + '</div></div>' +
         '<div class="acts">' + (shipped ? '<button data-unship="' + esc(q.id) + '">Undo</button>'
           : '<button class="primary" data-ship="' + esc(q.id) + '">' + (q.type === 'Order' ? 'Shipped' : 'Done') + '</button>' +
             '<button data-qprint="' + esc(q.id) + '" title="Print a work order">Print</button>' +
