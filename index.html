@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.044", KEY = "pt-site-reloaded";
+    var BUILT = "2.045", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -1573,9 +1573,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.044';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.045';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.045', '11/21/2026', 'Monday ordering email in a new order: supplies to order, then ink to order, then supplies ordered but not received (new), then ink ordered but not received.'],
     ['2.044', '11/21/2026', 'Ink in pounds: Ink Inventory, Manage → Ordering, Ink needed, Stock & minimums and the Monday email show pounds after the bottle numbers (9 lb a bottle). New "Print by item #" on Manage → Ink → Stock & minimums prints every ink sorted by item number (BAW first), with on hand, keep at least and ordered.'],
     ['2.043', '11/21/2026', 'Slip targets: the run screen shows the work order\'s slips sent out against the slips ordered, counting every ink run on it (so it carries on after a handoff or on another day). A yellow note says when one more full pallet gets there, and when the target is reached a pop-up (with a beep and a buzz) and a green banner tell the operator. The job assignment card and Manage → Queue show the same count, with a Target reached badge.'],
     ['2.042', '11/21/2026', 'Job history and handoffs. Manage → Reports → Job history (was Run log) lists every work order with who had it, every handoff and packer change, its ink runs (rolls, lots and deviations), and the issues and maintenance requests sent while it was the press\'s job; runs started without a work order are listed too. Search by job, dates, press or person. Hand off on the job assignment card passes the job and packers to the next operator, with or without an ink run open; someone else who logs in on that press is asked "Taking over?". Issues and maintenance requests now go with the job on the press.'],
@@ -4577,7 +4578,7 @@
       '<div class="item"><div><div class="t">Goes to</div><div class="s">' + esc(w.to || 'Nobody: type an address in Settings') + '</div></div>' +
       '<div class="acts">' + badge(w.on ? 'green' : 'yellow', w.on ? 'On · Mondays' : 'Off') + '</div></div>' +
       (w.on ? '' : '<p class="muted" style="margin:6px 0">To turn it on: on a computer, open the Apps Script editor, pick weeklyReportSetup and press Run (once).</p>') +
-      '<div class="item"><div><div class="t">Last sent</div><div class="s">' + (l ? esc(l.time) + ' · ' + l.inks + ' inks, ' + l.supplies + ' supplies to order, ' + l.overdue + ' not received' : 'Not sent yet') + '</div></div><div></div></div>';
+      '<div class="item"><div><div class="t">Last sent</div><div class="s">' + (l ? esc(l.time) + ' · ' + l.supplies + ' supplies, ' + l.inks + ' inks to order · ' + (l.suppliesOverdue || 0) + ' supply orders, ' + l.overdue + ' ink orders not received' : 'Not sent yet') + '</div></div><div></div></div>';
   }
   /* App health (2.031): rows in the growing tabs, Sheet size, last backup */
   function healthShow(h) {
