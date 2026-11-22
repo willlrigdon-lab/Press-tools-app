@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.045", KEY = "pt-site-reloaded";
+    var BUILT = "2.046", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -1275,7 +1275,7 @@
         <h2>Add a resource</h2>
         <p class="muted" style="margin-top:0">Shows on the operator's Resources tab. Management Forms show only below, under Printable forms.</p>
         <label for="rsSection">Section</label>
-        <select id="rsSection"><option>Company Info</option><option>Troubleshooting</option><option>Videos</option><option>SOPs</option><option>Best Practice Guides</option><option>Management Forms</option></select>
+        <select id="rsSection"><option>Company Info</option><option>Troubleshooting</option><option>Videos</option><option>SOPs</option><option>Best Practice Guides</option><option>Manuals</option><option>Management Forms</option></select>
         <label for="rsTitle">Title</label>
         <input id="rsTitle" maxlength="120" autocomplete="off" placeholder="e.g. Press troubleshooting guide">
         <label for="rsLink">Link</label>
@@ -1573,9 +1573,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.045';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.046';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.046', '11/21/2026', 'New Manuals section in Resources, starting with the Mark Andy 2200C service manual (opens in Google Drive). New SOP: Kiss Impression.'],
     ['2.045', '11/21/2026', 'Monday ordering email in a new order: supplies to order, then ink to order, then supplies ordered but not received (new), then ink ordered but not received.'],
     ['2.044', '11/21/2026', 'Ink in pounds: Ink Inventory, Manage → Ordering, Ink needed, Stock & minimums and the Monday email show pounds after the bottle numbers (9 lb a bottle). New "Print by item #" on Manage → Ink → Stock & minimums prints every ink sorted by item number (BAW first), with on hand, keep at least and ordered.'],
     ['2.043', '11/21/2026', 'Slip targets: the run screen shows the work order\'s slips sent out against the slips ordered, counting every ink run on it (so it carries on after a handoff or on another day). A yellow note says when one more full pallet gets there, and when the target is reached a pop-up (with a beep and a buzz) and a green banner tell the operator. The job assignment card and Manage → Queue show the same count, with a Target reached badge.'],
