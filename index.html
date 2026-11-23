@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.050", KEY = "pt-site-reloaded";
+    var BUILT = "2.051", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -1600,9 +1600,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.050';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.051';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.051', '11/23/2026', 'When management changes a job\'s press, operator or packers on the queue, Job history now shows the change with who made it and when, and keeps who the job started with. A new operator also takes over the run open on that job.'],
     ['2.050', '11/23/2026', 'Waste rolls can carry a note: type it when you save the roll, or tap Add note under Recently saved. The note shows with the roll on the run, in Manage → Waste and in Job history.'],
     ['2.049', '11/23/2026', 'Easier to read and tap: darker red count badges, bigger tap areas for small links and check boxes on phones and tablets, and small fixes for screen readers.'],
     ['2.048', '11/23/2026', 'Each ink run now keeps the station and anilox every ink ran on. If you swap an anilox or move a station during the run, tap "Change station or anilox" on that ink. Job history shows the setup as run, with what was planned when it changed.'],
@@ -3998,6 +3999,7 @@
     var h = '<div class="jhteam"><div>' + (startOp ? '<span class="muted">' + startLabel + '</span> <b>' + esc(startOp) + '</b>' : '<span class="muted">No operator assigned</span>') +
       (startPk ? ' <span class="muted">· packers</span> ' + esc(startPk) : '') + '</div>';
     team.forEach(function (x) {
+      if (x.type === 'press' || x.type === 'crew') { h += rlChange(x); return; }   // 2.051: a manager's change in Manage → Queue
       var took = x.by === x.to;
       h += '<div>→ ' + (took ? '<b>' + esc(x.to) + '</b> took over' : !x.from ? 'Handed to <b>' + esc(x.to) + '</b>' + (x.by ? ' by ' + esc(x.by) : '')
         : esc(x.from) + ' handed to <b>' + esc(x.to) + '</b>') +
@@ -4006,6 +4008,20 @@
         (x.note ? ' · “' + esc(x.note) + '”' : '') + '</div>';
     });
     return h + '</div>';
+  }
+  /** 2.051: a manager's press or crew change, with who made it and when. */
+  function rlChange(x) {
+    var by = (x.by ? ' <span class="muted">by ' + esc(x.by) + '</span>' : '') + ' <span class="muted">' + esc(x.when) + '</span>', t;
+    if (x.type === 'press') {
+      t = !x.from ? 'Put on <b>' + esc(x.to) + '</b>' : !x.to ? 'Taken off ' + esc(x.from) : 'Press changed ' + esc(x.from) + ' → <b>' + esc(x.to) + '</b>';
+    } else {
+      var parts = [];
+      if (x.from !== x.to) parts.push(!x.from ? 'Operator set to <b>' + esc(x.to) + '</b>' : !x.to ? 'Operator removed (was ' + esc(x.from) + ')'
+        : 'Operator changed ' + esc(x.from) + ' → <b>' + esc(x.to) + '</b>');
+      if (x.packers !== x.packersBefore) parts.push((parts.length ? 'packers' : 'Packers') + ' changed to ' + esc(x.packers || 'none'));
+      t = parts.join(' · ');
+    }
+    return '<div>→ ' + t + by + '</div>';
   }
   function rlNotes(h) {   // issues and maintenance requests
     return h.issues.map(function (x) {
