@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.046", KEY = "pt-site-reloaded";
+    var BUILT = "2.047", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -1573,9 +1573,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.046';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.047';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.047', '11/23/2026', 'Safer logins: after too many wrong PINs from any devices, new logins pause for 10 minutes and the owner gets an email. Changing someone\'s PIN now logs out devices still using the old one. Typed notes and names are always saved as plain text in the Sheet.'],
     ['2.046', '11/21/2026', 'New Manuals section in Resources, starting with the Mark Andy 2200C service manual (opens in Google Drive). New SOP: Kiss Impression.'],
     ['2.045', '11/21/2026', 'Monday ordering email in a new order: supplies to order, then ink to order, then supplies ordered but not received (new), then ink ordered but not received.'],
     ['2.044', '11/21/2026', 'Ink in pounds: Ink Inventory, Manage → Ordering, Ink needed, Stock & minimums and the Monday email show pounds after the bottle numbers (9 lb a bottle). New "Print by item #" on Manage → Ink → Stock & minimums prints every ink sorted by item number (BAW first), with on hand, keep at least and ordered.'],
