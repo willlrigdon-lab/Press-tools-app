@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.047", KEY = "pt-site-reloaded";
+    var BUILT = "2.048", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -504,6 +504,11 @@
     .ink .mixform { width: 100%; display: grid; gap: 6px; }
     .ink .mixform input { font-size: 17px; padding: 10px; }
     .ink .mixform button { padding: 10px; font-size: 16px; }
+    /* 2.048: station and anilox as run */
+    .ink .setupform label { font-size: 13px; color: var(--muted); }
+    .ink .setupform .planned { font-size: 14px; }
+    .jhsetup { margin: 4px 0 0; padding-left: 0; list-style: none; font-size: 14px; }
+    .jhsetup li { padding: 2px 0; }
     .rlrun { padding: 12px 0; border-top: 1px solid var(--line); }
     .rlrun:first-child { border-top: 0; }
     .rlrun .t { font-weight: 700; }
@@ -1573,9 +1578,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.047';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.048';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.048', '11/23/2026', 'Each ink run now keeps the station and anilox every ink ran on. If you swap an anilox or move a station during the run, tap "Change station or anilox" on that ink. Job history shows the setup as run, with what was planned when it changed.'],
     ['2.047', '11/23/2026', 'Safer logins: after too many wrong PINs from any devices, new logins pause for 10 minutes and the owner gets an email. Changing someone\'s PIN now logs out devices still using the old one. Typed notes and names are always saved as plain text in the Sheet.'],
     ['2.046', '11/21/2026', 'New Manuals section in Resources, starting with the Mark Andy 2200C service manual (opens in Google Drive). New SOP: Kiss Impression.'],
     ['2.045', '11/21/2026', 'Monday ordering email in a new order: supplies to order, then ink to order, then supplies ordered but not received (new), then ink ordered but not received.'],
@@ -2165,7 +2171,8 @@
       if (!inks.length) return;
       html += '<h3>' + side + '</h3>';
       inks.forEach(function (k) {
-        var sub = [k.color, k.anilox].filter(Boolean).map(esc).join(' · ');
+        var sub = [k.station ? 'Station ' + k.station : '', k.color, k.anilox ? 'Anilox ' + k.anilox : ''].filter(Boolean).map(esc).join(' · ') +
+          (k.changed ? ' ' + badge('yellow', 'Changed') : '');
         var adds = k.adds || [], last = adds[adds.length - 1], open = S.partialOpen === k.key;
         html += '<div class="ink"><div>' +
           '<div class="name">' + esc(k.ink) + '</div>' +
@@ -2178,17 +2185,35 @@
           (open ? '<div class="parts">' + [0.25, 0.5, 0.75].map(function (q) {
             return '<button class="plus" data-k="' + esc(k.key) + '" data-q="' + q + '">+' + PART[q] + '</button>';
           }).join('') + '</div>' : '') +
-          '</div>' + mixHtml(k, log) + '</div>';
+          '</div>' + mixHtml(k, log) + setupEditHtml(k) + '</div>';
       });
     });
     var keepLot = $('mixLot') ? $('mixLot').value : '', keepNote = $('mixNote') ? $('mixNote').value : '';
+    var keepSt = $('setupStation') ? $('setupStation').value : null, keepAn = $('setupAnilox') ? $('setupAnilox').value : null;
     var typing = document.activeElement && document.activeElement.id;
     $('runInks').innerHTML = html;
     if ($('mixLot')) {   // a redraw (tap, refresh) keeps what's being typed
       $('mixLot').value = keepLot; $('mixNote').value = keepNote;
       if (typing === 'mixLot' || typing === 'mixNote') $(typing).focus();
     }
+    if ($('setupStation') && keepSt !== null) {   // same for the station / anilox form
+      $('setupStation').value = keepSt; $('setupAnilox').value = keepAn;
+      if (typing === 'setupStation' || typing === 'setupAnilox') $(typing).focus();
+    }
     devRender(log);
+  }
+  /** 2.048: change an ink's station or anilox during the run; the run's record (Job history) keeps what was planned and what ran. */
+  function setupEditHtml(k) {
+    if (S.setupOpen !== k.key) {
+      return '<div class="mix"><button class="link mixbtn" data-setup="' + esc(k.key) + '">Change station or anilox</button></div>';
+    }
+    return '<div class="mix"><div class="mixform setupform">' +
+      '<label for="setupStation">Station for ' + esc(k.ink) + '</label>' +
+      '<input id="setupStation" type="text" inputmode="numeric" maxlength="2" autocomplete="off" enterkeyhint="next" value="' + esc(k.station || '') + '">' +
+      '<label for="setupAnilox">Anilox</label>' +
+      '<input id="setupAnilox" type="text" inputmode="numeric" maxlength="20" autocomplete="off" enterkeyhint="done" value="' + esc(k.anilox || '') + '">' +
+      (k.planned && k.changed ? '<div class="planned muted">Planned: station ' + esc(k.planned.station || '–') + ', anilox ' + esc(k.planned.anilox || '–') + '</div>' : '') +
+      '<div class="row2"><button data-setupcancel="1">Cancel</button><button class="primary" data-setupsave="' + esc(k.key) + '">Save</button></div></div></div>';
   }
   /*
    * 2.040 / 2.042: who has the job on this press, and the hand-off. The job is the press's work order (Manage → Queue) and/or
@@ -2428,6 +2453,18 @@
   $('runInks').addEventListener('click', function (e) {
     var lr = e.target.closest('button[data-lrm]');
     if (lr) { logRemove(lr.getAttribute('data-lrm')); return; }
+    var so = e.target.closest('button[data-setup]');
+    if (so) { S.setupOpen = so.getAttribute('data-setup'); renderRun(); $('setupStation').focus(); return; }
+    if (e.target.closest('button[data-setupcancel]')) { S.setupOpen = null; renderRun(); return; }
+    var ss = e.target.closest('button[data-setupsave]');
+    if (ss) {
+      var sk = ss.getAttribute('data-setupsave'), sRun = S.run.runId;
+      ss.disabled = true; msg('Saving setup…');
+      srv('inkSetSetup', [sRun, sk, $('setupStation').value.trim(), $('setupAnilox').value.trim()], function (run) {
+        S.setupOpen = null; S.run = withPending(run); renderRun(); msg('Setup saved. Job history shows what was planned and what ran.', 'ok');
+      }, function (err) { ss.disabled = false; msg(errText(err), 'err'); });
+      return;
+    }
     var mx = e.target.closest('button[data-mix]');
     if (mx) { S.mixOpen = mx.getAttribute('data-mix'); renderRun(); $('mixLot').focus(); return; }
     if (e.target.closest('button[data-mixcancel]')) { S.mixOpen = null; renderRun(); return; }
@@ -3923,6 +3960,19 @@
   }
   function rlRunLine(g) { return esc(g.press) + ' · ' + esc(g.started) + (g.ended ? ' → ' + esc(g.ended) : '') + (g.hours ? ' · ' + fmt(g.hours, 1) + ' h' : '') + (g.slips ? ' · ' + fmt(g.slips, 0) + ' slips' : ''); }
   function rlRunBadge(g) { return g.status === 'Cancelled' ? ' ' + badge('gray', 'Run cancelled') : g.status === 'Open' ? ' ' + badge('blue', 'Running') : ''; }
+  /** 2.048: station and anilox per ink as the run ran them ("was" = what was planned, when the operator changed it). */
+  function rlSetup(g) {
+    var list = (g.setup || []).filter(function (x) { return x.station || x.anilox; });
+    if (!list.length) return '';
+    var changed = list.filter(function (x) { return x.was; }).length;
+    return '<details class="jhmore"><summary>Setup as run (' + list.length + ' ink' + (list.length === 1 ? '' : 's') +
+      (changed ? ', ' + changed + ' changed' : '') + ')</summary><ul class="jhsetup">' + list.map(function (x) {
+        return '<li>' + esc(x.side) + ' · ' + (x.station ? 'Station ' + esc(x.station) : 'No station') + ' · <b>' + esc(x.ink) + '</b>' +
+          (x.anilox ? ' · Anilox ' + esc(x.anilox) : '') +
+          (x.was ? ' ' + badge('yellow', 'Changed') + ' <span class="muted">planned station ' + esc(x.was.station || '–') + ', anilox ' + esc(x.was.anilox || '–') + '</span>' : '') +
+          '</li>';
+      }).join('') + '</ul></details>';
+  }
   function rlFold(g) {   // rolls, lots and deviations of one run
     var n = g.entries.length;
     if (!n && !(g.rolls && g.rolls.count)) return '';
@@ -3951,7 +4001,7 @@
       rlTeam('Assigned to', o.startOperator, o.startPackers, o.team) +
       o.runs.map(function (g) {
         return '<div class="rlentry">' + badge('gray', 'Ink run') + ' ' + rlRunLine(g) + rlRunBadge(g) +
-          '<div class="s">started by ' + esc(g.startedBy || '—') + '</div>' + rlFold(g) + '</div>';
+          '<div class="s">started by ' + esc(g.startedBy || '—') + '</div>' + rlSetup(g) + rlFold(g) + '</div>';
       }).join('') +
       (o.runs.length ? '' : '<div class="s">No ink run started on it.</div>') +
       rlNotes(o) + '</div>';
@@ -3959,7 +4009,7 @@
   function rlLoose(g) {
     return '<div class="rlrun"><div class="t">' + esc(g.job) + ' <span class="muted">· ' + esc(g.state) + '</span> ' + badge('gray', 'No work order') + rlRunBadge(g) + '</div>' +
       '<div class="s">' + rlRunLine(g) + '</div>' +
-      rlTeam('Started by', g.startedBy, g.startPackers, g.team) + rlNotes(g) + rlFold(g) + '</div>';
+      rlTeam('Started by', g.startedBy, g.startPackers, g.team) + rlNotes(g) + rlSetup(g) + rlFold(g) + '</div>';
   }
   function rlShow(d) {
     setMsg('mMsg', '');
