@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <title>Maintenance Tools</title>
   <link rel="manifest" href="manifest.webmanifest?v=2">
@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "1.021", KEY = "mt-site-reloaded";
+    var BUILT = "1.022", KEY = "mt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -332,6 +332,15 @@
     :root[data-look="light"] .lockline { color: #b42318; }
     :root[data-look="light"] .pc-form { background: var(--field); }
     :root[data-look="light"] button.primary, :root[data-look="light"] .seg button.on { box-shadow: 0 4px 12px var(--accent-glow); }
+    /* ---- 1.022: accessibility pass (Impeccable review) ---- */
+    p { text-wrap: pretty; }   /* no single word alone on a paragraph's last line */
+    .cnt:not(.soft) { background: #c81e1e; color: #fff; }   /* count badges: white on the light red was hard to read */
+    @media (pointer: coarse) {   /* gloved fingers: 44px tap areas, same look */
+      #dZoomIn, #dZoomOut { min-inline-size: 44px; min-block-size: 44px; }
+      .reslink { display: inline-flex; align-items: center; gap: 6px; min-block-size: 44px; }
+      #ocBox > summary, #resAddBox > summary, .changes summary { padding-block: 11px; }   /* padding, not flex: keeps the ▼ arrow */
+      label:has(> #prFixed), label:has(> #ordClosed) { display: inline-flex; align-items: center; gap: 6px; min-block-size: 44px; }
+    }
   </style>
 </head>
 <body>
@@ -447,7 +456,7 @@
       <div class="cardhead"><h2>Parts to order</h2><button class="chip noprint" id="ordPrint">Print</button></div>
       <p class="muted" id="ordHint" style="margin-top:4px"></p>
       <div id="ordList"></div>
-      <label class="noprint" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--text)"><input type="checkbox" id="ordClosed" style="width:auto"> Show received and cancelled</label>
+      <label class="noprint" style="text-transform:none;letter-spacing:0;font-size:15px;color:var(--text)"><input type="checkbox" id="ordClosed" style="width:24px;height:24px"> Show received and cancelled</label>
     </div>
   </section>
 
@@ -492,7 +501,7 @@
     </div>
     <div class="card">
       <div class="cardhead"><h2>Problems</h2>
-        <label style="margin:0;text-transform:none;letter-spacing:0;font-size:15px;color:var(--text)"><input type="checkbox" id="prFixed" style="width:auto"> Show fixed</label></div>
+        <label style="margin:0;text-transform:none;letter-spacing:0;font-size:15px;color:var(--text)"><input type="checkbox" id="prFixed" style="width:24px;height:24px"> Show fixed</label></div>
       <div id="prList"><p class="muted">Loading…</p></div>
     </div>
   </section>
@@ -590,8 +599,9 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '1.021';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '1.022';   // bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   var APP_CHANGES = [
+    ['1.022', '11/23/2026', 'Easier to read and tap: darker red count badges, bigger tap areas for small links, zoom buttons and check boxes on phones and tablets, and small fixes for screen readers.'],
     ['1.021', '11/23/2026', 'Safer logins: after too many wrong PINs from any devices, new logins pause for 10 minutes and the owner gets an email. Changing someone\'s PIN now logs out devices still using the old one. Typed notes are always saved as plain text, and Press Tools can only print documents that are shared with a link.'],
     ['1.020', '11/21/2026', 'Resources shows the machine manuals from Press Tools (first: the Mark Andy 2200C service manual), and maintenance can add its own under Manuals. The manual is also linked on the MA1, MA2 and MA3 pages.'],
     ['1.019', '11/20/2026', 'Tap points: parts whose number starts with 0 (like 02109400 on the slitter) open again, with their name and where they\'re used. A part that really isn\'t in the parts list says so in the card instead of staying on Loading.'],

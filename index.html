@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <title>Press Tools</title>
   <link rel="manifest" href="manifest.webmanifest?v=2">
@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.048", KEY = "pt-site-reloaded";
+    var BUILT = "2.049", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -752,6 +752,18 @@
     :root[data-look="light"] .t-off { background: #e5e7eb; } :root[data-look="light"] .t-pto { background: #dbeafe; } :root[data-look="light"] .t-sick { background: #ffedd5; }
     :root[data-look="light"] button.primary, :root[data-look="light"] .seg button.on, :root[data-look="light"] .tabs button.on,
     :root[data-look="light"] .ink .plus, :root[data-look="light"] .pal .plus, :root[data-look="light"] .keypad button.primary { box-shadow: 0 4px 12px var(--accent-glow); }
+    /* ---- 2.049: accessibility pass (Impeccable review) ---- */
+    p { text-wrap: pretty; }   /* no single word alone on a paragraph's last line */
+    .cnt:not(.soft) { background: #c81e1e; color: #fff; }   /* count badges: white on the light red was 2.8:1, now about 5.6:1 */
+    .check input { width: 24px; height: 24px; }
+    @media (pointer: coarse) {   /* gloved fingers: 44px tap areas, same look */
+      .check { min-block-size: 44px; }
+      .ink .mixbtn { display: inline-flex; align-items: center; min-block-size: 44px; }
+      .ink .mixrm { position: relative; }
+      .ink .mixrm::after { content: ''; position: absolute; inset: -12px; }
+      .setupbox summary, details.jhmore > summary, .changes summary { padding-block: 11px; }   /* padding, not flex: keeps the ▼ arrow */
+    }
+    :root[data-look="light"] input::placeholder, :root[data-look="light"] textarea::placeholder { opacity: 1; }
   </style>
 </head>
 <body>
@@ -1409,6 +1421,7 @@
     <div class="card">
       <h2>Delete archived waste data</h2>
       <p class="muted" style="margin-top:0">Permanently deletes archived rolls saved before this date. This can't be undone.</p>
+      <label for="purgeBefore">Delete rolls archived before</label>
       <input id="purgeBefore" type="date">
       <button id="purgeBtn" class="wide danger">Delete archived rolls</button>
     </div>
@@ -1578,9 +1591,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.048';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.049';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.049', '11/23/2026', 'Easier to read and tap: darker red count badges, bigger tap areas for small links and check boxes on phones and tablets, and small fixes for screen readers.'],
     ['2.048', '11/23/2026', 'Each ink run now keeps the station and anilox every ink ran on. If you swap an anilox or move a station during the run, tap "Change station or anilox" on that ink. Job history shows the setup as run, with what was planned when it changed.'],
     ['2.047', '11/23/2026', 'Safer logins: after too many wrong PINs from any devices, new logins pause for 10 minutes and the owner gets an email. Changing someone\'s PIN now logs out devices still using the old one. Typed notes and names are always saved as plain text in the Sheet.'],
     ['2.046', '11/21/2026', 'New Manuals section in Resources, starting with the Mark Andy 2200C service manual (opens in Google Drive). New SOP: Kiss Impression.'],
