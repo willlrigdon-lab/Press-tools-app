@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.049", KEY = "pt-site-reloaded";
+    var BUILT = "2.050", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -182,6 +182,10 @@
     .recent li { display: flex; justify-content: space-between; padding: 9px 0; border-top: 1px solid var(--line); font-size: 15px; }
     .recent li:first-child { border-top: 0; }
     .recent .when { color: var(--muted); font-size: 13px; }
+    .recent .rnote { font-size: 14px; white-space: pre-wrap; }   /* 2.050 roll notes */
+    .recent .rnotebtn { padding: 2px 0; font-size: 14px; }
+    .recent .wnoteform { width: 100%; display: grid; gap: 8px; }
+    .rolls td.wnotecell { min-width: 180px; white-space: normal; }
 
     .pal { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; }
     .pal .count { font-size: 15px; }
@@ -760,6 +764,7 @@
       .check { min-block-size: 44px; }
       .ink .mixbtn { display: inline-flex; align-items: center; min-block-size: 44px; }
       .ink .mixrm { position: relative; }
+      .recent .rnotebtn { display: inline-flex; align-items: center; min-block-size: 44px; }
       .ink .mixrm::after { content: ''; position: absolute; inset: -12px; }
       .setupbox summary, details.jhmore > summary, .changes summary { padding-block: 11px; }   /* padding, not flex: keeps the ▼ arrow */
     }
@@ -973,6 +978,10 @@
           <input id="w_pallet3" inputmode="numeric" placeholder="Pallet 3" aria-label="Pallet 3">
         </div>
         <div class="hint">Type the slip count on each pallet, including a partial one. Leave a pallet blank if there isn't one.</div>
+
+        <label for="w_note">Note (optional)</label>
+        <textarea id="w_note" rows="2" maxlength="300" style="font-family:inherit;resize:vertical" aria-describedby="w_noteHint" placeholder="e.g. Stopped to run sample plates"></textarea>
+        <div id="w_noteHint" class="hint">Anything that explains this roll, like extra setups or a stop. It goes in the log with the roll.</div>
 
         <div class="wbtns">
           <button id="w_calcBtn">Calculate</button>
@@ -1591,9 +1600,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.049';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.050';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.050', '11/23/2026', 'Waste rolls can carry a note: type it when you save the roll, or tap Add note under Recently saved. The note shows with the roll on the run, in Manage → Waste and in Job history.'],
     ['2.049', '11/23/2026', 'Easier to read and tap: darker red count badges, bigger tap areas for small links and check boxes on phones and tablets, and small fixes for screen readers.'],
     ['2.048', '11/23/2026', 'Each ink run now keeps the station and anilox every ink ran on. If you swap an anilox or move a station during the run, tap "Change station or anilox" on that ink. Job history shows the setup as run, with what was planned when it changed.'],
     ['2.047', '11/23/2026', 'Safer logins: after too many wrong PINs from any devices, new logins pause for 10 minutes and the owner gets an email. Changing someone\'s PIN now logs out devices still using the old one. Typed notes and names are always saved as plain text in the Sheet.'],
@@ -1818,7 +1828,7 @@
   /* =====================================================================
      WASTE ROLL CALCULATOR
      ===================================================================== */
-  var W_FIELDS = ['rollNumber','packageLength','startCounter','endCounter','pallet1','pallet2','pallet3'];
+  var W_FIELDS = ['rollNumber','packageLength','startCounter','endCounter','pallet1','pallet2','pallet3','note'];
 
   function wRead() {
     var o = {};
@@ -1854,12 +1864,46 @@
       left.innerHTML = '<strong></strong><br><span class="when"></span>';
       left.querySelector('strong').textContent = r.rollNumber;
       left.querySelector('.when').textContent = r.savedAt + (r.press ? ' · ' + r.press : '') + (r.operator ? ' · ' + r.operator : '') + (r.job ? ' · ' + r.job : '');
+      if (r.note) {   // 2.050
+        var nt = document.createElement('span'); nt.className = 'rnote'; nt.textContent = r.note;
+        left.appendChild(document.createElement('br')); left.appendChild(nt);
+      }
+      if (r.canNote) {
+        var nb = document.createElement('button'); nb.type = 'button'; nb.className = 'link rnotebtn';
+        nb.textContent = r.note ? 'Edit note' : 'Add note'; nb.setAttribute('data-wnote', r.key);
+        left.appendChild(document.createElement('br')); left.appendChild(nb);
+      }
       var right = document.createElement('span');
       right.textContent = fmt(r.wasteFt, 2) + ' ft · ' + fmt(r.wastePct * 100, 2) + '%';
       li.appendChild(left); li.appendChild(right);
       ul.appendChild(li);
     });
+    W_RECENT = list;
   }
+  /** 2.050: add or edit the note on a saved roll, right in Recently saved. */
+  var W_RECENT = [];
+  $('w_recent').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-wnote]');
+    if (b) {
+      var key = b.getAttribute('data-wnote'), r = W_RECENT.filter(function (x) { return x.key === key; })[0]; if (!r) return;
+      var li = b.closest('li'), f = document.createElement('div'); f.className = 'wnoteform';
+      f.innerHTML = '<label for="w_noteEdit">Note for roll ' + esc(r.rollNumber) + '</label>' +
+        '<textarea id="w_noteEdit" rows="3" maxlength="300" style="font-family:inherit;resize:vertical"></textarea>' +
+        '<div class="row2"><button type="button" data-wnotecancel="1">Cancel</button><button type="button" class="primary" data-wnotesave="' + esc(key) + '">Save note</button></div>';
+      li.replaceChildren(f);
+      $('w_noteEdit').value = r.note || ''; $('w_noteEdit').focus();
+      return;
+    }
+    if (e.target.closest('button[data-wnotecancel]')) { wShowRecent(W_RECENT); return; }
+    var sv = e.target.closest('button[data-wnotesave]');
+    if (sv) {
+      sv.disabled = true; wMsg('Saving note…');
+      srv('wasteNoteSave', [sv.getAttribute('data-wnotesave'), $('w_noteEdit').value.trim()], function (res) {
+        wShowRecent(res.recent); wMsg(res.message, 'ok');
+        if (S.run && S.rolls && S.rolls.runId === S.run.runId) srv('inkGetRun', [S.run.runId], function (run) { if (run && run.rolls) { S.rolls = { runId: run.runId, data: run.rolls }; renderRolls(); } });
+      }, function (err) { sv.disabled = false; wMsg(errText(err), 'err'); });
+    }
+  });
 
   $('w_calcBtn').addEventListener('click', function () {
     wMsg('Calculating…'); wBusy(true);
@@ -2315,7 +2359,7 @@
     $('runRollsSum').textContent = d.count ? d.count + (d.count === 1 ? ' roll · ' : ' rolls · ') + pct(d.wastePct) + ' waste' : '';
     $('runRollsList').innerHTML = d.count ? d.rolls.map(function (x) {
       return '<div class="item"><div><div class="t">' + esc(x.roll) + '</div><div class="s">Counter ' + fmt(x.start, 0) + ' → ' + fmt(x.end, 0) +
-        (x.by ? ' · ' + esc(x.by) : '') + ' · ' + esc(x.saved) + '</div></div><div class="acts">' + badge('gray', pct(x.wastePct) + ' waste') + '</div></div>';
+        (x.by ? ' · ' + esc(x.by) : '') + ' · ' + esc(x.saved) + '</div>' + (x.note ? '<div class="s">“' + esc(x.note) + '”</div>' : '') + '</div><div class="acts">' + badge('gray', pct(x.wastePct) + ' waste') + '</div></div>';
     }).join('') : '<p class="muted" style="margin:0">No rolls saved on this run yet. A roll saved on ' + esc(r.press) + ' while this run is open is added here.</p>';
     var now = $('w_rollNumber').value.trim(), start = $('w_startCounter').value.trim(), sn = Number(start.replace(/,/g, ''));
     $('rollNow').innerHTML = now
@@ -3914,18 +3958,18 @@
     $('wRolls').innerHTML = '<table class="rolls rep"><tr><th>Saved</th><th>Press</th><th>Operator</th><th>Roll #</th><th>Job</th>' +
       '<th class="n">Package length</th><th class="n">Start counter</th><th class="n">End counter</th>' +
       '<th class="n">Pallet 1</th><th class="n">Pallet 2</th><th class="n">Pallet 3</th>' +
-      '<th class="n">Starting footage</th><th class="n">Machine count</th><th class="n">Finished product</th><th class="n">Waste ft</th><th class="n">Waste %</th></tr>' +
+      '<th class="n">Starting footage</th><th class="n">Machine count</th><th class="n">Finished product</th><th class="n">Waste ft</th><th class="n">Waste %</th><th>Note</th></tr>' +
       rolls.map(function (r) {
         return '<tr><td>' + esc(r.saved) + '</td><td>' + esc(r.press) + '</td><td>' + esc(r.operator) + '</td><td>' + esc(r.roll) + '</td>' +
           '<td>' + (r.job ? esc(r.job) + ' <span class="muted">· ' + esc(r.state) + '</span>' : '<span class="muted">—</span>') + '</td>' +
           '<td class="n">' + n(r.packageLength) + '</td><td class="n">' + n(r.startCounter) + '</td><td class="n">' + n(r.endCounter) + '</td>' +
           '<td class="n">' + n(r.p1) + '</td><td class="n">' + n(r.p2) + '</td><td class="n">' + n(r.p3) + '</td>' +
           '<td class="n">' + n(r.startingFootage, 2) + '</td><td class="n">' + n(r.machineCount) + '</td><td class="n">' + n(r.finished, 2) + '</td>' +
-          '<td class="n">' + n(r.wasteFt, 2) + '</td><td class="n">' + n(r.wastePct * 100, 2) + '%</td></tr>';
+          '<td class="n">' + n(r.wasteFt, 2) + '</td><td class="n">' + n(r.wastePct * 100, 2) + '%</td><td class="wnotecell">' + esc(r.note || '') + '</td></tr>';
       }).join('') +
       '<tr class="tot"><td colspan="5">Total · ' + total.rolls + ' roll' + (total.rolls === 1 ? '' : 's') + '</td><td></td><td></td><td></td>' +
       '<td class="n" colspan="3">' + n(sum.p) + ' slips</td><td class="n">' + n(total.start, 2) + '</td><td class="n">' + n(sum.mc) + '</td>' +
-      '<td class="n">' + n(total.finished, 2) + '</td><td class="n">' + n(total.waste, 2) + '</td><td class="n">' + n(total.wastePct * 100, 2) + '%</td></tr></table>';
+      '<td class="n">' + n(total.finished, 2) + '</td><td class="n">' + n(total.waste, 2) + '</td><td class="n">' + n(total.wastePct * 100, 2) + '%</td><td></td></tr></table>';
   }
   /* Manage → Reports → Job history (2.040; was Run log): every run with its team, handoffs, issues, requests, rolls, lots */
   var RL = { started: false, jobs: [] };
@@ -3999,7 +4043,8 @@
           '<div class="s">' + esc(x.by) + ' · ' + esc(x.when) + '</div></div>';
       }).join('') +
       (g.rolls && g.rolls.count ? '<div class="rlentry">' + badge('gray', 'Rolls') + ' <b>' + g.rolls.count + '</b> · ' + pct(g.rolls.wastePct) + ' waste overall' +
-        '<div class="s">' + g.rolls.list.map(function (x) { return esc(x.roll) + ' ' + pct(x.wastePct); }).join(' · ') + '</div></div>' : '') +
+        '<div class="s">' + g.rolls.list.map(function (x) { return esc(x.roll) + ' ' + pct(x.wastePct); }).join(' · ') + '</div>' +
+        g.rolls.list.filter(function (x) { return x.note; }).map(function (x) { return '<div class="s">' + esc(x.roll) + ': “' + esc(x.note) + '”</div>'; }).join('') + '</div>' : '') +
       '</details>';
   }
   var RL_STATUS = { Open: 'blue', Shipped: 'green', Done: 'green', Cancelled: 'gray' };
