@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.051", KEY = "pt-site-reloaded";
+    var BUILT = "2.052", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -563,7 +563,32 @@
       #workOrder .wo-grid { grid-template-columns: repeat(2, 1fr); }
       #workOrder .wo-big { font-size: 14pt; } #workOrder .wo-job { font-size: 15pt; }
     }
+    /* 2.052: the Press Setup Record and Job Sign-Off printed with a work order, one sheet each */
+    #workOrder .wo-page + .wo-page { break-before: page; page-break-before: always; margin-top: 18px; padding-top: 14px; border-top: 2px dashed #bbb; }
+    #workOrder .sf-page { font-size: 10.5pt; line-height: 1.4; color: #111; }
+    #workOrder .sf-p3 { font-size: 9.5pt; line-height: 1.3; }   /* the checklist page is the fullest */
+    #workOrder .sf-page p { margin: 3px 0 6px; text-wrap: pretty; }
+    #workOrder .sf-page ul { margin: 2px 0 6px; padding-left: 20px; } #workOrder .sf-page li { margin: 1px 0; }
+    #workOrder .sf-co { font-size: 9pt; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #1F3864; }
+    #workOrder .sf-title { font-size: 19pt; color: #1F3864; border-bottom: 1px solid #8EA2BF; padding-bottom: 2px; }
+    #workOrder .sf-sub { font-style: italic; color: #4F6E9E; margin: 4px 0 6px; }
+    #workOrder .sf-page h3 { font-size: 12pt; color: #2E5C8A; margin: 10px 0 3px; text-transform: none; letter-spacing: 0; }
+    #workOrder .sf-page h4 { font-size: 10.5pt; color: #2E5C8A; margin: 8px 0 3px; }
+    #workOrder .sf-t { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    #workOrder .sf-t th, #workOrder .sf-t td { border: 1px solid #8EA2BF; padding: 2px 5px; text-align: left; font-size: 9pt; color: #111; }
+    #workOrder .sf-t th { background: #E7ECF3; font-weight: 700; text-transform: none; letter-spacing: 0; }
+    #workOrder .sf-p1 .sf-t th, #workOrder .sf-p1 .sf-t td { font-size: 10pt; }
+    #workOrder .sf-st td { height: 30px; font-size: 11pt; font-weight: 600; } #workOrder .sf-st .sf-n { text-align: center; font-weight: 700; }
+    #workOrder .sf-st th:nth-child(1) { width: 12%; } #workOrder .sf-st th:nth-child(2) { width: 25%; }
+    #workOrder .sf-ck th:nth-child(1) { width: 52%; } #workOrder .sf-ck th:nth-child(2) { width: 13%; } #workOrder .sf-box { text-align: center; }
+    #workOrder .sf-hd td { height: 20px; } #workOrder .sf-hd .sf-k { width: 17%; } #workOrder .sf-hd td:not(.sf-k) { font-weight: 600; }
+    #workOrder .sf-line { display: inline-block; min-width: 70px; border-bottom: 1px solid #111; height: 1em; vertical-align: bottom; }
+    #workOrder .sf-step { padding-left: 34px; text-indent: -34px; margin: 0 0 6px; }
+    #workOrder .sf-caution { border: 1px solid #C0504D; background: #FDECEA; padding: 5px 8px; margin: 8px 0; font-weight: 700; }
+    #workOrder .sf-caution b { color: #9C0006; }
+    #workOrder .sf-ref { font-size: 8.5pt; } #workOrder .sf-exc { margin-top: 6px; } #workOrder .sf-lines div { height: 20px; }
     @media print {
+      #workOrder .wo-page + .wo-page { margin-top: 0; padding-top: 0; border-top: 0; }
       body.wo-open { background: #fff !important; overflow: visible; }
       body.wo-open > *:not(#workOrder) { display: none !important; }
       body.wo-open #workOrder { position: static; overflow: visible; padding: 4mm 2mm 0; }
@@ -1600,9 +1625,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.051';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.052';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.052', '11/24/2026', 'Printing a work order now prints the Press Setup Record and Job Sign-Off with it: 3 more pages, already filled in with each station\'s ink and anilox, the game, press, state, date and the assigned operator.'],
     ['2.051', '11/23/2026', 'When management changes a job\'s press, operator or packers on the queue, Job history now shows the change with who made it and when, and keeps who the job started with. A new operator also takes over the run open on that job.'],
     ['2.050', '11/23/2026', 'Waste rolls can carry a note: type it when you save the roll, or tap Add note under Recently saved. The note shows with the roll on the run, in Manage → Waste and in Job history.'],
     ['2.049', '11/23/2026', 'Easier to read and tap: darker red count badges, bigger tap areas for small links and check boxes on phones and tablets, and small fixes for screen readers.'],
@@ -4114,7 +4140,7 @@
     setMsg('mMsg', 'Getting the work order for ' + qName(id) + '…');
     srv('workOrder', [id], function (w) {
       // phones only print from a direct tap, so the sheet opens first and its own Print button prints it
-      printOpen('Work order preview', woHtml(w));
+      printOpen('Work order preview', '<div class="wo-page">' + woHtml(w) + '</div>' + (w.job ? sfHtml(w) : ''));   // 2.052: + the 3-page setup record
       setMsg('mMsg', '');
     }, mErr);
   }
@@ -4203,6 +4229,64 @@
       '<div class="tf-foot"><span>Training Acknowledgment Form</span><span>Use a second form if more signature lines are needed</span></div>';
   }
   function woCloseNow() { document.body.classList.remove('wo-open'); $('workOrder').setAttribute('aria-hidden', 'true'); }
+  /**
+   * 2.052: Press Setup Record and Job Sign-Off, 3 pages printed after every work order for a job. Filled from the work order:
+   * each station's ink and anilox, Job Name (the game), Machine (its press), Customer (the state), Operators (the assigned operator,
+   * room to add more), Date (the work order's date – end date written in), and the assigned operator's printed name on the sign-off.
+   */
+  function sfHtml(w) {
+    var h = '<div class="wo-page sf-page sf-p1"><div class="sf-co">Specialty Roll Products</div><div class="sf-title">Press Setup Record and Job Sign-Off</div>' +
+      '<div class="sf-sub">Complete for every run</div>' +
+      '<h3>1. Purpose</h3><p>Complete this record for every run, on every press. It sets a consistent, step-by-step method for preparing print stations, setting impression and registration, adjusting the die cut, and checking the sample against the approved proof before production.</p>' +
+      '<h3>2. Tools and Materials</h3><ul>' + ['Printing plates and plate cylinders', 'Sticky back (mounting tape), as needed', 'New doctor blades',
+        'Anilox rolls, as listed on the job ticket', 'Ink and ink trays', 'Plate rods', 'Paper roll', 'Bucket of water for cleaning plates, as needed']
+        .map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>' +
+      '<h3>3. Station Setup Record (Complete for Each Job)</h3><p>Record the ink and anilox for each station from the approved job ticket before setup. Do not rely on settings from a previous job. If a station runs a different ink or anilox than the job ticket lists, write what was actually used in the Deviation column next to it.</p>' +
+      '<table class="sf-t sf-st"><tr><th>Station</th><th>Ink</th><th>Ink Deviation</th><th>Anilox</th><th>Anilox Deviation</th></tr>' +
+      (w.stations || []).map(function (x) {
+        return '<tr><td class="sf-n">' + x.station + '</td><td>' + esc(x.ink) + '</td><td></td><td>' + esc(x.anilox) + '</td><td></td></tr>';
+      }).join('') + '</table></div>';
+    var steps = [
+      ['4.1', 'Prepare the stations', 'Prepare Stations 1–8, or only the stations the job needs based on its printing plates. Confirm the job ticket and gather the required materials. Install the correct anilox rolls and new doctor blades. Mount the printing plates onto the plate cylinders, then install the plate cylinders in the press following the approved machine procedure.'],
+      ['4.2', 'Fill the ink trays', 'Check the ink for each station against the job ticket. Fill each required ink tray with the correct ink up to the nipple at the back of the pan, as described in the setup notes.'],
+      ['4.3', 'Start, jog and idle the press', 'Complete the setup steps above and confirm every station is securely locked in place. Press the white button once and wait for the beep. To jog the press, press and hold the white button after the beep. To idle the press, press the white and green buttons together, following the approved machine operating instructions.'],
+      ['4.4', 'Set impression at Station 1', 'Use the knobs at the back of the ink tray to bring the impression in gradually until print appears. Adjust the impression knobs in and out until the print is set correctly.'],
+      ['4.5', 'Set impression at the remaining stations', 'Repeat step 4.4 at each remaining front station the job uses. When the last station is set, work back through the stations to Station 1.'],
+      ['4.6', 'Register the backer', 'After the front stations are registered, register the backer. Confirm alignment against the approved proof before adjusting the die cut.'],
+      ['4.7', 'Adjust the die cut', 'After the print is aligned, adjust the die cut to the paper length on the job ticket.'],
+      ['4.8', 'Inspect the sample', 'Measure the printed sample against the approved proof. Make minor adjustments as needed, and confirm that print, registration and die-cut measurements meet requirements before production starts.']];
+    h += '<div class="wo-page sf-page"><h3>4. Procedure</h3>' + steps.map(function (x) {
+        return '<p class="sf-step"><b>' + x[0] + '&nbsp;&nbsp;' + esc(x[1]) + '.</b> ' + esc(x[2]) + '</p>';
+      }).join('') +
+      '<div class="sf-caution"><b>CAUTION:</b> Make sure every station is completely locked in place before starting or idling the press.</div>' +
+      '<h3>5. Quality and Safety Verification</h3><ul>' + ['Verify every entry in the Station Setup Record against the job ticket before running.',
+        'Verify impression, registration, die-cut length and sample measurements against the approved proof.',
+        'Follow machine guarding and lockout/tagout requirements when changing blades and working around moving parts.',
+        'Report deviations or unclear setup instructions to Quality or the supervisor before production.']
+        .map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul></div>';
+    function chk(title, items) {
+      return '<h4>' + title + '</h4><table class="sf-t sf-ck"><tr><th>Item</th><th>Verified</th><th>Comments</th></tr>' +
+        items.map(function (t) { return '<tr><td>' + esc(t) + '</td><td class="sf-box">☐</td><td></td></tr>'; }).join('') + '</table>';
+    }
+    var blank = '<span class="sf-line"></span>';
+    h += '<div class="wo-page sf-page sf-p3"><h3>6. Flexo Printing Press Job Sign-Off Checklist</h3>' +
+      '<p>Complete this checklist for each job. Record exceptions in Comments and obtain required approvals before releasing the job to production.</p>' +
+      '<p class="sf-ref">Checklist reference: SRP-FRM-OPS-0005 │ Owner: Operations │ Source version: 1.0 │ Source effective date: 08/05/2026</p>' +
+      '<table class="sf-t sf-hd"><tr><td class="sf-k">Job Name</td><td>' + esc(w.job || '') + '</td><td class="sf-k">PO Number</td><td></td></tr>' +
+      '<tr><td class="sf-k">Machine</td><td>' + esc(w.press || '') + '</td><td class="sf-k">Customer</td><td>' + esc(w.state || '') + '</td></tr>' +
+      '<tr><td class="sf-k">Operators</td><td>' + (w.operator ? esc(w.operator) + ', ' : '') + blank + '</td><td class="sf-k">Date</td><td>' + esc(w.added || '') + ' – ' + blank + '</td></tr>' +
+      '<tr><td class="sf-k">Job Start Time</td><td></td><td class="sf-k">Job End Time</td><td></td></tr></table>' +
+      chk('Pre-Press Verification', ['Job traveler/work order reviewed', 'Customer specifications verified', 'Approved artwork available', 'Correct plate revision installed',
+        'Plate mounting verified', 'Correct anilox rolls installed', 'Correct substrate/material loaded', 'Material width verified', 'Correct inks available and mixed',
+        'Color standards available', 'Die/tooling verified']) +
+      chk('Press Setup Approval', ['Registration set and acceptable', 'Cure/drying system functioning properly', 'Die-cut registration acceptable', 'Slitting dimensions verified']) +
+      chk('Quality Inspection Sign-Off', ['Copy/text accuracy verified', 'Colors match approved standard', 'No missing print', 'No streaking or voids', 'No dirty print',
+        'No plate bounce/chatter', 'No gear marks', 'No registration issues', 'No die-cut issues', 'Label dimensions verified', 'Sample retained for quality records']) +
+      '<h4>Press Operator Sign-Off</h4><table class="sf-t sf-hd"><tr><td class="sf-k">Name:</td><td>' + esc(w.operator || '') + '</td><td class="sf-k">Signature:</td><td></td></tr>' +
+      '<tr><td class="sf-k">Name:</td><td></td><td class="sf-k">Signature:</td><td></td></tr></table>' +
+      '<p class="sf-exc">Checklist exceptions / corrective actions:</p><div class="wo-lines sf-lines"><div></div><div></div></div></div>';
+    return h;
+  }
   function woHtml(w) {
     var TYPE = { Order: 'Order', Stock: 'For stock', Note: 'Note' };
     var run = w.type === 'Note' && !w.slips ? '—' : w.slips ? fmt(w.slips, 0) + ' slips' : 'Open-ended';
