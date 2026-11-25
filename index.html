@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.052", KEY = "pt-site-reloaded";
+    var BUILT = "2.053", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -563,6 +563,10 @@
       #workOrder .wo-grid { grid-template-columns: repeat(2, 1fr); }
       #workOrder .wo-big { font-size: 14pt; } #workOrder .wo-job { font-size: 15pt; }
     }
+    /* 2.053: a run left open from another job */
+    .stalerun { margin: 0 0 10px; padding: 10px 12px; border: 1px solid var(--warn); border-left-width: 5px; border-radius: 12px; background: var(--warn-soft); font-size: 15px; }
+    .stalerun .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .stalerun .acts button { min-block-size: 44px; }
     /* 2.052: the Press Setup Record and Job Sign-Off printed with a work order, one sheet each */
     #workOrder .wo-page + .wo-page { break-before: page; page-break-before: always; margin-top: 18px; padding-top: 14px; border-top: 2px dashed #bbb; }
     #workOrder .sf-page { font-size: 10.5pt; line-height: 1.4; color: #111; }
@@ -1625,9 +1629,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.052';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.053';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.053', '11/25/2026', 'A run left open from an earlier job no longer gets in the way: the press shows a warning with End and Cancel buttons, Hand off and Report issue follow the job that\'s actually on the press, and marking a job done while its run is still open asks first.'],
     ['2.052', '11/24/2026', 'Printing a work order now prints the Press Setup Record and Job Sign-Off with it: 3 more pages, already filled in with each station\'s ink and anilox, the game, press, state, date and the assigned operator.'],
     ['2.051', '11/23/2026', 'When management changes a job\'s press, operator or packers on the queue, Job history now shows the change with who made it and when, and keeps who the job started with. A new operator also takes over the run open on that job.'],
     ['2.050', '11/23/2026', 'Waste rolls can carry a note: type it when you save the roll, or tap Add note under Recently saved. The note shows with the roll on the run, in Manage → Waste and in Job history.'],
@@ -2092,6 +2097,14 @@
   }
 
   /* ----- job assignment for this press (set by management) ----- */
+  /** 2.053: the open run is left over from another job (the server says so: not the press's current work order). */
+  function isStaleRun(r) { var st = S.assigned && S.assigned.staleRun; return !!(st && r && st.runId === r.runId); }
+  function staleHtml(a) {
+    var st = a.staleRun, c = a.current;
+    return '<div class="stalerun" role="alert"><b>' + esc(S.press) + ' still has a ' + esc(st.job) + ' run open</b>' + (st.started ? ' (started ' + esc(st.started) + ')' : '') +
+      ', but the job on ' + esc(S.press) + ' is <b>' + esc(c.job || c.note) + '</b>. End the ' + esc(st.job) + ' run if ink was used, or cancel it if it wasn\'t.' +
+      '<div class="acts"><button type="button" class="primary" data-stale="end">End ' + esc(st.job) + ' run</button><button type="button" data-stale="cancel">Cancel it</button></div></div>';
+  }
   function renderAssign() {
     var a = S.assigned;
     show('assignCard', !!(S.press && a && a.current));   // nothing assigned: no card
@@ -2102,7 +2115,7 @@
     var cj = c.jobKey ? S.jobs.filter(function (j) { return j.key === c.jobKey; })[0] : null;
     var canPick = !S.run && !!cj;
     var sub = [c.job ? esc(c.state) : '', qLine(c)].filter(Boolean).join(' · ');
-    $('assignNow').innerHTML = '<div class="muted">Now</div><div class="now">' + esc(c.job || c.note) + '</div>' +
+    $('assignNow').innerHTML = (a.staleRun ? staleHtml(a) : '') + '<div class="muted">Now</div><div class="now">' + esc(c.job || c.note) + '</div>' +
       (sub ? '<div class="nowsub">' + sub + '</div>' : '') +
       (c.job && c.note ? '<div class="nowsub" style="color:var(--text)">' + esc(c.note) + '</div>' : '') +
       '<div class="runteam"><div class="crew">' + (c.operator ? 'Operator: <b>' + esc(c.operator) + '</b>' : '<span class="muted">No operator yet</span>') +
@@ -2132,6 +2145,13 @@
     if (e.target.id === 'assignSetup') store('assignSetupOpen', e.target.open ? '1' : '0');
   }, true);
   $('assignNow').addEventListener('click', function (e) {
+    var sb = e.target.closest('[data-stale]');
+    if (sb) {   // 2.053: deal with the leftover run right from the card
+      opTab('ink');
+      if (sb.getAttribute('data-stale') === 'cancel') { $('cancelRun').click(); return; }
+      var eb = $('endToggle'); eb.scrollIntoView({ block: 'center' }); eb.focus();
+      return;
+    }
     if (e.target.closest('[data-hand]')) { handOpen(); return; }   // 2.042: hand off the work order, run or no run
     if (e.target.id !== 'assignPick') return;
     var c = S.assigned.current;
@@ -2313,6 +2333,7 @@
   }
   function jobHolder() {   // the open run's operator, else the work order's
     var r = S.run, c = S.assigned && S.assigned.current;
+    if (r && isStaleRun(r)) r = null;   // 2.053: a run left open from another job doesn't hold the press's job
     if (r) return { op: r.operator || r.startedBy || '', job: r.job, key: 'run:' + r.runId, packers: r.packers || '', what: r.job + ' · ' + r.state };
     if (c) return { op: c.operator || '', job: c.job || c.note || 'Note', key: 'wo:' + c.id, packers: c.packers || '',
       what: c.job ? c.job + ' · ' + c.state : (c.note || 'Note') };
@@ -3918,7 +3939,14 @@
     if (!ship && !unship) return;
     qLock(true);
     var label = b.textContent, nm = qName(ship || unship);
-    srv('queueShip', [ship || unship, !!unship, $('qShowShipped').checked], function (d) {
+    srv('queueShip', [ship || unship, !!unship, $('qShowShipped').checked], function shipped(d) {
+      if (d && d.confirmRun) {   // 2.053: its ink run is still open on the press
+        var cr = d.confirmRun;
+        if (!confirm(cr.job + ' · ' + cr.state + ' still has an ink run open on ' + cr.press + (cr.started ? ' (started ' + cr.started + ')' : '') + '.\n\n' +
+          'Mark the work order ' + cr.status.toLowerCase() + ' anyway? The run stays open until someone ends or cancels it on ' + cr.press + '.')) { qLock(false); return; }
+        srv('queueShip', [ship, false, $('qShowShipped').checked, true], shipped, mErr);
+        return;
+      }
       qShow(d);
       if (!ship) { setMsg('mMsg', 'Back in the queue.', 'ok'); return; }
       undoMsg('mMsg', nm + ': ' + (label === 'Done' ? 'marked done.' : 'marked shipped.'), function () {
