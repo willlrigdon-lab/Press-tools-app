@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.053", KEY = "pt-site-reloaded";
+    var BUILT = "2.054", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -1451,8 +1451,8 @@
       <button id="backupBtn" class="wide">Turn on nightly backup</button>
     </div>
     <div class="card">
-      <h2>Monday ordering email</h2>
-      <p class="muted" style="margin-top:0">Every Monday around 8 AM: ink and supplies to order (not marked Ordered yet) and ink marked Ordered a week or more ago that hasn't come in. Change who gets it in the Settings tab (Weekly report email).</p>
+      <h2>Monday emails</h2>
+      <p class="muted" style="margin-top:0">Every Monday around 8 AM, three emails: ink to order and ink orders not received; supplies to order and supply orders not received; the issues reported the week before. Change who gets them in the Settings tab (Weekly report email).</p>
       <div id="wkStatus"></div>
       <button id="wkSend" class="wide">Send one now</button>
     </div>
@@ -1629,9 +1629,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.053';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.054';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.054', '11/27/2026', 'The Monday email is now three emails: one for ink, one for supplies, and one listing the issues reported the week before.'],
     ['2.053', '11/25/2026', 'A run left open from an earlier job no longer gets in the way: the press shows a warning with End and Cancel buttons, Hand off and Report issue follow the job that\'s actually on the press, and marking a job done while its run is still open asks first.'],
     ['2.052', '11/24/2026', 'Printing a work order now prints the Press Setup Record and Job Sign-Off with it: 3 more pages, already filled in with each station\'s ink and anilox, the game, press, state, date and the assigned operator.'],
     ['2.051', '11/23/2026', 'When management changes a job\'s press, operator or packers on the queue, Job history now shows the change with who made it and when, and keeps who the job started with. A new operator also takes over the run open on that job.'],
@@ -4817,7 +4818,9 @@
       '<div class="item"><div><div class="t">Goes to</div><div class="s">' + esc(w.to || 'Nobody: type an address in Settings') + '</div></div>' +
       '<div class="acts">' + badge(w.on ? 'green' : 'yellow', w.on ? 'On · Mondays' : 'Off') + '</div></div>' +
       (w.on ? '' : '<p class="muted" style="margin:6px 0">To turn it on: on a computer, open the Apps Script editor, pick weeklyReportSetup and press Run (once).</p>') +
-      '<div class="item"><div><div class="t">Last sent</div><div class="s">' + (l ? esc(l.time) + ' · ' + l.supplies + ' supplies, ' + l.inks + ' inks to order · ' + (l.suppliesOverdue || 0) + ' supply orders, ' + l.overdue + ' ink orders not received' : 'Not sent yet') + '</div></div><div></div></div>';
+      '<div class="item"><div><div class="t">Last sent</div><div class="s">' + (l ? esc(l.time) + ' · ' + l.inks + ' inks to order, ' + l.overdue + ' ink orders not received · ' + l.supplies + ' supplies to order, ' + (l.suppliesOverdue || 0) + ' supply orders not received' +
+        (l.issues === undefined ? '' : ' · ' + l.issues + ' issues') : 'Not sent yet') + '</div></div>' +
+      '<div class="acts">' + (l && l.failed && l.failed.length ? badge('red', 'Not sent: ' + l.failed.join(', ')) : '') + '</div></div>';
   }
   /* App health (2.031): rows in the growing tabs, Sheet size, last backup */
   function healthShow(h) {
@@ -4870,7 +4873,7 @@
       function (e) { $('backupBtn').disabled = false; aErr(e); });
   });
   $('wkSend').addEventListener('click', function () {
-    if (!confirm('Send the ordering email to ' + (WK.to || 'the Settings address') + ' now?')) return;
+    if (!confirm('Send the 3 Monday emails (ink, supplies, last week\'s issues) to ' + (WK.to || 'the Settings address') + ' now?')) return;
     $('wkSend').disabled = true; setMsg('aMsg', 'Sending…');
     srv('weeklyReportNow', [], function (r) { $('wkSend').disabled = false; wkShow(r); setMsg('aMsg', r.message, 'ok'); },
       function (e) { $('wkSend').disabled = false; aErr(e); });
