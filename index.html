@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.064", KEY = "pt-site-reloaded";
+    var BUILT = "2.065", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -310,7 +310,7 @@
     .jlnew { margin-top: 16px; }
     .tablewrap { overflow-x: auto; }
     .pbshop, .pbgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-top: 10px; }
-    .pbgrid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+    .pbgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
     .pbgrid .pbstat { padding: 6px 8px; }
     .pbgrid .pbstat .v { font-size: 17px; }
     .pbgrid .pbstat .l { font-size: 12px; }
@@ -1763,13 +1763,14 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.064';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.065';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.065', '11/28/2026', 'Press board trimmed to progress: rolls, waste and cleanups are gone (the waste logs have those), and "yesterday" is now the last work day (Monday to Thursday, or a day off if something was printed then).'],
     ['2.064', '11/28/2026', 'Maintenance request: pick who gets it (Taylor, Cody or everyone on call). The phone remembers your last pick.'],
     ['2.063', '11/28/2026', 'A run that ends with nothing entered (like samples) logs no ink or waste: it stays out of the ink averages and its startup bottles go back to stock. It still shows in Job history, marked Not tracked.'],
     ['2.062', '11/28/2026', 'Save Roll double-checks the pallet count: when a roll shows waste below zero or far above what that press usually runs, it asks whether a + Pallet tap was missed or a partial typed wrong. Fix it, or Save anyway with a note.'],
-    ['2.061', '11/28/2026', 'Manage opens on the Press board: for each press, the job and how far along it is, the pace today and when it should finish, the crew, pallets today and yesterday, rolls and waste, cleanups and the next job. The shop day runs 5 AM to 4:59 AM.'],
+    ['2.061', '11/28/2026', 'Manage opens on the Press board: for each press, the job and how far along it is, the pace today and when it should finish, the crew, pallets today and the next job. The shop day runs 5 AM to 4:59 AM.'],
     ['2.060', '11/28/2026', 'Cleanup button on the run screen: pick why, enter leftovers (saved or trashed) and the slips on the pallet, and a new ink run starts on the same job with fresh startup bottles. The job, the roll on the press and the work order keep going.'],
     ['2.059', '11/28/2026', 'Each game in the Job library has its NetSuite item # (like IN-9003-03A), so work orders match the purchase orders and supply plan. It shows on the printed work order and you can search for it. Slips per box is filled in for most games.'],
     ['2.058', '11/28/2026', 'Pallets are counted once: the + Pallet taps on a press also count for the roll on it. At a roll change you only type the slips on the pallet right now; the next roll starts with that number. The roll card shows its exact slip total before you save. Typing Pallet 1, 2 and 3 by hand is still there.'],
@@ -4311,8 +4312,7 @@
     $('pbDay').textContent = 'Shop day from ' + d.day + ' · as of ' + d.asOf;
     var sh = d.shop, size = d.palletSlips || 100000;
     $('pbShop').innerHTML = pbStat(fmt(sh.pallets * size, 0), 'slips today (full pallets)') +
-      pbStat(fmt(sh.palletsYday * size, 0), 'yesterday') +
-      pbStat(sh.rolls ? fmt(sh.rolls, 0) + ' · ' + pct(sh.wastePct) : '0', 'rolls · waste today');
+      pbStat(fmt(sh.palletsLast * size, 0), 'last work day · ' + d.lastDay);
     $('pbList').innerHTML = d.presses.map(function (p) {
       var j = p.job, h = '<div class="card pbcard"><div class="cardhead"><h2>' + esc(p.press) + '</h2>' +
         (j && j.job ? '<button type="button" class="pbhist" data-st="' + esc(j.state) + '" data-jb="' + esc(j.job) + '">Job history</button>' : '') + '</div>';
@@ -4332,9 +4332,7 @@
         h += '<div class="pbcrew">' + (j.operator ? 'Operator: <b>' + esc(j.operator) + '</b>' : '<span class="muted">No operator yet</span>') +
           (j.packers ? ' · Packers: <b>' + esc(j.packers) + '</b>' : '') + '</div>';
       }
-      h += '<div class="pbgrid">' + pbStat(fmt(p.palletsToday, 0), 'pallets today') + pbStat(fmt(p.palletsYday, 0), 'yesterday') +
-        pbStat(p.rolls.count ? p.rolls.count + ' · ' + pct(p.rolls.wastePct) : '0', 'rolls · waste') + pbStat(fmt(p.cleanups, 0), 'cleanups') + '</div>' +
-        (p.roll ? '<div class="muted">On the press: roll ' + esc(p.roll) + '</div>' : '') +
+      h += '<div class="pbgrid">' + pbStat(fmt(p.palletsToday, 0), 'pallets today') + pbStat(fmt(p.palletsLast, 0), 'pallets ' + d.lastDay) + '</div>' +
         (p.next ? '<div class="muted">Next: ' + esc(p.next.job) + (p.next.state ? ' · ' + esc(p.next.state) : '') + (p.next.slips ? ' · ' + fmt(p.next.slips, 0) + ' slips' : '') +
           (p.more ? ' · +' + p.more + ' more' : '') + '</div>' : '');
       return h + '</div>';
