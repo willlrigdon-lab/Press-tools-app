@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.055", KEY = "pt-site-reloaded";
+    var BUILT = "2.056", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -293,6 +293,25 @@
       border-top: 1px solid var(--line); box-shadow: 0 -6px 14px rgba(0,0,0,.08); border-radius: 0 0 14px 14px; }
     .setup-head { margin-top: 14px; font-weight: 700; font-size: 16px; }
     .pack { margin: 6px 0 0; font-size: 17px; }
+    /* 2.056 job library */
+    .jlstate { margin: 16px 0 4px; font-size: 15px; color: var(--muted); }
+    .jlrow { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 10px; text-align: left; margin: 6px 0 0; padding: 12px; min-height: 44px; }
+    .jlrow .jlname { display: flex; flex-direction: column; min-width: 0; }
+    .jlrow .t { font-weight: 700; overflow-wrap: anywhere; }
+    .jlrow .s { color: var(--muted); font-size: 14px; font-weight: 400; }
+    .jlbadges { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; flex-shrink: 0; max-width: 55%; }
+    .jlstamp { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0 4px; }
+    .jlchg { padding: 9px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+    .jlchg:first-child { border-top: 0; }
+    .jlchg .s { color: var(--muted); font-size: 14px; }
+    .jbinfo { display: grid; gap: 6px; margin-top: 14px; }
+    .jbinfo label { margin-top: 8px; }
+    .setupnote { margin: 8px 0 0; padding: 8px 10px; border-left: 3px solid var(--accent); overflow-wrap: anywhere; }
+    .jlnew { margin-top: 16px; }
+    .tablewrap { overflow-x: auto; }
+    table.setup.jlusage { table-layout: auto; }
+    table.setup.jlusage th { width: auto; }
+    table.setup.jlusage td:first-child { overflow-wrap: normal; min-width: 7.5em; }
     table.setup { table-layout: fixed; }
     table.setup td, table.setup th { padding: 7px 4px; vertical-align: top; overflow-wrap: anywhere; }
     table.setup th:nth-child(1) { width: 44px; }
@@ -1144,7 +1163,7 @@
     </div>
     <div class="tabs" id="mTabs">
       <button data-t="queue" data-g="jobs" class="on">Queue<span class="cnt soft" data-c="queue"></span></button>
-      <button data-t="jobs" data-g="jobs">Edit jobs</button>
+      <button data-t="jobs" data-g="jobs">Job library</button>
       <button data-t="states" data-g="jobs">States</button>
       <button data-t="notices" data-g="jobs">Notices</button>
       <button data-t="resources" data-g="jobs">Resources</button>
@@ -1285,25 +1304,52 @@
     </div>
 
     <div id="m_jobs" class="mpane hidden">
-      <div class="card">
-        <h2>Edit a job</h2>
-        <p class="muted" style="margin-top:0">Inks, colors, press position and anilox. Operators see changes the next time they pick the job.</p>
-        <div class="row2">
-          <div><label for="jbState">State</label><select id="jbState"></select></div>
-          <div><label for="jbJob">Job</label><select id="jbJob"></select></div>
+      <!-- 2.056 job library: every game's setup, packing, plates, proof, usage, work orders and setup history -->
+      <div id="jlListCard" class="card">
+        <h2>Job library</h2>
+        <p class="muted" style="margin-top:0">Every game's setup, packing, plates, proof and history. Operators see the setup sheet at the press.</p>
+        <search>
+          <label for="jlFind">Find a game</label>
+          <input id="jlFind" type="search" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="search" placeholder="State or game name">
+        </search>
+        <div id="jlList"></div>
+        <div class="row2 jlnew">
+          <div><label for="jbState">New job in</label><select id="jbState"></select></div>
+          <div><label>&nbsp;</label><button id="jbNew" type="button" class="wide">+ New job</button></div>
         </div>
-        <button id="jbNew" class="wide">+ New job in this state</button>
+      </div>
+      <div id="jlPage" class="hidden">
+        <div class="card">
+          <div class="cardhead"><h2 id="jlTitle"></h2><button id="jlBack" type="button">All jobs</button></div>
+          <div id="jlStamp" class="jlstamp"></div>
+          <div id="jlView"></div>
+          <button id="jlEdit" type="button" class="primary wide">Edit this job</button>
+        </div>
+        <div class="card"><h2>Ink usage</h2><div id="jlUsage"></div></div>
+        <div class="card"><div class="cardhead"><h2>Work orders</h2><button id="jlHist" type="button">Job history</button></div><div id="jlOrders"></div></div>
+        <div class="card"><h2>Setup history</h2><div id="jlChanges"></div></div>
       </div>
       <div id="jbEditor" class="card hidden">
         <h2 id="jbTitle"></h2>
         <div id="jbNewName" class="hidden"><label for="jbName">New job name</label><input id="jbName" autocomplete="off" placeholder="e.g. Cash 4 Life"></div>
         <div id="jbRows"></div>
         <datalist id="jbInkList"></datalist>
-        <button id="jbAddRow" class="wide">+ Add ink</button>
+        <button id="jbAddRow" type="button" class="wide">+ Add ink</button>
+        <div class="jbinfo">
+          <label for="jbPack">Slips per pack</label>
+          <input id="jbPack" inputmode="numeric" autocomplete="off" placeholder="e.g. 2,500">
+          <label for="jbPlates">Plates</label>
+          <textarea id="jbPlates" rows="2" maxlength="500" placeholder="Where they're stored, condition, anything to know"></textarea>
+          <label for="jbProof">Proof link</label>
+          <input id="jbProof" type="url" inputmode="url" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" maxlength="500" placeholder="https://drive.google.com/…" aria-describedby="jbProofHelp">
+          <small id="jbProofHelp" class="muted">In Drive: Share → General access "Anyone with the link" → Copy link.</small>
+          <label for="jbNotes">Setup notes</label>
+          <textarea id="jbNotes" rows="3" maxlength="1000" placeholder="Anything the operator should know before starting"></textarea>
+        </div>
         <label class="check" style="margin-top:14px"><input type="checkbox" id="jbVerified"> Checked and correct (Verified)</label>
         <div class="row2">
-          <button id="jbCancel" class="wide">Cancel</button>
-          <button id="jbSave" class="primary wide">Save job</button>
+          <button id="jbCancel" type="button" class="wide">Cancel</button>
+          <button id="jbSave" type="button" class="primary wide">Save job</button>
         </div>
       </div>
     </div>
@@ -1629,9 +1675,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.055';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.056';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.056', '11/28/2026', 'Manage → Jobs → Job library: one page per game with its setup, slips per pack, plates, proof link, setup notes, who verified it and when, ink usage, recent work orders and a history of every change. Operators see the plates, setup notes and proof on the setup sheet.'],
     ['2.055', '11/28/2026', 'An ink that shows 0 used on a run now counts as 1/4 bottle used, so ordering and Ink needed never assume an ink uses nothing on a big run. Inventory counts don\'t change.'],
     ['2.054', '11/27/2026', 'The Monday email is now three emails: one for ink, one for supplies, and one listing the issues reported the week before.'],
     ['2.053', '11/25/2026', 'A run left open from an earlier job no longer gets in the way: the press shows a warning with End and Cancel buttons, Hand off and Report issue follow the job that\'s actually on the press, and marking a job done while its run is still open asks first.'],
@@ -1780,7 +1827,7 @@
    * The GitHub page's call shim (tools/build-site.js) also uses this list: reads give up after 30 s, saves after 90 s.
    */
   var READS = { me: 1, inkLoad: 1, inkGetRun: 1, wasteRecent: 1, wasteDraft: 1, noticesList: 1, resourcesList: 1, supplyItems: 1,
-    issuesList: 1, invStock: 1, invLastCount: 1, aniloxList: 1, queueList: 1, statesList: 1, jobGet: 1, wasteReport: 1,
+    issuesList: 1, invStock: 1, invLastCount: 1, aniloxList: 1, queueList: 1, statesList: 1, jobGet: 1, jobLibList: 1, jobLibGet: 1, wasteReport: 1,
     supplyRequests: 1, inkNeeded: 1, manageCounts: 1, workOrder: 1, jobHistory: 1, daysOffMine: 1, daysOffMonth: 1,
     usersList: 1, auditList: 1, appHealth: 1, suggestMine: 1, suggestList: 1, weeklyReportStatus: 1 };
   window.APP_READS = READS;   // the GitHub page's call shim reads this (tools/build-site.js)
@@ -2216,6 +2263,9 @@
       : '<span class="badge unv">Not verified yet</span>') + '</div>';
     if (!j.verified) html += '<p class="muted" style="margin:4px 0 0">Management hasn\'t checked this setup yet. Tell them if something is wrong.</p>';
     if (j.slipsPerPack) html += '<p class="pack">Pack: <b>' + Number(j.slipsPerPack).toLocaleString() + '</b> slips per stack</p>';
+    if (j.setupNotes) html += '<p class="setupnote"><b>Setup notes:</b> ' + esc(j.setupNotes) + '</p>';   // 2.056 job library
+    if (j.plates) html += '<p class="pack">Plates: ' + esc(j.plates) + '</p>';
+    if (j.proof && /^https:\/\//.test(j.proof)) html += '<p class="pack"><a href="' + esc(j.proof) + '" target="_blank" rel="noopener">Open the proof</a></p>';
     ['Front', 'Back'].forEach(function (side) {
       var inks = j.inks.filter(function (k) { return k.side === side; });
       if (!inks.length) return;
@@ -3588,7 +3638,7 @@
     states: function () { srv('statesList', [], statesShow, mErr); },
     notices: function () { srv('noticesList', [], function (d) { noticesShow(d); ntShow(d); }, mErr); },
     resources: function () { srvCached('resourcesList', [], rsShow, mErr, 'rsList'); },
-    jobs: function () { srv('jobGet', [''], jbLists, mErr); },
+    jobs: function () { jlLoad(); },
     daysoff: function () { calLoad(); },
     runlog: function () { rlLoad(); }
   };
@@ -4038,7 +4088,9 @@
       $('rlFrom').value = iso(f); $('rlTo').value = iso(t);
     }
     setMsg('mMsg', 'Loading…');
-    srv('jobHistory', [$('rlState').value || '', $('rlJob').value || '', $('rlFrom').value, $('rlTo').value, $('rlPress').value || '', $('rlOp').value || ''], rlShow, mErr);
+    var seq = RL.seq = (RL.seq || 0) + 1;   // 2.056: a slower, older reply never replaces the newest filters' list
+    srv('jobHistory', [$('rlState').value || '', $('rlJob').value || '', $('rlFrom').value, $('rlTo').value, $('rlPress').value || '', $('rlOp').value || ''],
+      function (d) { if (seq === RL.seq) rlShow(d); }, function (e) { if (seq === RL.seq) mErr(e); });
   }
   function rlJobs() {
     var st = $('rlState').value, keep = $('rlJob').value;
@@ -4571,22 +4623,91 @@
     }, function (e) { b.disabled = false; mErr(e); });
   });
 
-  /* job editor */
-  var JB = { lists: null, isNew: false };
-  function jbLists(d) {
+  /* 2.056 job library: list → one page per game → editor (inks + packing, plates, proof, setup notes) */
+  var JB = { lists: null, isNew: false, cur: '', page: null, list: [] };
+  function jbLists(d) {   // states, jobs and ink names for the editor; d.list (job library rows) when it came from jobLibList
     JB.lists = d;
+    if (d.list) JB.list = d.list;
     var keep = $('jbState').value || 'New York';
     $('jbState').innerHTML = d.states.map(function (s) { return opt(s, s, s === keep); }).join('');
     $('jbInkList').innerHTML = d.inkNames.map(function (x) { return opt(x.ink, x.color); }).join('');
-    jbJobs();
   }
-  function jbJobs(selectKey) {
-    var st = $('jbState').value;
-    $('jbJob').innerHTML = opt('', 'Choose a job…') + JB.lists.jobs.filter(function (j) { return j.state === st; })
-      .sort(function (a, b) { return a.job.localeCompare(b.job); })
-      .map(function (j) { return opt(j.key, j.job + (j.verified ? '' : ' (not verified)'), j.key === selectKey); }).join('');
-    if (!selectKey) show('jbEditor', false);
+  function jlView(which) {   // 'list', 'page' or 'edit'
+    show('jlListCard', which === 'list'); show('jlPage', which === 'page'); show('jbEditor', which === 'edit');
   }
+  function jlLoad() {
+    if (JB.cur && !$('jlPage').classList.contains('hidden')) { jlOpen(JB.cur); return; }
+    jlView('list');
+    srvCached('jobLibList', [], function (d) { jbLists(d); jlDraw(); }, mErr, 'jlList');
+  }
+  function jlDraw() {
+    var q = $('jlFind').value.trim().toLowerCase(), last = '', html = '', n = 0;
+    JB.list.forEach(function (j) {
+      if (q && (j.state + ' ' + j.job).toLowerCase().indexOf(q) === -1) return;
+      n++;
+      if (j.state !== last) { html += '<h3 class="jlstate">' + esc(j.state) + '</h3>'; last = j.state; }
+      html += '<button type="button" class="jlrow" data-jl="' + esc(j.key) + '"><span class="jlname"><span class="t">' + esc(j.job) + '</span>' +
+        '<span class="s">' + (j.lastRun ? 'Last run ' + esc(j.lastRun) : 'Not run yet') + ' · ' + j.inks + (j.inks === 1 ? ' ink' : ' inks') + '</span></span>' +
+        '<span class="jlbadges">' + (j.verified ? badge('ok', 'Verified') : badge('unv', 'Not verified')) +
+        (j.active ? '' : badge('gray', 'Not active')) + badge(j.flag, j.runs ? 'Tracked ' + j.runs : 'Never tracked') + '</span></button>';
+    });
+    $('jlList').innerHTML = n ? html : '<p class="muted">' + (q ? 'No game matches "' + esc($('jlFind').value.trim()) + '".' : 'No jobs yet.') + '</p>';
+  }
+  $('jlFind').addEventListener('input', jlDraw);
+  $('jlList').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-jl]'); if (b) jlOpen(b.getAttribute('data-jl'));
+  });
+  function jlOpen(key) {
+    JB.cur = key; jlView('page');
+    $('jlView').innerHTML = skel(3); $('jlUsage').innerHTML = ''; $('jlOrders').innerHTML = ''; $('jlChanges').innerHTML = '';
+    srv('jobLibGet', [key], jlPage, function (e) { mErr(e); JB.cur = ''; jlView('list'); });
+    window.scrollTo(0, 0);
+  }
+  function jlPage(d) {
+    JB.page = d; JB.cur = d.key;
+    if (!JB.lists) jbLists(d);
+    $('jlTitle').textContent = d.job + ' · ' + d.state;
+    $('jlStamp').innerHTML = (d.verified ? badge('ok', 'Verified' + (d.verifiedBy ? ' by ' + d.verifiedBy : '') + (d.verifiedOn ? ' on ' + d.verifiedOn : ''))
+      : badge('unv', 'Not verified yet')) + ' ' + (d.active ? badge('green', 'Active') : badge('gray', 'Not active')) + ' ' +
+      badge(d.flag, d.runs ? 'Tracked ' + d.runs + ' of ' + d.goalRuns : 'Never tracked') +
+      (d.lastRun ? ' <span class="muted">Last run ' + esc(d.lastRun) + '</span>' : '');
+    $('jlView').innerHTML = setupHtml(jlSetupJob(d));
+    var anyRate = d.usage.some(function (u) { return u.per !== null; });
+    $('jlUsage').innerHTML = anyRate ? '<p class="muted" style="margin-top:0">Average bottles per ' + fmt(d.orderSize, 0) +
+      ' slips from counted runs (0 used counts as ¼), and bottles to have for that order including the startup bottle.</p>' +
+      '<div class="tablewrap"><table class="setup jlusage"><tr><th>Ink</th><th class="n">Per ' + fmt(d.orderSize / 1000, 0) + 'K</th><th class="n">Order</th><th class="n">Runs</th></tr>' +
+      d.usage.map(function (u) {
+        return '<tr><td><b>' + esc(u.ink) + '</b><div class="muted">' + esc(u.side) + '</div></td><td class="n">' + (u.per === null ? '–' : fmt(u.per, 2)) +
+          '</td><td class="n">' + (u.order === null ? '–' : u.order) + '</td><td class="n">' + (u.runs ? u.kept + (u.kept !== u.runs ? ' of ' + u.runs : '') : '–') + '</td></tr>';
+      }).join('') + '</table></div>'
+      : '<p class="muted" style="margin:0">No counted runs yet. A run counts once it ends with enough slips (Setting "Min slips to count").</p>';
+    $('jlOrders').innerHTML = d.orders.length ? d.orders.map(function (o) {
+      return '<div class="item"><div><div class="t">' + esc(o.type) + (o.slips ? ' · ' + fmt(o.slips, 0) + ' slips' : '') + '</div><div class="s">' +
+        [o.press, o.operator, o.due ? 'due ' + o.due : '', o.shipped ? o.status.toLowerCase() + ' ' + o.shipped : ''].filter(Boolean).map(esc).join(' · ') +
+        '</div></div><div>' + badge(o.status === 'Queued' ? 'blue' : o.status === 'Cancelled' ? 'gray' : 'green', o.status) + '</div></div>';
+    }).join('') : '<p class="muted" style="margin:0">No work orders for this game yet.</p>';
+    $('jlChanges').innerHTML = (d.changes.length ? d.changes.map(function (c) {
+      return '<div class="jlchg"><div class="s">' + esc(c.when) + (c.by ? ' · ' + esc(c.by) : '') + '</div><div>' + esc(c.change) + '</div></div>';
+    }).join('') + (d.moreChanges ? '<p class="muted">+ ' + d.moreChanges + ' older (in the Job Changes tab)</p>' : '')
+      : '<p class="muted" style="margin:0">No changes recorded yet.</p>') +
+      '<p class="muted" style="margin-bottom:0"><small>Saves here are recorded from version 2.056 on. Changes typed straight into the Sheet aren\'t recorded.</small></p>';
+  }
+  function jlSetupJob(d) {   // the setup sheet the operators see, from the editor's rows
+    return { verified: d.verified, slipsPerPack: d.slipsPerPack, plates: d.plates, proof: d.proof, setupNotes: d.setupNotes,
+      inks: d.inks.map(function (k) { return { side: k.side, order: k.order === '' ? 999 : k.order, ink: k.ink, color: k.color, anilox: k.anilox, notes: k.notes }; }) };
+  }
+  $('jlBack').addEventListener('click', function () { JB.cur = ''; jlView('list'); if (JB.list.length) jlDraw(); jlLoad(); });
+  $('jlEdit').addEventListener('click', function () { if (JB.page) jbEdit(JB.page, false); });
+  $('jlHist').addEventListener('click', function () {   // Job history filtered to this game, all dates
+    var d = JB.page; if (!d) return;
+    RL.started = true;
+    $('rlState').innerHTML = opt(d.state, d.state, true);
+    $('rlJob').innerHTML = opt(d.job, d.job, true);
+    $('rlFrom').value = '';
+    var t = new Date();
+    $('rlTo').value = t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) + '-' + ('0' + t.getDate()).slice(-2);
+    mOpen('runlog');
+  });
   function jbRowHtml(k) {
     k = k || { side: 'Front', order: '', ink: '', color: '', anilox: '', notes: '' };
     return '<div class="jrow">' +
@@ -4600,21 +4721,18 @@
   }
   function jbEdit(d, isNew) {
     JB.isNew = !!isNew; JB.job = d.job || '';
-    show('jbEditor', true); show('jbNewName', JB.isNew);
-    $('jbTitle').textContent = JB.isNew ? 'New job · ' + $('jbState').value : d.job + ' · ' + d.state;
+    jlView('edit'); show('jbNewName', JB.isNew);
+    $('jbTitle').textContent = JB.isNew ? 'New job · ' + $('jbState').value : 'Edit ' + d.job + ' · ' + d.state;
     $('jbRows').innerHTML = (d.inks.length ? d.inks : [null]).map(jbRowHtml).join('');
     $('jbVerified').checked = !!d.verified;
+    $('jbPack').value = d.slipsPerPack ? fmt(d.slipsPerPack, 0) : '';
+    $('jbPlates').value = d.plates || ''; $('jbProof').value = d.proof || ''; $('jbNotes').value = d.setupNotes || '';
+    window.scrollTo(0, 0);
     if (JB.isNew) { $('jbName').value = ''; $('jbName').focus(); }
   }
-  $('jbState').addEventListener('change', function () { jbJobs(); });
-  $('jbJob').addEventListener('change', function () {
-    var key = $('jbJob').value;
-    if (!key) { show('jbEditor', false); return; }
-    srv('jobGet', [key], function (d) { jbEdit(d, false); }, mErr);
-  });
   $('jbNew').addEventListener('click', function () {
     if (!$('jbState').value) { setMsg('mMsg', 'Pick the state first.', 'err'); return; }
-    $('jbJob').value = '';
+    JB.cur = '';
     jbEdit({ inks: [], verified: false }, true);
   });
   $('jbAddRow').addEventListener('click', function () {
@@ -4633,7 +4751,9 @@
     var hit = JB.lists.inkNames.filter(function (x) { return x.ink.toLowerCase() === e.target.value.trim().toLowerCase(); })[0];
     if (hit && !color.value) color.value = hit.color;
   });
-  $('jbCancel').addEventListener('click', function () { show('jbEditor', false); $('jbJob').value = ''; });
+  $('jbCancel').addEventListener('click', function () {
+    if (JB.isNew || !JB.page) { JB.cur = ''; jlView('list'); jlLoad(); } else jlView('page');
+  });
   $('jbSave').addEventListener('click', function () {
     var inks = Array.prototype.map.call($('jbRows').querySelectorAll('.jrow'), function (row) {
       var k = {};
@@ -4641,12 +4761,16 @@
       return k;
     });
     var job = JB.isNew ? $('jbName').value.trim() : JB.job;
-    var payload = { state: $('jbState').value, job: job, isNew: JB.isNew, verified: $('jbVerified').checked, inks: inks };
+    var state = JB.isNew ? $('jbState').value : JB.page.state;
+    var payload = { state: state, job: job, isNew: JB.isNew, verified: $('jbVerified').checked, inks: inks,
+      slipsPerPack: $('jbPack').value.trim(), plates: $('jbPlates').value.trim(), proof: $('jbProof').value.trim(), setupNotes: $('jbNotes').value.trim() };
     $('jbSave').disabled = true; setMsg('mMsg', 'Saving…');
     srv('jobSave', [payload], function (d) {
       $('jbSave').disabled = false;
-      jbLists(d); jbJobs(d.key); jbEdit(d, false);
       setMsg('mMsg', 'Saved ' + d.job + ': ' + d.inks.length + ' ink' + (d.inks.length === 1 ? '' : 's') + '.', 'ok');
+      JB.isNew = false;
+      srv('jobLibList', [], function (l) { jbLists(l); }, function () {});
+      jlOpen(d.key);
     }, function (e) { $('jbSave').disabled = false; mErr(e); });
   });
 
