@@ -8,9 +8,14 @@
   <meta name="apple-mobile-web-app-title" content="Press Tools">
   <meta name="theme-color" content="#080b10">
 <script>
-  // Press Tools outside Google: each server call goes to the Apps Script web app.
+  // Press Tools outside Google: each server call goes to the fast server (2.073), or the Apps Script web app.
+  // The fast server answers 503 when it is starting or reloading (nothing was saved): then Apps Script answers.
+  // If it can't be reached at all, reads, logins and taps (safe to send twice) go to Apps Script right away, and
+  // for the next 2 minutes everything does; a save that got no answer shows the usual "no connection" message.
   (function () {
-    var API = "https://script.google.com/macros/s/AKfycbwMgwtxB1V7RS2l8aKheG8IsMR0C5MsdENcJ2QVPPWMdT9ahNBUmjbcdYWwFKU_UtEyBQ/exec";
+    var API = "https://script.google.com/macros/s/AKfycbwMgwtxB1V7RS2l8aKheG8IsMR0C5MsdENcJ2QVPPWMdT9ahNBUmjbcdYWwFKU_UtEyBQ/exec", FAST = "https://press-tools-fast-362558829173.us-central1.run.app/exec";
+    var GAS_ONLY = {"backupInstall":1,"appHealth":1,"weeklyReportStatus":1,"weeklyReportNow":1,"archivePurge":1}, fastOff = 0;
+    window.APP_SERVER_INFO = function () { return { fast: FAST, usingFast: !!FAST && Date.now() >= fastOff }; };
     function runner(ok, fail) {
       return new Proxy({}, { get: function (_, name) {
         if (name === "withSuccessHandler") return function (f) { return runner(f, fail); };
@@ -26,9 +31,18 @@
             if (done) return; done = true; if (ctl) ctl.abort();
             if (fail) fail(new Error("NetworkError: no answer from the server in " + secs + " seconds"));
           }, secs * 1000);
-          // text/plain keeps this a "simple" request, which Apps Script answers without a CORS preflight.
-          fetch(API, { method: "POST", body: body, headers: { "Content-Type": "text/plain;charset=utf-8" }, signal: ctl ? ctl.signal : undefined })
-            .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+          // text/plain keeps this a "simple" request, answered without a CORS preflight.
+          var fast = !!FAST && Date.now() >= fastOff && !(name === "api" && GAS_ONLY[args[1]]);
+          function send(url) {
+            return fetch(url, { method: "POST", body: body, headers: { "Content-Type": "text/plain;charset=utf-8" }, signal: ctl ? ctl.signal : undefined })
+              .then(function (r) { if (!r.ok) { var e = new Error("HTTP " + r.status); e.notSaved = url === FAST && r.status === 503; throw e; } return r.json(); });
+          }
+          send(fast ? FAST : API).catch(function (e) {
+            if (!fast || done || (e && e.name === "AbortError")) throw e;
+            fastOff = Date.now() + 120000;
+            if (e.notSaved || quick) return send(API);
+            throw e;
+          })
             .then(function (r) {
               if (done) return; done = true; clearTimeout(timer);
               if (r.error) { if (fail) fail(new Error(r.error)); } else if (ok) ok(r.value);
@@ -45,7 +59,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.072", KEY = "pt-site-reloaded";
+    var BUILT = "2.073", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -1845,9 +1859,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.072';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.073';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.073', '11/28/2026', 'Faster: the app now runs on a fast server that keeps a copy of the Google Sheet ready, so screens open and saves finish in well under a second. The Sheet is still the official log, and the old way takes over by itself if the fast server ever can\'t answer. Everyone logs in once more with their PIN after this update.'],
     ['2.072', '11/28/2026', 'Ink run and waste roll on one screen: during a run the roll on the press is on the run screen. Roll change closes the roll coming off (ending counter, pallets from your + Pallet taps, slips on the pallet now, waste check) and puts the next roll on in one save. Put a roll on starts the first one. The Waste roll tab is still there when no run is open.'],
     ['2.071', '11/28/2026', 'Run screen: the Ink run and Waste roll tabs are back while a run is open, so the roll is one tap away. Resources opens on its own page instead of under the job card.'],
     ['2.070', '11/28/2026', 'Resources: the App Guides (How-To Guide and Overview) have a Print button, like the SOPs.'],
