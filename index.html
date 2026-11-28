@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.062", KEY = "pt-site-reloaded";
+    var BUILT = "2.063", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -1761,9 +1761,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.062';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.063';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.063', '11/28/2026', 'A run that ends with nothing entered (like samples) logs no ink or waste: it stays out of the ink averages and its startup bottles go back to stock. It still shows in Job history, marked Not tracked.'],
     ['2.062', '11/28/2026', 'Save Roll double-checks the pallet count: when a roll shows waste below zero or far above what that press usually runs, it asks whether a + Pallet tap was missed or a partial typed wrong. Fix it, or Save anyway with a note.'],
     ['2.061', '11/28/2026', 'Manage opens on the Press board: for each press, the job and how far along it is, the pace today and when it should finish, the crew, pallets today and yesterday, rolls and waste, cleanups and the next job. The shop day runs 5 AM to 4:59 AM.'],
     ['2.060', '11/28/2026', 'Cleanup button on the run screen: pick why, enter leftovers (saved or trashed) and the slips on the pallet, and a new ink run starts on the same job with fresh startup bottles. The job, the roll on the press and the work order keep going.'],
@@ -2952,7 +2953,8 @@
     }).join('') : '<p class="muted">No extra bottles were opened, so there are no leftovers to enter.</p>';
     var fromPallets = S.run.slipsFromPallets || runSlipsNow(S.run);
     $('slips').value = fromPallets > 0 ? fromPallets : '';
-    $('slipsHint').textContent = fromPallets > 0
+    var empty = !S.run.pallets && !S.run.partial && !S.run.inks.some(function (k) { return k.opened > 0; }) && !runRolls().count;
+    $('slipsHint').textContent = empty ? 'Nothing has been entered on this run. If you finish with slips left blank, no ink or waste is logged for it (like samples) and the startup bottles go back to stock. It still shows in Job history.' : fromPallets > 0
       ? 'Filled in from the pallets entered (' + S.run.pallets + ' full + ' + fmt(S.run.partial || 0, 0) + ' partial' +
         (S.run.startPartial ? ' − ' + fmt(S.run.startPartial, 0) + ' already on the pallet at the start' : '') + '). Change it if the real count is different.'
       : 'No pallets were entered. You can type the count now or add it on the Runs tab later.';
@@ -3016,6 +3018,13 @@
 
   function renderDone(res) {
     show('endView', false); show('runView', false); show('setupView', false); show('doneView', true); show('w_link', false);
+    if (res.notTracked) {   // 2.063: a sample run with nothing entered
+      $('doneTitle').textContent = 'Run not logged: ' + res.job;
+      $('doneMeta').textContent = res.press + ' · nothing was entered, so no ink or waste is logged for this run (it still shows in Job history). The startup bottles went back to stock.';
+      $('doneTable').replaceChildren();
+      $('doneView').scrollIntoView();
+      return;
+    }
     $('doneTitle').textContent = 'Run finished: ' + res.job;
     $('doneMeta').textContent = res.press + (res.slips !== '' ? ' · ' + fmt(res.slips, 0) + ' slips' : ' · slips not entered yet (add them on the Runs tab)') +
       (res.rolls && res.rolls.count ? ' · ' + res.rolls.count + (res.rolls.count === 1 ? ' roll, ' : ' rolls, ') + pct(res.rolls.wastePct) + ' waste' : '');
@@ -4402,7 +4411,7 @@
     }).join('');
   }
   function rlRunLine(g) { return esc(g.press) + ' · ' + esc(g.started) + (g.ended ? ' → ' + esc(g.ended) : '') + (g.hours ? ' · ' + fmt(g.hours, 1) + ' h' : '') + (g.slips ? ' · ' + fmt(g.slips, 0) + ' slips' : ''); }
-  function rlRunBadge(g) { return g.status === 'Cancelled' ? ' ' + badge('gray', 'Run cancelled') : g.status === 'Open' ? ' ' + badge('blue', 'Running') : ''; }
+  function rlRunBadge(g) { return g.status === 'Cancelled' ? ' ' + badge('gray', 'Run cancelled') : g.status === 'Not tracked' ? ' ' + badge('gray', 'Not tracked') : g.status === 'Open' ? ' ' + badge('blue', 'Running') : ''; }
   /** 2.048: station and anilox per ink as the run ran them ("was" = what was planned, when the operator changed it). */
   function rlSetup(g) {
     var list = (g.setup || []).filter(function (x) { return x.station || x.anilox; });
