@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.059", KEY = "pt-site-reloaded";
+    var BUILT = "2.060", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -309,6 +309,9 @@
     .setupnote { margin: 8px 0 0; padding: 8px 10px; border-left: 3px solid var(--accent); overflow-wrap: anywhere; }
     .jlnew { margin-top: 16px; }
     .tablewrap { overflow-x: auto; }
+    .seg.seg-wrap { display: grid; grid-auto-flow: row; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .seg.seg-wrap button { white-space: normal; min-height: 48px; border-radius: 12px; }
+    .seg.cuseg { margin-top: 6px; }
     .wtotal { margin: 10px 0 4px; font-size: 18px; }
     .wtotal.bad b { color: var(--bad, #f87171); }
     .plgrid { display: grid; grid-template-columns: 1fr 96px; gap: 8px 10px; align-items: center; }
@@ -973,19 +976,40 @@
           </div>
         </div>
 
+        <button id="cleanToggle" class="wide">Cleanup · start a new ink run</button>
         <button id="endToggle" class="primary wide">End Run</button>
         <div style="text-align:center"><button id="cancelRun" class="link">Started by mistake? Cancel run</button></div>
       </div>
 
       <!-- Ending a run -->
       <div id="endView" class="card hidden">
-        <h2>End run</h2>
-        <p class="muted" style="margin-top:0">How much is left in the last bottle opened of each ink?</p>
+        <h2 id="endTitle">End run</h2>
+        <!-- 2.060 cleanup: same screen, plus why, saved/trashed per ink and the pallet count -->
+        <div id="cuWhyBox" class="hidden">
+          <label>Why the cleanup</label>
+          <div class="seg seg-wrap" id="cuWhy">
+            <button type="button" data-v="Color change">Color change</button>
+            <button type="button" data-v="Contamination / dirty ink">Contamination</button>
+            <button type="button" data-v="End-of-day wash">End-of-day wash</button>
+            <button type="button" data-v="Other">Other</button>
+          </div>
+          <label for="cuNote">Note (optional, needed for Other)</label>
+          <input id="cuNote" maxlength="200" autocomplete="off">
+          <p class="muted">The job, the roll on the press and the work order keep going. Every ink gets a fresh startup bottle on the new run.</p>
+        </div>
+        <p class="muted" style="margin-top:0" id="endAsk">How much is left in the last bottle opened of each ink?</p>
         <div id="endInks"></div>
         <p id="endRolls" class="muted hidden"></p>
-        <label for="slips">Slips printed</label>
-        <input id="slips" inputmode="numeric" placeholder="Can be filled in later">
-        <div class="hint" id="slipsHint"></div>
+        <div id="endSlipsBox">
+          <label for="slips">Slips printed</label>
+          <input id="slips" inputmode="numeric" placeholder="Can be filled in later">
+          <div class="hint" id="slipsHint"></div>
+        </div>
+        <div id="cuPalletBox" class="hidden">
+          <label for="cuPallet">Slips on the pallet right now</label>
+          <input id="cuPallet" inputmode="numeric" autocomplete="off" aria-describedby="cuHint">
+          <div class="hint" id="cuHint"></div>
+        </div>
         <div class="row2">
           <button id="endBack" class="wide">Back</button>
           <button id="endSave" class="primary wide">Finish Run</button>
@@ -1715,9 +1739,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.059';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.060';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.060', '11/28/2026', 'Cleanup button on the run screen: pick why, enter leftovers (saved or trashed) and the slips on the pallet, and a new ink run starts on the same job with fresh startup bottles. The job, the roll on the press and the work order keep going.'],
     ['2.059', '11/28/2026', 'Each game in the Job library has its NetSuite item # (like IN-9003-03A), so work orders match the purchase orders and supply plan. It shows on the printed work order and you can search for it. Slips per box is filled in for most games.'],
     ['2.058', '11/28/2026', 'Pallets are counted once: the + Pallet taps on a press also count for the roll on it. At a roll change you only type the slips on the pallet right now; the next roll starts with that number. The roll card shows its exact slip total before you save. Typing Pallet 1, 2 and 3 by hand is still there.'],
     ['2.057', '11/28/2026', 'Plates on hand: each game in the Job library keeps a count of full plate sets plus extra single plates, and the setup sheet shows it. Slips per box now shows next to slips per stack.'],
@@ -2409,7 +2434,7 @@
 
     // pallets (don't overwrite the partial box while someone is typing in it)
     $('palCount').textContent = r.pallets;
-    $('palSlips').textContent = fmt(r.pallets * (r.palletSlips || 100000) + (r.partial || 0), 0);
+    $('palSlips').textContent = fmt(runSlipsNow(r), 0);
     $('palMinus').disabled = !(r.pallets > 0);
     if (document.activeElement !== $('partialIn')) $('partialIn').value = r.partial ? r.partial : '';
     renderTarget();
@@ -2629,7 +2654,9 @@
    * a buzz when a tap here reached it; silent when the device opens a run that was already there, e.g. after a handoff).
    */
   var TG = { ctx: null, tapAt: 0 };
-  function targetSent(r) { var t = r && r.target; return t ? t.before + r.pallets * (r.palletSlips || 100000) + (r.partial || 0) : 0; }
+  /** 2.060: a run started after a cleanup begins with slips already on the pallet (startPartial). */
+  function runSlipsNow(r) { return Math.max(0, r.pallets * (r.palletSlips || 100000) + (r.partial || 0) - (r.startPartial || 0)); }
+  function targetSent(r) { var t = r && r.target; return t ? t.before + runSlipsNow(r) : 0; }
   function renderTarget() {
     var r = S.run, t = r && r.target;
     show('palTarget', !!t);
@@ -2857,9 +2884,18 @@
   });
 
   /* ----- end ----- */
-  $('endToggle').addEventListener('click', function () {
+  $('endToggle').addEventListener('click', function () { openEnd('end'); });
+  $('cleanToggle').addEventListener('click', function () { openEnd('cleanup'); });
+  function openEnd(mode) {
     if (waitForQueue()) return;
-    S.leftovers = {};
+    var cu = mode === 'cleanup';
+    S.endMode = mode; S.leftovers = {}; S.trashed = {}; S.cuWhy = '';
+    $('endTitle').textContent = cu ? 'Cleanup · new ink run' : 'End run';
+    $('endSave').textContent = cu ? 'Start the new run' : 'Finish Run';
+    $('endAsk').textContent = cu ? 'How much is left in the last bottle opened of each ink, and is it saved or trashed?' : 'How much is left in the last bottle opened of each ink?';
+    show('cuWhyBox', cu); show('cuPalletBox', cu); show('endSlipsBox', !cu);
+    Array.prototype.forEach.call($('cuWhy').children, function (b) { b.classList.remove('on'); });
+    $('cuNote').value = ''; $('cuPallet').value = ''; cuTotal();
     var inks = S.run.inks.filter(function (k) { return k.opened > 0; });
     $('endInks').innerHTML = inks.length ? inks.map(function (k) {
       return '<div class="end-ink"><div class="name">' + esc(k.ink) + ' <span class="muted">· ' + k.side + '</span></div>' +
@@ -2868,12 +2904,13 @@
           return l[0] <= last;                  // a ½ bottle can't have ¾ left
         }).map(function (l) {
           return '<button data-v="' + l[0] + '">' + l[1] + '</button>';
-        }).join('') + '</div></div>';
+        }).join('') + '</div>' + (cu ? '<div class="seg cuseg" data-t="' + esc(k.key) + '"><button type="button" data-s="0" class="on">Saved</button><button type="button" data-s="1">Trashed</button></div>' : '') + '</div>';
     }).join('') : '<p class="muted">No extra bottles were opened, so there are no leftovers to enter.</p>';
-    var fromPallets = S.run.slipsFromPallets || (S.run.pallets * (S.run.palletSlips || 100000) + (S.run.partial || 0));
+    var fromPallets = S.run.slipsFromPallets || runSlipsNow(S.run);
     $('slips').value = fromPallets > 0 ? fromPallets : '';
     $('slipsHint').textContent = fromPallets > 0
-      ? 'Filled in from the pallets entered (' + S.run.pallets + ' full + ' + fmt(S.run.partial || 0, 0) + ' partial). Change it if the real count is different.'
+      ? 'Filled in from the pallets entered (' + S.run.pallets + ' full + ' + fmt(S.run.partial || 0, 0) + ' partial' +
+        (S.run.startPartial ? ' − ' + fmt(S.run.startPartial, 0) + ' already on the pallet at the start' : '') + '). Change it if the real count is different.'
       : 'No pallets were entered. You can type the count now or add it on the Runs tab later.';
     var rd = runRolls(), onPress = $('w_rollNumber').value.trim();
     $('endRolls').textContent = (rd.count ? 'Rolls on this run: ' + rd.count + ' · ' + pct(rd.wastePct) + ' waste overall.' : 'No rolls were saved on this run.') +
@@ -2881,8 +2918,27 @@
     show('endRolls', true);
     opTab('ink'); show('runView', false); show('endView', true); msg('');
     $('endView').scrollIntoView();
+  }
+  function cuTotal() {
+    var v = $('cuPallet').value.replace(/,/g, '').trim(), r = S.run;
+    if (!r || v === '' || !isFinite(Number(v))) { $('cuHint').textContent = 'Count the partial pallet. The new ink run starts with it.'; return; }
+    var n = r.pallets * (r.palletSlips || 100000) + Number(v) - (r.startPartial || 0);
+    $('cuHint').innerHTML = 'This ink run: <b>' + fmt(n, 0) + '</b> slips (' + r.pallets + ' × ' + fmt(r.palletSlips || 100000, 0) +
+      (r.startPartial ? ' − ' + fmt(r.startPartial, 0) : '') + ' + ' + fmt(Number(v), 0) + ')';
+  }
+  $('cuPallet').addEventListener('input', cuTotal);
+  $('cuWhy').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-v]'); if (!b) return;
+    S.cuWhy = b.getAttribute('data-v');
+    Array.prototype.forEach.call(this.children, function (x) { x.classList.toggle('on', x === b); });
   });
   $('endInks').addEventListener('click', function (e) {
+    var t = e.target.closest('[data-s]');
+    if (t) {   // 2.060: saved or trashed (cleanup)
+      var tseg = t.parentNode; S.trashed[tseg.getAttribute('data-t')] = t.getAttribute('data-s') === '1';
+      Array.prototype.forEach.call(tseg.children, function (b) { b.classList.toggle('on', b === t); });
+      return;
+    }
     var v = e.target.getAttribute('data-v'); if (v === null) return;
     var seg = e.target.parentNode, key = seg.getAttribute('data-k');
     S.leftovers[key] = Number(v);
@@ -2893,6 +2949,19 @@
     if (waitForQueue()) return;
     var need = S.run.inks.filter(function (k) { return k.opened > 0 && !(k.key in S.leftovers); });
     if (need.length) { msg('Pick the leftover for: ' + need.map(function (k) { return k.ink; }).join(', '), 'err'); return; }
+    if (S.endMode === 'cleanup') {
+      if (!S.cuWhy) { msg('Pick why the press is being cleaned.', 'err'); return; }
+      if (!$('cuPallet').value.trim()) { msg('Count the slips on the pallet right now.', 'err'); $('cuPallet').focus(); return; }
+      setBusy(true); msg('Starting the new run…');
+      var trashed = {}; Object.keys(S.trashed).forEach(function (k) { if (S.trashed[k]) trashed[k] = true; });
+      call('inkCleanup', [S.run.runId, S.cuWhy, $('cuNote').value.trim(), S.leftovers, trashed, $('cuPallet').value], function (res) {
+        setBusy(false);
+        S.run = withPending(res.run); show('endView', false); show('runView', true); renderRun();
+        msg('Cleanup logged: the last ink run printed ' + fmt(res.ended.slips, 0) + ' slips. New run started with fresh startup bottles.', 'ok');
+        $('runView').scrollIntoView();
+      });
+      return;
+    }
     setBusy(true); msg('Finishing run…');
     call('inkEndRun', [S.run.runId, $('slips').value, S.leftovers], function (res) {
       setBusy(false); msg('');
@@ -4251,10 +4320,10 @@
   function rlFold(g) {   // rolls, lots and deviations of one run
     var n = g.entries.length;
     if (!n && !(g.rolls && g.rolls.count)) return '';
-    return '<details class="jhmore"><summary>Rolls, lots and deviations (' + (g.rolls.count ? g.rolls.count + (g.rolls.count === 1 ? ' roll' : ' rolls') : '') +
+    return '<details class="jhmore"><summary>Rolls, lots, deviations and cleanups (' + (g.rolls.count ? g.rolls.count + (g.rolls.count === 1 ? ' roll' : ' rolls') : '') +
       (g.rolls.count && n ? ', ' : '') + (n ? n + (n === 1 ? ' entry' : ' entries') : '') + ')</summary>' +
       g.entries.map(function (x) {
-        return '<div class="rlentry">' + (x.kind === 'Mixed ink'
+        return '<div class="rlentry">' + (x.kind === 'Cleanup' ? badge('gray', 'Cleanup') + ' ' + esc(x.details) : x.kind === 'Mixed ink'
           ? badge('blue', 'Mixed ink') + ' <b>' + esc(x.ink) + '</b> <span class="muted">(' + esc(x.side) + ')</span> · Lot <b>' + esc(x.lot) + '</b>' + (x.details ? ' · ' + esc(x.details) : '')
           : badge('yellow', 'Deviation') + ' ' + (x.ink ? '<b>' + esc(x.ink) + '</b> <span class="muted">(' + esc(x.side) + ')</span>: ' : '') + esc(x.details)) +
           '<div class="s">' + esc(x.by) + ' · ' + esc(x.when) + '</div></div>';
