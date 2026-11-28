@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.058", KEY = "pt-site-reloaded";
+    var BUILT = "2.059", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -1334,7 +1334,7 @@
         <p class="muted" style="margin-top:0">Every game's setup, packing, plates, proof and history. Operators see the setup sheet at the press.</p>
         <search>
           <label for="jlFind">Find a game</label>
-          <input id="jlFind" type="search" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="search" placeholder="State or game name">
+          <input id="jlFind" type="search" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="search" placeholder="State, game or item #">
         </search>
         <div id="jlList"></div>
         <div class="row2 jlnew">
@@ -1345,6 +1345,7 @@
       <div id="jlPage" class="hidden">
         <div class="card">
           <div class="cardhead"><h2 id="jlTitle"></h2><button id="jlBack" type="button">All jobs</button></div>
+          <div id="jlItem" class="muted"></div>
           <div id="jlStamp" class="jlstamp"></div>
           <div id="jlView"></div>
           <button id="jlEdit" type="button" class="primary wide">Edit this job</button>
@@ -1371,6 +1372,8 @@
         <datalist id="jbInkList"></datalist>
         <button id="jbAddRow" type="button" class="wide">+ Add ink</button>
         <div class="jbinfo">
+          <label for="jbItem">Item # (NetSuite)</label>
+          <input id="jbItem" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" maxlength="40" placeholder="e.g. IN-9003-03A">
           <label for="jbPack">Slips per pack</label>
           <input id="jbPack" inputmode="numeric" autocomplete="off" placeholder="e.g. 2,500">
           <label for="jbBox">Slips per box</label>
@@ -1712,9 +1715,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.058';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.059';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.059', '11/28/2026', 'Each game in the Job library has its NetSuite item # (like IN-9003-03A), so work orders match the purchase orders and supply plan. It shows on the printed work order and you can search for it. Slips per box is filled in for most games.'],
     ['2.058', '11/28/2026', 'Pallets are counted once: the + Pallet taps on a press also count for the roll on it. At a roll change you only type the slips on the pallet right now; the next roll starts with that number. The roll card shows its exact slip total before you save. Typing Pallet 1, 2 and 3 by hand is still there.'],
     ['2.057', '11/28/2026', 'Plates on hand: each game in the Job library keeps a count of full plate sets plus extra single plates, and the setup sheet shows it. Slips per box now shows next to slips per stack.'],
     ['2.056', '11/28/2026', 'Manage → Jobs → Job library: one page per game with its setup, slips per pack, plates, proof link, setup notes, who verified it and when, ink usage, recent work orders and a history of every change. Operators see the plates, setup notes and proof on the setup sheet.'],
@@ -4469,6 +4473,7 @@
     h += '<div class="wo-grid">' + cell('Type', esc(TYPE[w.type] || w.type)) + cell('Run', esc(run)) + cell('Due', esc(w.due)) +
       cell('Press', esc(w.press ? w.press + (w.line ? ' · #' + w.line + ' in line' : '') : 'Not assigned')) +
       cell('Operator', esc(w.operator)) + cell('Packers', esc(w.packers)) +
+      (w.itemNo ? cell('Item #', esc(w.itemNo)) : '') +   // 2.059: NetSuite item, to match POs and the supply plan
       cell('Pack', [w.slipsPerPack ? '<b>' + fmt(w.slipsPerPack, 0) + '</b> slips per stack' : '', w.slipsPerBox ? '<b>' + fmt(w.slipsPerBox, 0) + '</b> per box' : ''].filter(Boolean).join(' · ')) +
       cell('Queued', esc((w.added || '') + (w.addedBy ? ' by ' + w.addedBy : ''))) + '</div>';
     if (w.note && w.job) h += '<div class="wo-for"><b>For:</b> ' + esc(w.note) + '</div>';
@@ -4732,11 +4737,11 @@
   function jlDraw() {
     var q = $('jlFind').value.trim().toLowerCase(), last = '', html = '', n = 0;
     JB.list.forEach(function (j) {
-      if (q && (j.state + ' ' + j.job).toLowerCase().indexOf(q) === -1) return;
+      if (q && (j.state + ' ' + j.job + ' ' + (j.itemNo || '')).toLowerCase().indexOf(q) === -1) return;
       n++;
       if (j.state !== last) { html += '<h3 class="jlstate">' + esc(j.state) + '</h3>'; last = j.state; }
       html += '<button type="button" class="jlrow" data-jl="' + esc(j.key) + '"><span class="jlname"><span class="t">' + esc(j.job) + '</span>' +
-        '<span class="s">' + (j.lastRun ? 'Last run ' + esc(j.lastRun) : 'Not run yet') + ' · ' + j.inks + (j.inks === 1 ? ' ink' : ' inks') +
+        '<span class="s">' + (j.itemNo ? esc(j.itemNo) + ' · ' : '') + (j.lastRun ? 'Last run ' + esc(j.lastRun) : 'Not run yet') + ' · ' + j.inks + (j.inks === 1 ? ' ink' : ' inks') +
         (j.plateSets === null || j.plateSets === undefined ? '' : ' · ' + j.plateSets + (j.plateSets === 1 ? ' plate set' : ' plate sets')) + '</span></span>' +
         '<span class="jlbadges">' + (j.verified ? badge('ok', 'Verified') : badge('unv', 'Not verified')) +
         (j.active ? '' : badge('gray', 'Not active')) + badge(j.flag, j.runs ? 'Tracked ' + j.runs : 'Never tracked') + '</span></button>';
@@ -4757,6 +4762,7 @@
     JB.page = d; JB.cur = d.key;
     if (!JB.lists) jbLists(d);
     $('jlTitle').textContent = d.job + ' · ' + d.state;
+    $('jlItem').textContent = d.itemNo ? 'Item # ' + d.itemNo : 'No item # yet';
     $('jlStamp').innerHTML = (d.verified ? badge('ok', 'Verified' + (d.verifiedBy ? ' by ' + d.verifiedBy : '') + (d.verifiedOn ? ' on ' + d.verifiedOn : ''))
       : badge('unv', 'Not verified yet')) + ' ' + (d.active ? badge('green', 'Active') : badge('gray', 'Not active')) + ' ' +
       badge(d.flag, d.runs ? 'Tracked ' + d.runs + ' of ' + d.goalRuns : 'Never tracked') +
@@ -4838,6 +4844,7 @@
     $('jbVerified').checked = !!d.verified;
     $('jbPack').value = d.slipsPerPack ? fmt(d.slipsPerPack, 0) : '';
     $('jbBox').value = d.slipsPerBox ? fmt(d.slipsPerBox, 0) : '';
+    $('jbItem').value = d.itemNo || '';
     $('jbPlates').value = d.plates || ''; $('jbProof').value = d.proof || ''; $('jbNotes').value = d.setupNotes || '';
     window.scrollTo(0, 0);
     if (JB.isNew) { $('jbName').value = ''; $('jbName').focus(); }
@@ -4875,7 +4882,7 @@
     var job = JB.isNew ? $('jbName').value.trim() : JB.job;
     var state = JB.isNew ? $('jbState').value : JB.page.state;
     var payload = { state: state, job: job, isNew: JB.isNew, verified: $('jbVerified').checked, inks: inks,
-      slipsPerPack: $('jbPack').value.trim(), slipsPerBox: $('jbBox').value.trim(), plates: $('jbPlates').value.trim(), proof: $('jbProof').value.trim(), setupNotes: $('jbNotes').value.trim() };
+      itemNo: $('jbItem').value.trim(), slipsPerPack: $('jbPack').value.trim(), slipsPerBox: $('jbBox').value.trim(), plates: $('jbPlates').value.trim(), proof: $('jbProof').value.trim(), setupNotes: $('jbNotes').value.trim() };
     $('jbSave').disabled = true; setMsg('mMsg', 'Saving…');
     srv('jobSave', [payload], function (d) {
       $('jbSave').disabled = false;
