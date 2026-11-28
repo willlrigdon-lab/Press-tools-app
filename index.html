@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.068", KEY = "pt-site-reloaded";
+    var BUILT = "2.069", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -672,7 +672,10 @@
     /* 2.030: SOP/guide/form printing inside the app (same full-screen preview as the work order) */
     .resrow { display: flex; gap: 8px; align-items: center; }
     .resrow .res { flex: 1; min-width: 0; }
-    .resrow .resprint { padding: 10px 14px; font-size: 15px; white-space: nowrap; }
+    .resrow .resprint, .resrow .resshare { padding: 10px 14px; font-size: 15px; white-space: nowrap; }
+    .resshareto { display: flex; gap: 8px; padding: 0 4px 10px 42px; }
+    .resshareto a.btn { flex: 1; text-align: center; }
+    .resapps { border: 1px solid var(--line); border-radius: 14px; padding: 4px 10px; margin: 4px 0 10px; }
     #workOrder .pdfpage { display: block; width: 100%; max-width: 820px; margin: 0 auto 12px; border: 1px solid #ccc; }
     #workOrder .pdfwait { color: #444; padding: 20px 0; text-align: center; }
     .tf-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #111; padding-bottom: 6px; margin-bottom: 10px; }
@@ -1481,7 +1484,7 @@
         <h2>Add a resource</h2>
         <p class="muted" style="margin-top:0">Shows on the operator's Resources tab. Management Forms show only below, under Printable forms.</p>
         <label for="rsSection">Section</label>
-        <select id="rsSection"><option>Company Info</option><option>Troubleshooting</option><option>Videos</option><option>SOPs</option><option>Best Practice Guides</option><option>Manuals</option><option>Management Forms</option></select>
+        <select id="rsSection"><option>App Guides</option><option>Company Info</option><option>Troubleshooting</option><option>Videos</option><option>SOPs</option><option>Best Practice Guides</option><option>Manuals</option><option>Management Forms</option></select>
         <label for="rsTitle">Title</label>
         <input id="rsTitle" maxlength="120" autocomplete="off" placeholder="e.g. Press troubleshooting guide">
         <label for="rsLink">Link</label>
@@ -1783,9 +1786,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.068';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.069';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.069', '11/28/2026', 'Resources: a new App Guides section with the How-To Guide and the Overview, both app links at the top, and a Share button on everything so you can text or email a link.'],
     ['2.068', '11/28/2026', 'One run screen, step 1: while a run is open the tabs go away. The job, a big + Pallet, the inks (partial bottles, mixed lots and station changes under each ink\'s ⋯), the roll on the press, then Cleanup and End Run. The roll form opens from the roll card; Resources moved to the name menu.'],
     ['2.067', '11/28/2026', 'Cleanup asks only whether it\'s the end of the week or the end of the job.'],
     ['2.066', '11/28/2026', 'Printed work orders: the two blank lines at the end of the sign-off checklist are gone, so it no longer spills onto an extra page. Write exceptions in the space under the heading.'],
@@ -2001,26 +2005,51 @@
           '<a class="call" target="_top" href="' + esc(telHref(p.phone)) + '">' + esc(p.phone) + '</a></div>';
       }).join('') + '</details>';
   }
+  /* 2.069: the app links (built in, so always current) and a Share button on every resource */
+  var APP_LINKS = [
+    { id: 'app-pt', title: 'Press Tools', note: 'Jobs, ink, waste and ordering', link: 'https://willlrigdon-lab.github.io/Press-tools-app/' },
+    { id: 'app-mt', title: 'Maintenance Tools', note: 'Problems, parts and machine drawings', link: 'https://willlrigdon-lab.github.io/Press-tools-app/maintenance/' }];
+  function resRow(x, printable) {
+    var a = '<a class="res" target="_blank" rel="noopener" href="' + esc(x.link) + '"><span class="ic">' + icon(resIsVideo(x.link) ? 'play' : 'doc') + '</span>' +
+      '<span><span class="t">' + esc(x.title) + '</span>' + (x.note ? '<br><span class="s">' + esc(x.note) + '</span>' : '') + '</span></a>';
+    return '<div class="resrow">' + a +
+      (printable ? '<button class="resprint" data-print="' + esc(x.id) + '" data-title="' + esc(x.title) + '">' + icon('print') + ' Print</button>' : '') +
+      '<button class="resshare" data-share="' + esc(x.link) + '" data-title="' + esc(x.title) + '" aria-label="Share ' + esc(x.title) + '">Share</button></div>';
+  }
+  function resShare(b) {
+    var url = b.getAttribute('data-share'), title = b.getAttribute('data-title');
+    if (navigator.share) { navigator.share({ title: title, text: title, url: url }).catch(function () {}); return; }
+    var row = b.closest('.resrow'), next = row.nextElementSibling;
+    if (next && next.classList.contains('resshareto')) { next.remove(); return; }
+    var body = encodeURIComponent(title + ': ' + url);
+    row.insertAdjacentHTML('afterend', '<div class="resshareto"><a class="btn" href="sms:?&body=' + body + '">Text</a>' +
+      '<a class="btn" href="mailto:?subject=' + encodeURIComponent(title) + '&body=' + body + '">Email</a></div>');
+  }
   function resShow() {
     var d = RES.list; if (!d) return;
     var q = $('resSearch').value.trim().toLowerCase();
+    var apps = APP_LINKS.filter(function (x) { return !q || ('apps app links ' + x.title + ' ' + x.note).toLowerCase().indexOf(q) !== -1; });
     var ops = d.resources.filter(function (x) { return x.section !== 'Management Forms'; });   // forms for management show only on Manage → Resources
     var list = ops.filter(function (x) { return !q || (x.title + ' ' + x.note + ' ' + x.section).toLowerCase().indexOf(q) !== -1; });
     var dir = dirHtml(d.directory || [], q);
     if (!ops.length && !(d.directory || []).length) { $('resList').innerHTML = '<p class="muted">No resources yet. Management adds them under Manage → Jobs → Resources.</p>'; return; }
-    if (!list.length && !dir) { $('resList').innerHTML = '<p class="muted">Nothing matches "' + esc(q) + '".</p>'; return; }
-    var html = dir ? '<h2 class="ressec">Company Info</h2>' + dir : '', sec = dir ? 'Company Info' : null;
+    if (!list.length && !dir && !apps.length) { $('resList').innerHTML = '<p class="muted">Nothing matches "' + esc(q) + '".</p>'; return; }
+    var html = apps.length ? '<h2 class="ressec">The apps</h2><div class="resapps">' + apps.map(function (x) { return resRow(x, false); }).join('') + '</div>' : '';
+    var sec = null, dirDone = false;
     list.forEach(function (x) {
-      if (x.section !== sec) { sec = x.section; html += '<h2 class="ressec">' + esc(sec) + '</h2>'; }
-      var a = '<a class="res" target="_blank" rel="noopener" href="' + esc(x.link) + '"><span class="ic">' + icon(resIsVideo(x.link) ? 'play' : 'doc') + '</span>' +
-        '<span><span class="t">' + esc(x.title) + '</span>' + (x.note ? '<br><span class="s">' + esc(x.note) + '</span>' : '') + '</span></a>';
-      html += canPrint(x) ? '<div class="resrow">' + a + '<button class="resprint" data-print="' + esc(x.id) + '" data-title="' + esc(x.title) + '">' + icon('print') + ' Print</button></div>' : a;
+      if (x.section !== sec) {
+        if (dir && !dirDone && x.section !== 'App Guides') { html += '<h2 class="ressec">Company Info</h2>' + dir; dirDone = true; sec = 'Company Info'; }
+        if (x.section !== sec) { sec = x.section; html += '<h2 class="ressec">' + esc(sec) + '</h2>'; }
+      }
+      html += resRow(x, canPrint(x));
     });
+    if (dir && !dirDone) html += '<h2 class="ressec">Company Info</h2>' + dir;
     $('resList').innerHTML = html;
   }
   $('resSearch').addEventListener('input', resShow);
   $('resList').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-print]'); if (b) printDoc(b.getAttribute('data-print'), b.getAttribute('data-title'));
+    var sh = e.target.closest('button[data-share]'); if (sh) resShare(sh);
   });
   $('opTabs').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-v]'); if (b) { opTab(b.getAttribute('data-v')); window.scrollTo(0, 0); }
