@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.057", KEY = "pt-site-reloaded";
+    var BUILT = "2.058", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -309,6 +309,8 @@
     .setupnote { margin: 8px 0 0; padding: 8px 10px; border-left: 3px solid var(--accent); overflow-wrap: anywhere; }
     .jlnew { margin-top: 16px; }
     .tablewrap { overflow-x: auto; }
+    .wtotal { margin: 10px 0 4px; font-size: 18px; }
+    .wtotal.bad b { color: var(--bad, #f87171); }
     .plgrid { display: grid; grid-template-columns: 1fr 96px; gap: 8px 10px; align-items: center; }
     .plgrid label { margin: 0; overflow-wrap: anywhere; }
     .plgrid input { text-align: center; }
@@ -1023,13 +1025,31 @@
           </div>
         </div>
 
-        <label>Pallets (slips on each)</label>
-        <div class="row3">
-          <input id="w_pallet1" inputmode="numeric" placeholder="Pallet 1" aria-label="Pallet 1">
-          <input id="w_pallet2" inputmode="numeric" placeholder="Pallet 2" aria-label="Pallet 2">
-          <input id="w_pallet3" inputmode="numeric" placeholder="Pallet 3" aria-label="Pallet 3">
+        <input id="w_mode" type="hidden">
+        <!-- 2.058: pallets counted once. + Pallet taps count for the roll; one counted number at the roll change. -->
+        <div id="w_countBox">
+          <label for="w_startPartial">Slips on the pallet when this roll started</label>
+          <input id="w_startPartial" inputmode="numeric" autocomplete="off" aria-describedby="w_spHint">
+          <div id="w_spHint" class="hint wfill hidden"></div>
+          <label for="w_palletsDone">Full pallets finished this roll</label>
+          <input id="w_palletsDone" inputmode="numeric" autocomplete="off" aria-describedby="w_pdHint">
+          <div id="w_pdHint" class="hint">Counted from the + Pallet taps on this press. Fix it if a tap was missed.</div>
+          <label for="w_endPartial">Slips on the pallet now</label>
+          <input id="w_endPartial" inputmode="numeric" autocomplete="off" aria-describedby="w_epHint">
+          <div id="w_epHint" class="hint">Count the partial pallet when the roll comes off. It carries over to the next roll.</div>
+          <div id="w_rollSlips" class="wtotal" aria-live="polite"></div>
+          <button type="button" id="w_toHand" class="link">Type pallets by hand instead</button>
         </div>
-        <div class="hint">Type the slip count on each pallet, including a partial one. Leave a pallet blank if there isn't one.</div>
+        <div id="w_handBox" class="hidden">
+          <label>Pallets (slips on each)</label>
+          <div class="row3">
+            <input id="w_pallet1" inputmode="numeric" placeholder="Pallet 1" aria-label="Pallet 1">
+            <input id="w_pallet2" inputmode="numeric" placeholder="Pallet 2" aria-label="Pallet 2">
+            <input id="w_pallet3" inputmode="numeric" placeholder="Pallet 3" aria-label="Pallet 3">
+          </div>
+          <div class="hint">Type the slip count on each pallet, including a partial one. Leave a pallet blank if there isn't one.</div>
+          <button type="button" id="w_toCount" class="link">Count with + Pallet taps instead</button>
+        </div>
 
         <label for="w_note">Note (optional)</label>
         <textarea id="w_note" rows="2" maxlength="300" style="font-family:inherit;resize:vertical" aria-describedby="w_noteHint" placeholder="e.g. Stopped to run sample plates"></textarea>
@@ -1692,9 +1712,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.057';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.058';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.058', '11/28/2026', 'Pallets are counted once: the + Pallet taps on a press also count for the roll on it. At a roll change you only type the slips on the pallet right now; the next roll starts with that number. The roll card shows its exact slip total before you save. Typing Pallet 1, 2 and 3 by hand is still there.'],
     ['2.057', '11/28/2026', 'Plates on hand: each game in the Job library keeps a count of full plate sets plus extra single plates, and the setup sheet shows it. Slips per box now shows next to slips per stack.'],
     ['2.056', '11/28/2026', 'Manage → Jobs → Job library: one page per game with its setup, slips per pack, plates, proof link, setup notes, who verified it and when, ink usage, recent work orders and a history of every change. Operators see the plates, setup notes and proof on the setup sheet.'],
     ['2.055', '11/28/2026', 'An ink that shows 0 used on a run now counts as 1/4 bottle used, so ordering and Ink needed never assume an ink uses nothing on a big run. Inventory counts don\'t change.'],
@@ -1927,12 +1948,13 @@
   /* =====================================================================
      WASTE ROLL CALCULATOR
      ===================================================================== */
-  var W_FIELDS = ['rollNumber','packageLength','startCounter','endCounter','pallet1','pallet2','pallet3','note'];
+  var W_FIELDS = ['rollNumber','packageLength','startCounter','endCounter','pallet1','pallet2','pallet3','note','mode','startPartial','palletsDone','endPartial'];
 
   function wRead() {
     var o = {};
     W_FIELDS.forEach(function (f) { o[f] = $('w_' + f).value; });
     o.press = S.press || '';
+    o.mode = wMode();
     return o;
   }
   function wMsg(text, kind) { setMsg('w_msg', text, kind); }
@@ -2017,6 +2039,7 @@
       wShowResult(res.saved, true);
       wShowRecent(res.recent);
       if (res.lastEnd) WD.lastEnd = res.lastEnd;
+      WD.rollPallets = 0;   // 2.058: the next roll counts its own + Pallet taps
       if (res.run) S.rolls = { runId: res.run.runId, data: res.run.rolls };
       if (S.run && res.run && res.run.runId === S.run.runId) renderRolls();
       wMsg('Roll ' + res.saved.rollNumber + ' saved' + (res.run ? ' to the ' + res.run.job + ' run.' : '.'), 'ok');
@@ -2026,7 +2049,7 @@
 
   /* Typed entries are kept until "Clear for next roll": in the Sheet for the press (survives time-outs,
      reloads and other devices) and on this device as a backup. */
-  var WD = { timer: null, sent: '', lastEnd: null };
+  var WD = { timer: null, sent: '', lastEnd: null, rollPallets: 0, autoPallets: '', palletSize: 100000 };
   /* 2.035: the machine counter keeps counting from roll to roll, so an empty Starting Counter is filled from the
      last roll saved on this press (the operator can change it). */
   function wPrefillStart() {
@@ -2038,9 +2061,47 @@
     return true;
   }
   $('w_startCounter').addEventListener('input', function () { show('w_startHint', false); });
+  /* 2.058: pallets counted once (the user, 2026-11-28). A full pallet = Setting "Slips per pallet" (100,000); partials are counted.
+     This roll = full pallets finished × pallet size − slips on the pallet when it started + slips on it now. */
+  function wMode() { return $('w_mode').value === 'hand' ? 'hand' : 'count'; }
+  function wShowMode() { var hand = wMode() === 'hand'; show('w_handBox', hand); show('w_countBox', !hand); wTotal(); }
+  function wNum(id) { var v = $(id).value.replace(/,/g, '').trim(); return v === '' ? null : Number(v); }
+  function wTotal() {
+    var el = $('w_rollSlips'); if (!el) return;
+    var size = WD.palletSize || 100000, sp = wNum('w_startPartial') || 0, pd = wNum('w_palletsDone') || 0, ep = wNum('w_endPartial');
+    if (wMode() === 'hand' || ep === null || !isFinite(sp) || !isFinite(pd) || !isFinite(ep)) { el.textContent = ''; return; }
+    var n = pd * size - sp + ep;
+    el.innerHTML = 'This roll: <b>' + fmt(n, 0) + '</b> slips <span class="muted">(' + fmt(pd, 0) + ' × ' + fmt(size, 0) + ' − ' + fmt(sp, 0) + ' + ' + fmt(ep, 0) + ')</span>';
+    el.classList.toggle('bad', n <= 0);
+  }
+  /** Fill what the app already knows: the slips left on the pallet by the last roll, and the + Pallet taps since then. */
+  function wPrefillCount() {
+    var e = WD.lastEnd;
+    if (!$('w_startPartial').value.trim() && e && e.endPartial !== null && e.endPartial !== undefined) {
+      $('w_startPartial').value = fmt(e.endPartial, 0);
+      $('w_spHint').textContent = 'From ' + (e.roll || 'the last roll') + ' (slips on the pallet when it came off)'; show('w_spHint', true);
+    }
+    if (!$('w_palletsDone').value.trim() || $('w_palletsDone').value === String(WD.autoPallets)) $('w_palletsDone').value = WD.rollPallets || 0;
+    WD.autoPallets = $('w_palletsDone').value;
+    wTotal();
+  }
+  /** A + Pallet tap on this press counts for the roll too (unless the operator typed a different number). */
+  function wPalletTap(press, q) {
+    if (press !== S.press || wMode() === 'hand') return;
+    WD.rollPallets = Math.max(0, (WD.rollPallets || 0) + q);
+    if ($('w_palletsDone').value === String(WD.autoPallets) || !$('w_palletsDone').value.trim()) {
+      $('w_palletsDone').value = WD.rollPallets; WD.autoPallets = String(WD.rollPallets);
+      store('wasteDraft', JSON.stringify(wFields())); clearTimeout(WD.timer); WD.timer = setTimeout(wDraftSend, 1500);
+    }
+    wTotal();
+  }
+  $('w_startPartial').addEventListener('input', function () { show('w_spHint', false); });
+  ['w_startPartial', 'w_palletsDone', 'w_endPartial'].forEach(function (id) { $(id).addEventListener('input', wTotal); });
+  $('w_toHand').addEventListener('click', function () { $('w_mode').value = 'hand'; wShowMode(); wDraftSend(); $('w_pallet1').focus(); });
+  $('w_toCount').addEventListener('click', function () { $('w_mode').value = ''; wShowMode(); wPrefillCount(); wDraftSend(); $('w_endPartial').focus(); });
   function wFields() { var o = {}; W_FIELDS.forEach(function (f) { o[f] = $('w_' + f).value; }); return o; }
-  function wHasEntries(o) { return W_FIELDS.some(function (f) { return String(o[f] || '').trim(); }); }
-  function wFill(o) { W_FIELDS.forEach(function (f) { $('w_' + f).value = o[f] || ''; }); store('wasteDraft', JSON.stringify(o)); }
+  function wHasEntries(o) { return W_FIELDS.some(function (f) { return f !== 'mode' && f !== 'palletsDone' && String(o[f] || '').trim(); }); }
+  function wFill(o) { W_FIELDS.forEach(function (f) { $('w_' + f).value = o[f] || ''; }); store('wasteDraft', JSON.stringify(o)); wShowMode(); }
   function wDraftSend() {
     clearTimeout(WD.timer); WD.timer = null;
     if (!S.press || !A.token) return;
@@ -2056,7 +2117,8 @@
     srv('wasteDraft', [press], function (d) {
       if (press !== S.press) return;
       WD.lastEnd = d.lastEnd || null;
-      show('w_startHint', false);
+      WD.rollPallets = d.rollPallets || 0; WD.palletSize = d.palletSize || 100000;
+      show('w_startHint', false); show('w_spHint', false);
       if (wHasEntries(d.fields)) {
         wFill(d.fields); WD.sent = JSON.stringify(wFields());
         wMsg('Entries restored for ' + press + (d.savedAt ? ' (typed ' + d.savedAt + (d.by ? ' by ' + d.by : '') + ')' : '') + '.');
@@ -2064,6 +2126,7 @@
         wFill({}); WD.sent = JSON.stringify(wFields());   // the other press keeps its own entries
       } else if (wHasEntries(wFields())) wDraftSend();
       if (!$('w_rollNumber').value.trim()) wPrefillStart();   // a new roll starts where the last one ended
+      wShowMode(); wPrefillCount();
       if (S.run) renderRolls();
     });
   }
@@ -2071,6 +2134,7 @@
     var wDraft = JSON.parse(store('wasteDraft') || '{}') || {};
     W_FIELDS.forEach(function (f) { if (wDraft[f]) $('w_' + f).value = wDraft[f]; });
   } catch (e) { /* no saved entries */ }
+  wShowMode();
   W_FIELDS.forEach(function (f) {
     $('w_' + f).addEventListener('input', function () {
       if (f === 'rollNumber' && S.run) renderRolls();   // the run screen shows the roll on the press
@@ -2082,8 +2146,12 @@
   window.addEventListener('pagehide', function () { if (WD.timer) wDraftSend(); });
 
   $('w_clearBtn').addEventListener('click', function () {
+    var mode = $('w_mode').value;
     W_FIELDS.forEach(function (f) { $('w_' + f).value = ''; });
-    show('w_startHint', false);
+    $('w_mode').value = mode;   // keep the way this press counts pallets
+    show('w_startHint', false); show('w_spHint', false);
+    WD.autoPallets = '';
+    wPrefillCount();
     store('wasteDraft', '{}');
     wDraftSend();      // the saved entries are cleared first...
     wPrefillStart();   // ...then the next roll's Starting Counter is filled in (kept once something else is typed)
@@ -2493,7 +2561,7 @@
   $('rollNow').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
     opTab('waste');
-    var f = $(b.id === 'rollFinish' ? (($('w_endCounter').value.trim()) ? 'w_pallet1' : 'w_endCounter') : 'w_rollNumber');
+    var f = $(b.id === 'rollFinish' ? (($('w_endCounter').value.trim()) ? (wMode() === 'hand' ? 'w_pallet1' : 'w_endPartial') : 'w_endCounter') : 'w_rollNumber');
     f.focus(); f.scrollIntoView({ block: 'center' });
   });
 
@@ -2614,6 +2682,7 @@
       if (!confirm('Take back one pallet?')) return;
     }
     r.pallets += q; renderRun();           // show it right away
+    wPalletTap(r.press, q);                // 2.058: the same tap counts for the roll on this press
     queueTap({ fn: 'inkPallet', runId: r.runId, qty: q, label: 'pallet ' + (q === 1 ? '+1' : '−1') });
   }
   $('palPlus').addEventListener('click', function () { audioUnlock(); palTap(1); });
