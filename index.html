@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.069", KEY = "pt-site-reloaded";
+    var BUILT = "2.070", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -1786,9 +1786,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.069';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.070';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.070', '11/28/2026', 'Resources: the App Guides (How-To Guide and Overview) have a Print button, like the SOPs.'],
     ['2.069', '11/28/2026', 'Resources: a new App Guides section with the How-To Guide and the Overview, both app links at the top, and a Share button on everything so you can text or email a link.'],
     ['2.068', '11/28/2026', 'One run screen, step 1: while a run is open the tabs go away. The job, a big + Pallet, the inks (partial bottles, mixed lots and station changes under each ink\'s ⋯), the roll on the press, then Cleanup and End Run. The roll form opens from the roll card; Resources moved to the name menu.'],
     ['2.067', '11/28/2026', 'Cleanup asks only whether it\'s the end of the week or the end of the job.'],
@@ -4640,7 +4641,7 @@
     }).catch(function (e) { fail('Could not reach Maintenance Tools (' + (e && e.message ? e.message : e) + ').'); });
   }
   /** Can this resource be printed in the app? (Google Drive files and Docs in the printable sections) */
-  var PRINTABLE = ['SOPs', 'Best Practice Guides', 'Management Forms', 'Troubleshooting'];
+  var PRINTABLE = ['SOPs', 'Best Practice Guides', 'Management Forms', 'Troubleshooting', 'App Guides'];   // 2.070: + App Guides (Maintenance Tools 1.023 serves them)
   function canPrint(x) { return PRINTABLE.indexOf(x.section) !== -1 && /drive\.google\.com|docs\.google\.com/.test(x.link); }
   /** Training Acknowledgment, built by the app; doc = {type: 'SOP' | 'Best Practices' | '', title} fills in which document. */
   function tfHtml(doc) {
