@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.071", KEY = "pt-site-reloaded";
+    var BUILT = "2.072", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -313,9 +313,10 @@
     .runonly { display: none; }
     #operatorView.running .runonly { display: block; margin: 0 0 10px; }
     #operatorView.running #secInk > .colhead, #operatorView.running #secWaste > .colhead { display: none; }
-    /* 2.071 (the user): during a run the Ink run · Waste roll tabs stay (Resources is in the name menu); Resources opens on its own, without the job card */
-    #operatorView.running #opTabs .tb, #operatorView.running #opTabs [data-v="res"], #operatorView.running #rollBack { display: none !important; }
-    @media (min-width: 760px) { #operatorView.running #opTabs .ph { display: block; } }
+    /* 2.072: during a run the roll lives on the run screen (Roll change sheet), so no tabs; Resources (name menu) opens on its own, without the job card */
+    #operatorView.running #opTabs { display: none; }
+    .rcwas { margin: 0 0 6px; }
+    .rcnext { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 6px; }
     #operatorView.resopen > .card:first-child, #operatorView.resopen #assignCard, #operatorView.resopen #takeOver { display: none !important; }
     #operatorView.running:not(.rollopen) #secWaste { display: none !important; }
     #operatorView.running.rollopen #secInk { display: none !important; }
@@ -745,6 +746,9 @@
     .rollnow { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; gap: 10px; align-items: center; justify-content: space-between; }
     .rollnow .rn { min-width: 0; }
     .rollnow button { margin: 0; flex: none; padding: 10px 16px; }
+    .rollnow { flex-wrap: wrap; }   /* 2.072: text on its own line, Roll change + Edit this roll under it */
+    .rollnow .rn { flex: 1 1 100%; }
+    .rollnow #rollFinish { flex: 1 1 auto; }
     #runRollsList .item { padding: 8px 0; }
     .wlink { margin: 0 0 10px; background: rgba(95,168,216,.14); color: #cfe6f7; border: 1px solid rgba(95,168,216,.45); }
     .wfill { color: var(--accent); }
@@ -1691,6 +1695,57 @@
     </form>
   </div>
 
+  <!-- 2.072 Roll change: close the roll coming off and put the next one on, from the run screen -->
+  <div id="rcSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="rcTitle">
+    <form id="rcForm" class="sheet-card" aria-labelledby="rcTitle" novalidate>
+      <h2 id="rcTitle">Roll change</h2>
+      <p id="rcWas" class="muted rcwas"></p>
+      <label for="rcEnd">Ending counter</label>
+      <input id="rcEnd" inputmode="decimal" autocomplete="off">
+      <label for="rcPallets">Full pallets finished this roll</label>
+      <input id="rcPallets" inputmode="numeric" autocomplete="off" aria-describedby="rcPalHint">
+      <div id="rcPalHint" class="hint">From your + Pallet taps. Fix it if a tap was missed.</div>
+      <label for="rcNow">Slips on the pallet now (count)</label>
+      <input id="rcNow" inputmode="numeric" autocomplete="off">
+      <div id="rcTotal" class="wtotal" aria-live="polite"></div>
+      <label for="rcNote">Note (optional)</label>
+      <textarea id="rcNote" rows="2" maxlength="300" style="font-family:inherit;resize:vertical" placeholder="e.g. Web break at 9:40"></textarea>
+      <div class="rcnext">
+        <label for="rcNextRoll">Next roll number</label>
+        <input id="rcNextRoll" autocomplete="off" autocapitalize="characters" aria-describedby="rcNextHint">
+        <label for="rcNextLen">Next roll's package length</label>
+        <input id="rcNextLen" inputmode="decimal" autocomplete="off">
+        <div id="rcNextHint" class="hint">Leave these blank for the last roll of the job.</div>
+      </div>
+      <div id="rcCheck" class="push red hidden" role="alert"></div>
+      <div class="row2">
+        <button id="rcCancel" type="button" class="wide">Close</button>
+        <button id="rcSave" type="submit" class="primary wide">Save roll</button>
+      </div>
+      <button type="button" id="rcFull" class="link">Open the full roll form</button>
+    </form>
+  </div>
+  <!-- 2.072 Start a roll (no roll on the press yet) -->
+  <div id="rsSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="rsTitle">
+    <form id="rsForm" class="sheet-card" aria-labelledby="rsTitle" novalidate>
+      <h2 id="rsTitle">Roll on the press</h2>
+      <label for="rsRoll">Roll number</label>
+      <input id="rsRoll" autocomplete="off" autocapitalize="characters">
+      <label for="rsLen">Package length</label>
+      <input id="rsLen" inputmode="decimal" autocomplete="off">
+      <label for="rsStart">Starting counter</label>
+      <input id="rsStart" inputmode="decimal" autocomplete="off">
+      <label for="rsStartPal">Slips on the pallet when this roll started</label>
+      <input id="rsStartPal" inputmode="numeric" autocomplete="off" aria-describedby="rsHint">
+      <div id="rsHint" class="hint">Filled in from the last roll when the app knows it.</div>
+      <div class="row2">
+        <button id="rsCancel" type="button" class="wide">Close</button>
+        <button id="rsSave" type="submit" class="primary wide">Put it on the press</button>
+      </div>
+      <button type="button" id="rsFull" class="link">Open the full roll form</button>
+    </form>
+  </div>
+
   <!-- ===================== NAME MENU (top bar) ===================== -->
   <div id="meSheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="meTitle">
     <div class="sheet-card menu-card">
@@ -1790,9 +1845,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.071';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.072';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.072', '11/28/2026', 'Ink run and waste roll on one screen: during a run the roll on the press is on the run screen. Roll change closes the roll coming off (ending counter, pallets from your + Pallet taps, slips on the pallet now, waste check) and puts the next roll on in one save. Put a roll on starts the first one. The Waste roll tab is still there when no run is open.'],
     ['2.071', '11/28/2026', 'Run screen: the Ink run and Waste roll tabs are back while a run is open, so the roll is one tap away. Resources opens on its own page instead of under the job card.'],
     ['2.070', '11/28/2026', 'Resources: the App Guides (How-To Guide and Overview) have a Print button, like the SOPs.'],
     ['2.069', '11/28/2026', 'Resources: a new App Guides section with the How-To Guide and the Overview, both app links at the top, and a Share button on everything so you can text or email a link.'],
@@ -2157,21 +2213,22 @@
       var f = $(wMode() === 'hand' ? 'w_pallet1' : 'w_palletsDone'); f.focus(); f.scrollIntoView({ block: 'center' });
     } else if (e.target.closest('[data-wforce]')) { show('w_check', false); wSave(true); }
   });
-  function wSave(force) {
+  function wSave(force, ctx) {   // ctx (2.072): the Roll change sheet {check: element, busy(on), after(res)}
     if (!S.press) { wMsg('Pick your press first (at the top).', 'err'); return; }
-    wMsg('Saving…'); wBusy(true); show('w_check', false);
+    var chk = ctx ? ctx.check : $('w_check');
+    wMsg('Saving…'); wBusy(true); if (ctx) ctx.busy(true); show(chk.id, false);
     var input = wRead(); if (force) input.force = true;
     srv('wasteSave', [input], function (res) {
-      wBusy(false);
+      wBusy(false); if (ctx) ctx.busy(false);
       if (res.check) {
         var c = res.check, p = fmt(c.wastePct * 100, 1) + '%';
         wMsg('');
-        $('w_check').innerHTML = '<b>This roll shows ' + p + ' waste' + (c.kind === 'high' && c.usual !== null ? ' (' + esc(S.press) + ' usually runs about ' + fmt(c.usual * 100, 1) + '%)' : '') + '.</b> ' +
+        chk.innerHTML = '<b>This roll shows ' + p + ' waste' + (c.kind === 'high' && c.usual !== null ? ' (' + esc(S.press) + ' usually runs about ' + fmt(c.usual * 100, 1) + '%)' : '') + '.</b> ' +
           (c.kind === 'negative' ? 'Waste can\'t be below zero, so the slips are too high: an extra + Pallet tap, or a partial typed too big?'
             : 'Did you miss a + Pallet tap, or type a partial wrong?') +
           '<div class="row2"><button type="button" data-wfix="1">Fix it</button><button type="button" class="primary" data-wforce="1">Save anyway</button></div>' +
           '<div class="hint">If it\'s right (a web break, extra setups), add a note above before saving.</div>';
-        show('w_check', true); $('w_check').scrollIntoView({ block: 'center' });
+        show(chk.id, true); chk.scrollIntoView({ block: 'center' });
         return;
       }
       wShowResult(res.saved, true);
@@ -2182,7 +2239,8 @@
       if (S.run && res.run && res.run.runId === S.run.runId) renderRolls();
       wMsg('Roll ' + res.saved.rollNumber + ' saved' + (res.run ? ' to the ' + res.run.job + ' run.' : '.'), 'ok');
       if (S.run && S.run.press === S.press && S.run.stale) { S.run.stale = null; show('staleNote', false); }   // a roll counts as an update
-    }, wError);
+      if (ctx) ctx.after(res);
+    }, function (e) { if (ctx) ctx.busy(false); wError(e); });
   }
 
   /* Typed entries are kept until "Clear for next roll": in the Sheet for the press (survives time-outs,
@@ -2283,7 +2341,8 @@
   });
   window.addEventListener('pagehide', function () { if (WD.timer) wDraftSend(); });
 
-  $('w_clearBtn').addEventListener('click', function () {
+  /** Clear for the next roll. next (2.072, Roll change) = {roll, len}: that roll goes on the press right away. */
+  function wClearNext(next) {
     var mode = $('w_mode').value;
     W_FIELDS.forEach(function (f) { $('w_' + f).value = ''; });
     $('w_mode').value = mode;   // keep the way this press counts pallets
@@ -2291,13 +2350,16 @@
     WD.autoPallets = '';
     wPrefillCount();
     store('wasteDraft', '{}');
-    wDraftSend();      // the saved entries are cleared first...
-    wPrefillStart();   // ...then the next roll's Starting Counter is filled in (kept once something else is typed)
+    if (!next) wDraftSend();   // the saved entries are cleared first...
+    wPrefillStart();           // ...then the next roll's Starting Counter is filled in (kept once something else is typed)
+    if (next) {
+      $('w_rollNumber').value = next.roll; $('w_packageLength').value = next.len;
+      store('wasteDraft', JSON.stringify(wFields())); wDraftSend();   // one save: the next roll with its carried-over start
+    }
     if (S.run) renderRolls();
     $('w_resultCard').classList.add('hidden');
-    wMsg('');
-    $('w_rollNumber').focus();
-  });
+  }
+  $('w_clearBtn').addEventListener('click', function () { wClearNext(null); wMsg(''); $('w_rollNumber').focus(); });
 
   function wLoadRecent() {
     srv('wasteRecent', [], wShowRecent);
@@ -2699,20 +2761,89 @@
         (x.by ? ' · ' + esc(x.by) : '') + ' · ' + esc(x.saved) + '</div>' + (x.note ? '<div class="s">“' + esc(x.note) + '”</div>' : '') + '</div><div class="acts">' + badge('gray', pct(x.wastePct) + ' waste') + '</div></div>';
     }).join('') : '<p class="muted" style="margin:0">No rolls saved on this run yet. A roll saved on ' + esc(r.press) + ' while this run is open is added here.</p>';
     var now = $('w_rollNumber').value.trim(), start = $('w_startCounter').value.trim(), sn = Number(start.replace(/,/g, ''));
+    var sp = wNum('w_startPartial'), pd = wNum('w_palletsDone');
     $('rollNow').innerHTML = now
       ? '<div class="rn"><div class="t">On the press: <b>' + esc(now) + '</b></div><div class="muted">' +
-        (start ? 'From counter ' + (isFinite(sn) ? fmt(sn, 0) : esc(start)) : 'Starting counter not typed yet') + '</div></div>' +
-        '<button type="button" class="primary" id="rollFinish">Finish roll</button>'
-      : '<div class="rn muted">No roll typed in yet.</div><button type="button" id="rollStart">+ Start next roll</button>';
+        (start ? 'From counter ' + (isFinite(sn) ? fmt(sn, 0) : esc(start)) : 'Starting counter not typed yet') +
+        (sp ? ' · ' + fmt(sp, 0) + ' on the pallet at the start' : '') + (wMode() !== 'hand' ? ' · ' + fmt(pd || 0, 0) + ' full pallet' + (pd === 1 ? '' : 's') + ' so far' : '') + '</div></div>' +
+        '<button type="button" class="primary" id="rollFinish">Roll change</button><button type="button" class="link" id="rollEdit">Edit this roll</button>'
+      : '<div class="rn muted">No roll on the press yet.</div><button type="button" id="rollStart">+ Put a roll on</button>';
     $('w_link').innerHTML = '<b>Linked to the open run:</b> ' + esc(r.job) + ' · ' + esc(r.state) + ' on ' + esc(r.press) + '. The roll joins it when you save.';
     show('w_link', true);
   }
   $('rollNow').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
-    opTab('waste');
+    if (b.id === 'rollFinish' && wMode() !== 'hand') { rcOpen(); return; }   // 2.072: Roll change sheet over the run
+    if (b.id === 'rollStart') { rsOpen(); return; }
+    opTab('waste');   // Edit this roll, or pallets typed by hand: the full roll form
     var f = $(b.id === 'rollFinish' ? (($('w_endCounter').value.trim()) ? (wMode() === 'hand' ? 'w_pallet1' : 'w_endPartial') : 'w_endCounter') : 'w_rollNumber');
     f.focus(); f.scrollIntoView({ block: 'center' });
   });
+  /* 2.072 Roll change (the user, 2026-11-28: ink run and waste on one screen). The sheet fills the roll form's own fields and saves
+     with wSave, so drafts, the pallet math and the waste check are the same as the full form. */
+  function rcNums() {
+    var n = function (id) { var v = $(id).value.replace(/,/g, '').trim(); return v === '' ? null : Number(v); };
+    return { end: n('rcEnd'), pd: n('rcPallets'), now: n('rcNow') };
+  }
+  function rcTotal() {
+    var x = rcNums(), size = WD.palletSize || 100000, sp = wNum('w_startPartial') || 0, el = $('rcTotal');
+    if (x.now === null || !isFinite(x.now) || !isFinite(x.pd || 0)) { el.textContent = ''; return; }
+    var slips = (x.pd || 0) * size - sp + x.now;
+    el.innerHTML = 'This roll: <b>' + fmt(slips, 0) + '</b> slips <span class="muted">(' + fmt(x.pd || 0, 0) + ' × ' + fmt(size, 0) + ' − ' + fmt(sp, 0) + ' + ' + fmt(x.now, 0) + ')</span>';
+    el.classList.toggle('bad', slips <= 0);
+    var nx = $('rcNextRoll').value.trim(), endTxt = x.end !== null && isFinite(x.end) ? fmt(x.end, 0) : '…';
+    $('rcNextHint').textContent = nx ? nx + ' starts at counter ' + endTxt + ' with ' + fmt(x.now, 0) + ' on the pallet (carried over).' : 'Leave these blank for the last roll of the job.';
+  }
+  function rcOpen() {
+    wPrefillCount();
+    var sc = $('w_startCounter').value.trim(), sp = wNum('w_startPartial');
+    $('rcWas').innerHTML = 'Roll coming off: <b>' + esc($('w_rollNumber').value.trim()) + '</b>' + (sc ? ' · from counter ' + (isFinite(Number(sc.replace(/,/g, ''))) ? fmt(Number(sc.replace(/,/g, '')), 0) : esc(sc)) : '') + (sp ? ' · ' + fmt(sp, 0) + ' on the pallet at the start' : '');
+    $('rcEnd').value = $('w_endCounter').value; $('rcPallets').value = $('w_palletsDone').value || '0';
+    $('rcNow').value = $('w_endPartial').value; $('rcNote').value = $('w_note').value;
+    $('rcNextRoll').value = ''; $('rcNextLen').value = '';
+    show('rcCheck', false); rcBusy(false); rcTotal();
+    sheetOpen('rcSheet'); $('rcEnd').focus();
+  }
+  function rcBusy(on) { $('rcSave').disabled = on; $('rcSave').textContent = on ? 'Saving…' : ($('rcNextRoll').value.trim() ? 'Save roll · start the next one' : 'Save roll'); }
+  ['rcEnd', 'rcPallets', 'rcNow', 'rcNextRoll'].forEach(function (id) { $(id).addEventListener('input', function () { rcTotal(); if (!$('rcSave').disabled) rcBusy(false); }); });
+  function rcSave(force) {
+    var x = rcNums();
+    if (x.end === null) { setMsg('w_msg', 'Type the ending counter.', 'err'); $('rcEnd').focus(); return; }
+    if (x.now === null) { setMsg('w_msg', 'Count the slips on the pallet now (0 if none).', 'err'); $('rcNow').focus(); return; }
+    var next = $('rcNextRoll').value.trim() ? { roll: $('rcNextRoll').value.trim().toUpperCase(), len: $('rcNextLen').value.trim() } : null;
+    if (next && !next.len) { setMsg('w_msg', 'Type the next roll\'s package length, or leave the next roll blank.', 'err'); $('rcNextLen').focus(); return; }
+    $('w_endCounter').value = $('rcEnd').value; $('w_palletsDone').value = $('rcPallets').value; $('w_endPartial').value = $('rcNow').value; $('w_note').value = $('rcNote').value;
+    store('wasteDraft', JSON.stringify(wFields())); wTotal();
+    wSave(force, { check: $('rcCheck'), busy: rcBusy, after: function (res) {
+      sheetClose('rcSheet');
+      wClearNext(next);
+      wMsg('Roll ' + res.saved.rollNumber + ' saved' + (next ? '. On the press now: ' + next.roll + '.' : '.'), 'ok');
+    } });
+  }
+  $('rcForm').addEventListener('submit', function (e) { e.preventDefault(); rcSave(false); });
+  $('rcCheck').addEventListener('click', function (e) {
+    if (e.target.closest('[data-wforce]')) rcSave(true);
+    else if (e.target.closest('[data-wfix]')) { show('rcCheck', false); $('rcPallets').focus(); }
+  });
+  $('rcCancel').addEventListener('click', function () { sheetClose('rcSheet'); });
+  $('rcFull').addEventListener('click', function () { sheetClose('rcSheet'); opTab('waste'); $('w_endCounter').focus(); });
+  function rsOpen() {
+    wPrefillStart(); wPrefillCount();
+    $('rsRoll').value = $('w_rollNumber').value; $('rsLen').value = $('w_packageLength').value;
+    $('rsStart').value = $('w_startCounter').value; $('rsStartPal').value = $('w_startPartial').value;
+    sheetOpen('rsSheet'); $('rsRoll').focus();
+  }
+  $('rsForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!$('rsRoll').value.trim()) { setMsg('w_msg', 'Type the roll number.', 'err'); $('rsRoll').focus(); return; }
+    $('w_rollNumber').value = $('rsRoll').value.trim().toUpperCase(); $('w_packageLength').value = $('rsLen').value.trim();
+    $('w_startCounter').value = $('rsStart').value.trim(); $('w_startPartial').value = $('rsStartPal').value.trim();
+    store('wasteDraft', JSON.stringify(wFields())); wDraftSend(); wTotal();
+    sheetClose('rsSheet'); renderRolls();
+    wMsg('Roll ' + $('w_rollNumber').value + ' is on the press.', 'ok');
+  });
+  $('rsCancel').addEventListener('click', function () { sheetClose('rsSheet'); });
+  $('rsFull').addEventListener('click', function () { sheetClose('rsSheet'); opTab('waste'); $('w_rollNumber').focus(); });
 
   /** This run's log (mixed lots, deviations). Loads send it with the run; taps don't, so it's kept here. */
   function runLog() {
