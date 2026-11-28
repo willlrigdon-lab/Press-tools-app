@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.065", KEY = "pt-site-reloaded";
+    var BUILT = "2.066", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -1763,9 +1763,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.065';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.066';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.066', '11/28/2026', 'Printed work orders: the two blank lines at the end of the sign-off checklist are gone, so it no longer spills onto an extra page. Write exceptions in the space under the heading.'],
     ['2.065', '11/28/2026', 'Press board trimmed to progress: rolls, waste and cleanups are gone (the waste logs have those), and "yesterday" is now the last work day (Monday to Thursday, or a day off if something was printed then).'],
     ['2.064', '11/28/2026', 'Maintenance request: pick who gets it (Taylor, Cody or everyone on call). The phone remembers your last pick.'],
     ['2.063', '11/28/2026', 'A run that ends with nothing entered (like samples) logs no ink or waste: it stays out of the ink averages and its startup bottles go back to stock. It still shows in Job history, marked Not tracked.'],
@@ -4644,7 +4645,7 @@
         'No plate bounce/chatter', 'No gear marks', 'No registration issues', 'No die-cut issues', 'Label dimensions verified', 'Sample retained for quality records']) +
       '<h4>Press Operator Sign-Off</h4><table class="sf-t sf-hd"><tr><td class="sf-k">Name:</td><td>' + esc(w.operator || '') + '</td><td class="sf-k">Signature:</td><td></td></tr>' +
       '<tr><td class="sf-k">Name:</td><td></td><td class="sf-k">Signature:</td><td></td></tr></table>' +
-      '<p class="sf-exc">Checklist exceptions / corrective actions:</p><div class="wo-lines sf-lines"><div></div><div></div></div></div>';
+      '<p class="sf-exc">Checklist exceptions / corrective actions:</p></div>';   // 2.066: the user, no ruled lines (they spilled onto a page of their own); write in the space
     return h;
   }
   function woHtml(w) {
