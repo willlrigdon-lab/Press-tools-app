@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.054", KEY = "pt-site-reloaded";
+    var BUILT = "2.055", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -1629,9 +1629,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.054';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.055';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.055', '11/28/2026', 'An ink that shows 0 used on a run now counts as 1/4 bottle used, so ordering and Ink needed never assume an ink uses nothing on a big run. Inventory counts don\'t change.'],
     ['2.054', '11/27/2026', 'The Monday email is now three emails: one for ink, one for supplies, and one listing the issues reported the week before.'],
     ['2.053', '11/25/2026', 'A run left open from an earlier job no longer gets in the way: the press shows a warning with End and Cancel buttons, Hand off and Report issue follow the job that\'s actually on the press, and marking a job done while its run is still open asks first.'],
     ['2.052', '11/24/2026', 'Printing a work order now prints the Press Setup Record and Job Sign-Off with it: 3 more pages, already filled in with each station\'s ink and anilox, the game, press, state, date and the assigned operator.'],
