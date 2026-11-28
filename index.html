@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.070", KEY = "pt-site-reloaded";
+    var BUILT = "2.071", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -312,7 +312,11 @@
     /* 2.068 one run screen: while a run is open the tabs go away; the roll form and Resources open over the run */
     .runonly { display: none; }
     #operatorView.running .runonly { display: block; margin: 0 0 10px; }
-    #operatorView.running #opTabs, #operatorView.running #secInk > .colhead, #operatorView.running #secWaste > .colhead { display: none; }
+    #operatorView.running #secInk > .colhead, #operatorView.running #secWaste > .colhead { display: none; }
+    /* 2.071 (the user): during a run the Ink run · Waste roll tabs stay (Resources is in the name menu); Resources opens on its own, without the job card */
+    #operatorView.running #opTabs .tb, #operatorView.running #opTabs [data-v="res"], #operatorView.running #rollBack { display: none !important; }
+    @media (min-width: 760px) { #operatorView.running #opTabs .ph { display: block; } }
+    #operatorView.resopen > .card:first-child, #operatorView.resopen #assignCard, #operatorView.resopen #takeOver { display: none !important; }
     #operatorView.running:not(.rollopen) #secWaste { display: none !important; }
     #operatorView.running.rollopen #secInk { display: none !important; }
     #operatorView.running.rollopen #secWaste { display: block !important; }
@@ -1786,9 +1790,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.070';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.071';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.071', '11/28/2026', 'Run screen: the Ink run and Waste roll tabs are back while a run is open, so the roll is one tap away. Resources opens on its own page instead of under the job card.'],
     ['2.070', '11/28/2026', 'Resources: the App Guides (How-To Guide and Overview) have a Print button, like the SOPs.'],
     ['2.069', '11/28/2026', 'Resources: a new App Guides section with the How-To Guide and the Overview, both app links at the top, and a Share button on everything so you can text or email a link.'],
     ['2.068', '11/28/2026', 'One run screen, step 1: while a run is open the tabs go away. The job, a big + Pallet, the inks (partial bottles, mixed lots and station changes under each ink\'s ⋯), the roll on the press, then Cleanup and End Run. The roll form opens from the roll card; Resources moved to the name menu.'],
@@ -1973,6 +1978,7 @@
   function opTab(v) {
     if (v !== 'ink' && v !== 'waste' && v !== 'res') v = 'ink';
     $('operatorView').classList.toggle('rollopen', v === 'waste');   // 2.068: while running, the roll form opens over the run
+    $('operatorView').classList.toggle('resopen', v === 'res');      // 2.071: Resources on its own (no press or job card above it)
     if (v !== 'res' || !$('operatorView').classList.contains('running')) store('opTab', v);
     Array.prototype.forEach.call($('opTabs').children, function (b) {
       var bv = b.getAttribute('data-v');
