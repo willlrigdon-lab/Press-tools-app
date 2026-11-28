@@ -59,7 +59,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.073", KEY = "pt-site-reloaded";
+    var BUILT = "2.074", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -1031,7 +1031,7 @@
         </details>
 
         <button id="cleanToggle" class="wide">Cleanup · start a new ink run</button>
-        <button id="endToggle" class="primary wide">End Run</button>
+        <button id="endToggle" class="primary wide">Finish job</button>
         <div style="text-align:center"><button id="cancelRun" class="link">Started by mistake? Cancel run</button></div>
       </div>
 
@@ -1058,13 +1058,32 @@
           <div class="hint" id="slipsHint"></div>
         </div>
         <div id="cuPalletBox" class="hidden">
-          <label for="cuPallet">Slips on the pallet right now</label>
+          <label for="cuPallet" id="cuPalletLabel">Slips on the pallet right now</label>
           <input id="cuPallet" inputmode="numeric" autocomplete="off" aria-describedby="cuHint">
           <div class="hint" id="cuHint"></div>
         </div>
+        <!-- 2.074 Finish job (3.0 Release 3): the roll on the press stays on (default) or comes off; the work order is finished -->
+        <div id="fjRollBox" class="hidden">
+          <label id="fjRollLabel">Roll on the press</label>
+          <div class="seg" id="fjRoll" role="group" aria-labelledby="fjRollLabel">
+            <button type="button" data-v="stay" class="on" aria-pressed="true">Stays on for the next job</button>
+            <button type="button" data-v="off" aria-pressed="false">Comes off now</button>
+          </div>
+          <div id="fjOffBox" class="hidden">
+            <label for="fjEnd">Ending counter</label>
+            <input id="fjEnd" inputmode="decimal" autocomplete="off">
+            <label for="fjNote">Roll note (optional)</label>
+            <input id="fjNote" maxlength="300" autocomplete="off" placeholder="e.g. web break at 9:40">
+          </div>
+          <div class="hint" id="fjRollHint"></div>
+        </div>
+        <div id="fjWoBox" class="hidden">
+          <label class="check"><input type="checkbox" id="fjWoDone" checked> <span id="fjWoText"></span></label>
+        </div>
+        <div id="fjCheck" class="push red hidden" role="alert"></div>
         <div class="row2">
           <button id="endBack" class="wide">Back</button>
-          <button id="endSave" class="primary wide">Finish Run</button>
+          <button id="endSave" class="primary wide">Finish job</button>
         </div>
       </div>
 
@@ -1859,9 +1878,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.073';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.074';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.074', '11/28/2026', 'Finish job: at the end of a job, one screen counts the pallet once, takes the ink leftovers, and keeps the roll on for the next job (or takes it off with its ending counter). Orders are marked Printed so the press moves on to its next job; management still marks them Shipped. End Run is now part of Finish job.'],
     ['2.073', '11/28/2026', 'Faster: the app now runs on a fast server that keeps a copy of the Google Sheet ready, so screens open and saves finish in well under a second. The Sheet is still the official log, and the old way takes over by itself if the fast server ever can\'t answer. Everyone logs in once more with their PIN after this update.'],
     ['2.072', '11/28/2026', 'Ink run and waste roll on one screen: during a run the roll on the press is on the run screen. Roll change closes the roll coming off (ending counter, pallets from your + Pallet taps, slips on the pallet now, waste check) and puts the next roll on in one save. Put a roll on starts the first one. The Waste roll tab is still there when no run is open.'],
     ['2.071', '11/28/2026', 'Run screen: the Ink run and Waste roll tabs are back while a run is open, so the roll is one tap away. Resources opens on its own page instead of under the job card.'],
@@ -3150,16 +3170,18 @@
   });
 
   /* ----- end ----- */
-  $('endToggle').addEventListener('click', function () { openEnd('end'); });
+  $('endToggle').addEventListener('click', function () { openEnd('finish'); });   // 2.074: End Run is folded into Finish job
   $('cleanToggle').addEventListener('click', function () { openEnd('cleanup'); });
   function openEnd(mode) {
     if (waitForQueue()) return;
-    var cu = mode === 'cleanup';
+    var cu = mode === 'cleanup', fj = mode === 'finish';
     S.endMode = mode; S.leftovers = {}; S.trashed = {}; S.cuWhy = '';
-    $('endTitle').textContent = cu ? 'Cleanup · new ink run' : 'End run';
-    $('endSave').textContent = cu ? 'Start the new run' : 'Finish Run';
+    $('endTitle').textContent = cu ? 'Cleanup · new ink run' : fj ? 'Finish job' : 'End run';
+    $('endSave').textContent = cu ? 'Start the new run' : fj ? 'Finish job' : 'Finish Run';
     $('endAsk').textContent = cu ? 'How much is left in the last bottle opened of each ink, and is it saved or trashed?' : 'How much is left in the last bottle opened of each ink?';
-    show('cuWhyBox', cu); show('cuPalletBox', cu); show('endSlipsBox', !cu);
+    $('cuPalletLabel').textContent = fj ? 'Slips on the pallet now (count)' : 'Slips on the pallet right now';
+    show('cuWhyBox', cu); show('cuPalletBox', cu || fj); show('endSlipsBox', !cu && !fj);
+    show('fjCheck', false); fjSetup(fj);
     Array.prototype.forEach.call($('cuWhy').children, function (b) { b.classList.remove('on'); });
     $('cuNote').value = ''; $('cuPallet').value = ''; cuTotal();
     var inks = S.run.inks.filter(function (k) { return k.opened > 0; });
@@ -3181,18 +3203,90 @@
       : 'No pallets were entered. You can type the count now or add it on the Runs tab later.';
     var rd = runRolls(), onPress = $('w_rollNumber').value.trim();
     $('endRolls').textContent = (rd.count ? 'Rolls on this run: ' + rd.count + ' · ' + pct(rd.wastePct) + ' waste overall.' : 'No rolls were saved on this run.') +
-      (onPress ? ' Roll ' + onPress + ' is still on the press; it carries on into the next job.' : '');
+      (onPress && mode !== 'finish' ? ' Roll ' + onPress + ' is still on the press; it carries on into the next job.' : '');   // Finish job asks about it below
     show('endRolls', true);
     opTab('ink'); show('runView', false); show('endView', true); msg('');
     $('endView').scrollIntoView();
   }
   function cuTotal() {
-    var v = $('cuPallet').value.replace(/,/g, '').trim(), r = S.run;
-    if (!r || v === '' || !isFinite(Number(v))) { $('cuHint').textContent = 'Count the partial pallet. The new ink run starts with it.'; return; }
+    var v = $('cuPallet').value.replace(/,/g, '').trim(), r = S.run, fj = S.endMode === 'finish';
+    if (!r || v === '' || !isFinite(Number(v))) {
+      $('cuHint').textContent = !fj ? 'Count the partial pallet. The new ink run starts with it.'
+        : runEmpty() ? 'Nothing has been entered on this run. Leave this blank to finish without logging ink or waste (samples); it still shows in Job history.'
+        : 'Count the partial pallet. It finishes the ink run, and the roll if it comes off.';
+      return;
+    }
     var n = r.pallets * (r.palletSlips || 100000) + Number(v) - (r.startPartial || 0);
-    $('cuHint').innerHTML = 'This ink run: <b>' + fmt(n, 0) + '</b> slips (' + r.pallets + ' × ' + fmt(r.palletSlips || 100000, 0) +
+    $('cuHint').innerHTML = (fj ? 'This job\'s ink run: <b>' : 'This ink run: <b>') + fmt(n, 0) + '</b> slips (' + r.pallets + ' × ' + fmt(r.palletSlips || 100000, 0) +
       (r.startPartial ? ' − ' + fmt(r.startPartial, 0) : '') + ' + ' + fmt(Number(v), 0) + ')';
   }
+  /* ----- 2.074 Finish job (3.0 Release 3, the user 2026-11-28): one count ends the ink run, the roll stays on (default) or comes
+     off with the same count, and the work order is finished: an order is marked Printed (management still marks it Shipped),
+     a stock run or note Done. End Run is folded in: untick "finished" to end only the run. ----- */
+  function runEmpty() { var r = S.run; return !r.pallets && !r.partial && !r.startPartial && !r.inks.some(function (k) { return k.opened > 0; }) && !runRolls().count; }
+  function fjSetup(on) {
+    var roll = $('w_rollNumber').value.trim(), cur = S.assigned && S.assigned.current, r = S.run;
+    var wo = on && cur && r && (r.queueId ? cur.id === r.queueId : !!cur.jobKey && cur.jobKey === r.jobKey) ? cur : null;   // as runBelongsTo_ on the server
+    show('fjRollBox', on && !!roll); show('fjWoBox', !!wo);
+    S.fjRoll = 'stay'; fjRollShow();
+    $('fjEnd').value = ''; $('fjNote').value = '';
+    if (on && roll) {
+      $('fjRollLabel').textContent = 'Roll on the press: ' + roll;
+      var hand = wMode() === 'hand';
+      $('fjRoll').querySelector('[data-v="off"]').disabled = hand;
+      $('fjRollHint').textContent = hand ? 'This roll\'s pallets are typed by hand: if it comes off, save it with Edit this roll first.'
+        : 'Stays on: the next job carries on with it. Comes off: it\'s saved with the same pallet count.';
+    }
+    if (wo) {
+      $('fjWoDone').checked = true;
+      $('fjWoText').textContent = wo.type === 'Order' ? 'This work order is finished on ' + S.press + ': mark it Printed (management still marks it Shipped) and move to the next job'
+        : 'This ' + (wo.type === 'Stock' ? 'stock run' : 'assignment') + ' is finished on ' + S.press + ': mark it Done and move to the next job';
+    }
+  }
+  function fjRollShow() {
+    Array.prototype.forEach.call($('fjRoll').children, function (b) { var on = b.getAttribute('data-v') === S.fjRoll; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+    show('fjOffBox', S.fjRoll === 'off');
+  }
+  $('fjRoll').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-v]'); if (!b || b.disabled) return;
+    S.fjRoll = b.getAttribute('data-v'); fjRollShow(); show('fjCheck', false);
+    if (S.fjRoll === 'off') $('fjEnd').focus();
+  });
+  function fjSave(force) {
+    var off = S.fjRoll === 'off' && !$('fjRollBox').classList.contains('hidden');
+    if (off && !$('fjEnd').value.trim()) { msg('Type the ending counter for the roll coming off.', 'err'); $('fjEnd').focus(); return; }
+    if (!$('cuPallet').value.trim() && !runEmpty()) { msg('Count the slips on the pallet now.', 'err'); $('cuPallet').focus(); return; }
+    var roll = null;
+    if (off) { roll = wRead(); roll.endCounter = $('fjEnd').value; roll.note = $('fjNote').value.trim(); }
+    var woDone = !$('fjWoBox').classList.contains('hidden') && $('fjWoDone').checked;
+    setBusy(true); msg('Finishing the job…'); show('fjCheck', false);
+    call('inkFinishJob', [S.run.runId, $('cuPallet').value, S.leftovers, roll, woDone, !!force], function (res) {
+      setBusy(false);
+      if (res.check) {
+        var c = res.check, p = fmt(c.wastePct * 100, 1) + '%';
+        msg('');
+        $('fjCheck').innerHTML = '<b>The roll coming off shows ' + p + ' waste' + (c.kind === 'high' && c.usual !== null ? ' (' + esc(S.press) + ' usually runs about ' + fmt(c.usual * 100, 1) + '%)' : '') + '.</b> ' +
+          (c.kind === 'negative' ? 'Waste can\'t be below zero, so the slips are too high: an extra + Pallet tap, or a count typed too big?' : 'Did you miss a + Pallet tap, or type the count or counter wrong?') +
+          '<div class="row2"><button type="button" data-wfix="1">Fix it</button><button type="button" class="primary" data-wforce="1">Finish anyway</button></div>';
+        show('fjCheck', true); $('fjCheck').scrollIntoView({ block: 'center' });
+        return;
+      }
+      msg('');
+      S.run = null;
+      if (res.roll) { WD.lastEnd = res.roll.lastEnd; WD.rollPallets = 0; wClearNext(null); }
+      if (res.assigned) { S.assigned = res.assigned; renderAssign(); }
+      renderDone(res.ended);
+      var a = res.assigned && res.assigned.current;
+      $('doneAssign').innerHTML = (res.roll ? 'Roll <b>' + esc(res.roll.saved.rollNumber) + '</b> came off and was saved. ' : $('w_rollNumber').value.trim() ? 'Roll <b>' + esc($('w_rollNumber').value.trim()) + '</b> stays on for the next job. ' : '') +
+        (res.wo ? 'Work order <b>' + esc(res.wo.job) + '</b> marked ' + esc(res.wo.status) + '. ' : '') +
+        (res.wo || res.roll ? (a ? 'Next on ' + esc(S.press) + ': <b>' + esc(a.job || a.note) + '</b>.' : 'Nothing else is lined up for ' + esc(S.press) + '.') : '');
+      show('doneAssign', !!$('doneAssign').textContent.trim());
+    });
+  }
+  $('fjCheck').addEventListener('click', function (e) {
+    if (e.target.closest('[data-wforce]')) fjSave(true);
+    else if (e.target.closest('[data-wfix]')) { show('fjCheck', false); $('cuPallet').focus(); }
+  });
   $('cuPallet').addEventListener('input', cuTotal);
   $('cuWhy').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-v]'); if (!b) return;
@@ -3216,6 +3310,7 @@
     if (waitForQueue()) return;
     var need = S.run.inks.filter(function (k) { return k.opened > 0 && !(k.key in S.leftovers); });
     if (need.length) { msg('Pick the leftover for: ' + need.map(function (k) { return k.ink; }).join(', '), 'err'); return; }
+    if (S.endMode === 'finish') { fjSave(false); return; }
     if (S.endMode === 'cleanup') {
       if (!S.cuWhy) { msg('Pick why the press is being cleaned.', 'err'); return; }
       if (!$('cuPallet').value.trim()) { msg('Count the slips on the pallet right now.', 'err'); $('cuPallet').focus(); return; }
@@ -3246,7 +3341,7 @@
       $('doneView').scrollIntoView();
       return;
     }
-    $('doneTitle').textContent = 'Run finished: ' + res.job;
+    $('doneTitle').textContent = 'Job finished: ' + res.job;
     $('doneMeta').textContent = res.press + (res.slips !== '' ? ' · ' + fmt(res.slips, 0) + ' slips' : ' · slips not entered yet (add them on the Runs tab)') +
       (res.rolls && res.rolls.count ? ' · ' + res.rolls.count + (res.rolls.count === 1 ? ' roll, ' : ' rolls, ') + pct(res.rolls.wastePct) + ' waste' : '');
     var hasPer = res.slips !== '' && res.slips > 0;
@@ -4309,8 +4404,8 @@
     $('qAnilox').innerHTML = anxShortHtml(d.anilox);
     if (!d.queue.length) { $('qList').innerHTML = '<p class="muted">Nothing in the queue.</p>'; return; }
     $('qList').innerHTML = d.queue.map(function (q) {
-      var shipped = q.closed;
-      var press = shipped ? '' : '<div class="qpress"><select data-assign="' + esc(q.id) + '" aria-label="Press for ' + esc(q.job || q.note) + '">' +
+      var shipped = q.closed, printed = q.printed;   // 2.074: printed = finished on its press, waiting to ship
+      var press = shipped || printed ? '' : '<div class="qpress"><select data-assign="' + esc(q.id) + '" aria-label="Press for ' + esc(q.job || q.note) + '">' +
         opt('', 'No press', !q.press) + d.presses.map(function (p) { return opt(p, p, p === q.press); }).join('') + '</select>' +
         (q.press ? '<span class="muted">#' + (q.line || q.pressOrder) + ' in line</span>' +
           '<button data-move="' + esc(q.id) + '" data-dir="-1" aria-label="Move up">▲</button>' +
@@ -4324,13 +4419,14 @@
       var title = q.job ? esc(q.job) + ' <span class="muted">· ' + esc(q.state) + '</span>' : esc(q.note);
       var typeBadge = q.type === 'Stock' ? badge('gray', 'For stock') + ' ' : q.type === 'Note' ? badge('gray', 'Note') + ' ' : '';
       var info = qLine(q) + (shipped ? (qLine(q) ? ' · ' : '') + q.status.toLowerCase() + ' ' + esc(q.shipped) : '') +
+        (printed ? (qLine(q) ? ' · ' : '') + 'printed ' + esc(q.printedAt) + (q.printedBy ? ' by ' + esc(q.printedBy) : '') + (q.press ? ' on ' + esc(q.press) : '') : '') +
         (q.progress ? (qLine(q) ? ' · ' : '') + fmt(q.progress.sent, 0) + ' of ' + fmt(q.progress.ordered, 0) + ' sent out' : '');   // 2.043
       var tick = shipped ? '' : '<input type="checkbox" class="qsel" data-qsel="' + esc(q.id) + '"' + (M.sel[q.id] ? ' checked' : '') +
         ' aria-label="Select ' + esc(q.job || q.note) + '">';
       return '<div class="item qitem"><div><div class="t">' + tick + title + '</div>' +
         (info ? '<div class="s">' + info + '</div>' : '') +
         (q.job && q.note ? '<div class="s">“' + esc(q.note) + '”</div>' : '') +
-        '<div>' + typeBadge + (q.progress && q.progress.reached ? badge('green', 'Target reached') + ' ' : '') +
+        '<div>' + typeBadge + (printed ? badge('blue', 'Printed · ready to ship') + ' ' : '') + (q.progress && q.progress.reached ? badge('green', 'Target reached') + ' ' : '') +
         (q.job ? badge(q.flag, FLAG_TEXT[q.flag] + (q.runs ? ' (' + q.runs + ')' : '')) : '') + '</div></div>' +
         '<div class="acts">' + (shipped ? '<button data-unship="' + esc(q.id) + '">Undo</button>'
           : '<button class="primary" data-ship="' + esc(q.id) + '">' + (q.type === 'Order' ? 'Shipped' : 'Done') + '</button>' +
@@ -4671,7 +4767,7 @@
         g.rolls.list.filter(function (x) { return x.note; }).map(function (x) { return '<div class="s">' + esc(x.roll) + ': “' + esc(x.note) + '”</div>'; }).join('') + '</div>' : '') +
       '</details>';
   }
-  var RL_STATUS = { Open: 'blue', Shipped: 'green', Done: 'green', Cancelled: 'gray' };
+  var RL_STATUS = { Open: 'blue', Printed: 'blue', Shipped: 'green', Done: 'green', Cancelled: 'gray' };
   var RL_TYPE = { Order: 'Order', Stock: 'For stock', Note: 'Note' };
   function rlOrder(o) {
     var title = o.job ? esc(o.job) + ' <span class="muted">· ' + esc(o.state) + '</span>' : esc(o.note || 'Note');
