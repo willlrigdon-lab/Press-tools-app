@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.060", KEY = "pt-site-reloaded";
+    var BUILT = "2.061", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -309,6 +309,16 @@
     .setupnote { margin: 8px 0 0; padding: 8px 10px; border-left: 3px solid var(--accent); overflow-wrap: anywhere; }
     .jlnew { margin-top: 16px; }
     .tablewrap { overflow-x: auto; }
+    .pbshop, .pbgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-top: 10px; }
+    .pbgrid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+    .pbgrid .pbstat { padding: 6px 8px; }
+    .pbgrid .pbstat .v { font-size: 17px; }
+    .pbgrid .pbstat .l { font-size: 12px; }
+    .pbstat { padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+    .pbstat .v { font-size: 20px; font-weight: 700; }
+    .pbstat .l { font-size: 13px; color: var(--muted); }
+    .pbcard .now { font-size: 20px; font-weight: 700; margin-top: 4px; overflow-wrap: anywhere; }
+    .pbprog, .pbpace, .pbcrew { margin-top: 8px; }
     .seg.seg-wrap { display: grid; grid-auto-flow: row; grid-template-columns: 1fr 1fr; gap: 8px; }
     .seg.seg-wrap button { white-space: normal; min-height: 48px; border-radius: 12px; }
     .seg.cuseg { margin-top: 6px; }
@@ -1210,7 +1220,8 @@
       <button data-g="crew">Crew</button>
     </div>
     <div class="tabs" id="mTabs">
-      <button data-t="queue" data-g="jobs" class="on">Queue<span class="cnt soft" data-c="queue"></span></button>
+      <button data-t="board" data-g="jobs" class="on">Press board</button>
+      <button data-t="queue" data-g="jobs">Queue<span class="cnt soft" data-c="queue"></span></button>
       <button data-t="jobs" data-g="jobs">Job library</button>
       <button data-t="states" data-g="jobs">States</button>
       <button data-t="notices" data-g="jobs">Notices</button>
@@ -1225,7 +1236,17 @@
     </div>
     </div>
 
-    <div id="m_queue" class="mpane">
+    <div id="m_board" class="mpane">
+      <!-- 2.061 press board: progress per press for the shop day (5 AM to 4:59 AM) -->
+      <div class="card">
+        <div class="cardhead"><h2>Press board</h2><button id="pbRefresh" type="button">Refresh</button></div>
+        <p class="muted" id="pbDay" style="margin:4px 0 0"></p>
+        <div id="pbShop" class="pbshop"></div>
+      </div>
+      <div id="pbList"></div>
+    </div>
+
+    <div id="m_queue" class="mpane hidden">
       <div class="card">
         <h2>Add to the queue</h2>
         <div class="seg" id="qType">
@@ -1739,9 +1760,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.060';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.061';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.061', '11/28/2026', 'Manage opens on the Press board: for each press, the job and how far along it is, the pace today and when it should finish, the crew, pallets today and yesterday, rolls and waste, cleanups and the next job. The shop day runs 5 AM to 4:59 AM.'],
     ['2.060', '11/28/2026', 'Cleanup button on the run screen: pick why, enter leftovers (saved or trashed) and the slips on the pallet, and a new ink run starts on the same job with fresh startup bottles. The job, the roll on the press and the work order keep going.'],
     ['2.059', '11/28/2026', 'Each game in the Job library has its NetSuite item # (like IN-9003-03A), so work orders match the purchase orders and supply plan. It shows on the printed work order and you can search for it. Slips per box is filled in for most games.'],
     ['2.058', '11/28/2026', 'Pallets are counted once: the + Pallet taps on a press also count for the roll on it. At a roll change you only type the slips on the pallet right now; the next roll starts with that number. The roll card shows its exact slip total before you save. Typing Pallet 1, 2 and 3 by hand is still there.'],
@@ -1895,7 +1917,7 @@
    * The GitHub page's call shim (tools/build-site.js) also uses this list: reads give up after 30 s, saves after 90 s.
    */
   var READS = { me: 1, inkLoad: 1, inkGetRun: 1, wasteRecent: 1, wasteDraft: 1, noticesList: 1, resourcesList: 1, supplyItems: 1,
-    issuesList: 1, invStock: 1, invLastCount: 1, aniloxList: 1, queueList: 1, statesList: 1, jobGet: 1, jobLibList: 1, jobLibGet: 1, wasteReport: 1,
+    issuesList: 1, invStock: 1, invLastCount: 1, aniloxList: 1, queueList: 1, statesList: 1, jobGet: 1, jobLibList: 1, jobLibGet: 1, pressBoard: 1, wasteReport: 1,
     supplyRequests: 1, inkNeeded: 1, manageCounts: 1, workOrder: 1, jobHistory: 1, daysOffMine: 1, daysOffMonth: 1,
     usersList: 1, auditList: 1, appHealth: 1, suggestMine: 1, suggestList: 1, weeklyReportStatus: 1 };
   window.APP_READS = READS;   // the GitHub page's call shim reads this (tools/build-site.js)
@@ -3785,9 +3807,10 @@
   /* =====================================================================
      MANAGEMENT
      ===================================================================== */
-  var M = { tab: 'queue', jobs: [], period: 'week', last: {}, sel: {}, counts: {}, countsAt: 0 };
+  var M = { tab: 'board', jobs: [], period: 'week', last: {}, sel: {}, counts: {}, countsAt: 0 };
   function mErr(e) { setMsg('mMsg', errText(e), 'err'); }
   var M_LOAD = {
+    board: function () { srvCached('pressBoard', [], pbShow, mErr, 'pbList'); M.boardAt = Date.now(); },
     queue: function () { srvCached('queueList', [$('qShowShipped').checked], qShow, mErr, 'qList'); },
     waste: function () { wReport(); },
     supplies: function () { srvCached('supplyRequests', [$('supShowAll').checked], supShow, mErr, 'supList'); },
@@ -3850,7 +3873,7 @@
   $('mStats').addEventListener('click', function (e) { var b = e.target.closest('button[data-go]'); if (b) mOpen(b.getAttribute('data-go')); });
   $('mGroups').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-g]'); if (!b) return;
-    var g = b.getAttribute('data-g');   // always the group's first screen: Jobs → Queue, Ink → Ordering, Reports → Waste
+    var g = b.getAttribute('data-g');   // always the group's first screen: Jobs → Press board (2.061), Ink → Ordering, Reports → Waste
     mOpen(document.querySelector('#mTabs button[data-g="' + g + '"]').getAttribute('data-t'));
   });
   $('mTabs').addEventListener('click', function (e) { var b = e.target.closest('button[data-t]'); if (b) mOpen(b.getAttribute('data-t')); });
@@ -4242,6 +4265,60 @@
   }
   /* Manage → Reports → Job history (2.040; was Run log): every run with its team, handoffs, issues, requests, rolls, lots */
   var RL = { started: false, jobs: [] };
+  /* 2.061 press board */
+  function pbShow(d) {
+    $('pbDay').textContent = 'Shop day from ' + d.day + ' · as of ' + d.asOf;
+    var sh = d.shop, size = d.palletSlips || 100000;
+    $('pbShop').innerHTML = pbStat(fmt(sh.pallets * size, 0), 'slips today (full pallets)') +
+      pbStat(fmt(sh.palletsYday * size, 0), 'yesterday') +
+      pbStat(sh.rolls ? fmt(sh.rolls, 0) + ' · ' + pct(sh.wastePct) : '0', 'rolls · waste today');
+    $('pbList').innerHTML = d.presses.map(function (p) {
+      var j = p.job, h = '<div class="card pbcard"><div class="cardhead"><h2>' + esc(p.press) + '</h2>' +
+        (j && j.job ? '<button type="button" class="pbhist" data-st="' + esc(j.state) + '" data-jb="' + esc(j.job) + '">Job history</button>' : '') + '</div>';
+      if (!j) h += '<p class="muted" style="margin:0">Nothing assigned.</p>';
+      else {
+        h += '<div class="now">' + esc(j.job || j.note) + (j.job ? ' <span class="muted">· ' + esc(j.state) + '</span>' : '') + '</div>' +
+          '<div class="muted">' + [j.type, j.due ? 'due ' + j.due : ''].filter(Boolean).map(esc).join(' · ') + '</div>';
+        if (j.ordered && j.sent !== null && j.sent !== undefined) {
+          var left = Math.max(0, j.ordered - j.sent);
+          h += '<div class="pbprog"><b>' + fmt(j.sent, 0) + '</b> of ' + fmt(j.ordered, 0) + ' sent out' +
+            (j.reached ? ' ' + badge('green', 'Target reached') : ' · ' + fmt(left, 0) + ' to go') + '</div>' +
+            '<progress class="tgbar' + (j.reached ? ' done' : '') + '" max="' + j.ordered + '" value="' + Math.min(j.sent, j.ordered) + '"></progress>';
+        }
+        if (j.perHour) h += '<div class="pbpace">Pace today: <b>' + fmt(j.perHour, 0) + '</b> slips an hour' +
+          (j.finish ? ' · finishes about <b>' + esc(j.finish) + '</b>' + (j.late ? ' ' + badge('red', 'After the due date') : '') : '') + '</div>';
+        else if (!j.reached && j.ordered) h += '<div class="muted pbpace">Pace shows after 2 pallets today.</div>';
+        h += '<div class="pbcrew">' + (j.operator ? 'Operator: <b>' + esc(j.operator) + '</b>' : '<span class="muted">No operator yet</span>') +
+          (j.packers ? ' · Packers: <b>' + esc(j.packers) + '</b>' : '') + '</div>';
+      }
+      h += '<div class="pbgrid">' + pbStat(fmt(p.palletsToday, 0), 'pallets today') + pbStat(fmt(p.palletsYday, 0), 'yesterday') +
+        pbStat(p.rolls.count ? p.rolls.count + ' · ' + pct(p.rolls.wastePct) : '0', 'rolls · waste') + pbStat(fmt(p.cleanups, 0), 'cleanups') + '</div>' +
+        (p.roll ? '<div class="muted">On the press: roll ' + esc(p.roll) + '</div>' : '') +
+        (p.next ? '<div class="muted">Next: ' + esc(p.next.job) + (p.next.state ? ' · ' + esc(p.next.state) : '') + (p.next.slips ? ' · ' + fmt(p.next.slips, 0) + ' slips' : '') +
+          (p.more ? ' · +' + p.more + ' more' : '') + '</div>' : '');
+      return h + '</div>';
+    }).join('');
+  }
+  function pbStat(v, label) { return '<div class="pbstat"><div class="v">' + v + '</div><div class="l">' + esc(label) + '</div></div>'; }
+  $('pbRefresh').addEventListener('click', function () { M_LOAD.board(); });
+  $('pbList').addEventListener('click', function (e) {
+    var b = e.target.closest('button.pbhist'); if (!b) return;
+    rlFor(b.getAttribute('data-st'), b.getAttribute('data-jb'));
+  });
+  setInterval(function () {   // refresh about once a minute while the board is on screen
+    if (M.tab === 'board' && !document.hidden && !$('m_board').classList.contains('hidden') && !$('manageView').classList.contains('hidden') &&
+      Date.now() - (M.boardAt || 0) > 55000) M_LOAD.board();
+  }, 15000);
+  /** Job history filtered to one game, all dates (Job library and press board). */
+  function rlFor(state, job) {
+    RL.started = true;
+    $('rlState').innerHTML = opt(state, state, true);
+    $('rlJob').innerHTML = opt(job, job, true);
+    $('rlFrom').value = '';
+    var t = new Date();
+    $('rlTo').value = t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) + '-' + ('0' + t.getDate()).slice(-2);
+    mOpen('runlog');
+  }
   function rlLoad() {
     if (!RL.started) {   // default: the last 30 days
       RL.started = true;
@@ -4885,14 +4962,7 @@
   $('jlBack').addEventListener('click', function () { JB.cur = ''; jlView('list'); if (JB.list.length) jlDraw(); jlLoad(); });
   $('jlEdit').addEventListener('click', function () { if (JB.page) jbEdit(JB.page, false); });
   $('jlHist').addEventListener('click', function () {   // Job history filtered to this game, all dates
-    var d = JB.page; if (!d) return;
-    RL.started = true;
-    $('rlState').innerHTML = opt(d.state, d.state, true);
-    $('rlJob').innerHTML = opt(d.job, d.job, true);
-    $('rlFrom').value = '';
-    var t = new Date();
-    $('rlTo').value = t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) + '-' + ('0' + t.getDate()).slice(-2);
-    mOpen('runlog');
+    var d = JB.page; if (d) rlFor(d.state, d.job);
   });
   function jbRowHtml(k) {
     k = k || { side: 'Front', order: '', ink: '', color: '', anilox: '', notes: '' };
