@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.056", KEY = "pt-site-reloaded";
+    var BUILT = "2.057", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -309,6 +309,10 @@
     .setupnote { margin: 8px 0 0; padding: 8px 10px; border-left: 3px solid var(--accent); overflow-wrap: anywhere; }
     .jlnew { margin-top: 16px; }
     .tablewrap { overflow-x: auto; }
+    .plgrid { display: grid; grid-template-columns: 1fr 96px; gap: 8px 10px; align-items: center; }
+    .plgrid label { margin: 0; overflow-wrap: anywhere; }
+    .plgrid input { text-align: center; }
+    .plgrid .gone { color: var(--muted); }
     table.setup.jlusage { table-layout: auto; }
     table.setup.jlusage th { width: auto; }
     table.setup.jlusage td:first-child { overflow-wrap: normal; min-width: 7.5em; }
@@ -1325,6 +1329,17 @@
           <div id="jlView"></div>
           <button id="jlEdit" type="button" class="primary wide">Edit this job</button>
         </div>
+        <div class="card">
+          <h2>Plates on hand</h2>
+          <p id="jlPlateNow" class="muted" style="margin-top:0"></p>
+          <div class="plgrid">
+            <label for="plSets">Full sets</label>
+            <input id="plSets" inputmode="numeric" autocomplete="off" maxlength="3">
+          </div>
+          <p class="muted" style="margin:12px 0 4px">Extra single plates</p>
+          <div id="plExtras" class="plgrid"></div>
+          <button id="plSave" type="button" class="primary wide">Save plate count</button>
+        </div>
         <div class="card"><h2>Ink usage</h2><div id="jlUsage"></div></div>
         <div class="card"><div class="cardhead"><h2>Work orders</h2><button id="jlHist" type="button">Job history</button></div><div id="jlOrders"></div></div>
         <div class="card"><h2>Setup history</h2><div id="jlChanges"></div></div>
@@ -1338,7 +1353,9 @@
         <div class="jbinfo">
           <label for="jbPack">Slips per pack</label>
           <input id="jbPack" inputmode="numeric" autocomplete="off" placeholder="e.g. 2,500">
-          <label for="jbPlates">Plates</label>
+          <label for="jbBox">Slips per box</label>
+          <input id="jbBox" inputmode="numeric" autocomplete="off" placeholder="e.g. 10,000">
+          <label for="jbPlates">Plate notes</label>
           <textarea id="jbPlates" rows="2" maxlength="500" placeholder="Where they're stored, condition, anything to know"></textarea>
           <label for="jbProof">Proof link</label>
           <input id="jbProof" type="url" inputmode="url" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" maxlength="500" placeholder="https://drive.google.com/…" aria-describedby="jbProofHelp">
@@ -1675,9 +1692,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.056';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.057';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.057', '11/28/2026', 'Plates on hand: each game in the Job library keeps a count of full plate sets plus extra single plates, and the setup sheet shows it. Slips per box now shows next to slips per stack.'],
     ['2.056', '11/28/2026', 'Manage → Jobs → Job library: one page per game with its setup, slips per pack, plates, proof link, setup notes, who verified it and when, ink usage, recent work orders and a history of every change. Operators see the plates, setup notes and proof on the setup sheet.'],
     ['2.055', '11/28/2026', 'An ink that shows 0 used on a run now counts as 1/4 bottle used, so ordering and Ink needed never assume an ink uses nothing on a big run. Inventory counts don\'t change.'],
     ['2.054', '11/27/2026', 'The Monday email is now three emails: one for ink, one for supplies, and one listing the issues reported the week before.'],
@@ -2262,9 +2280,11 @@
     var html = '<div class="setup-head">Setup sheet ' + (j.verified ? '<span class="badge ok">Approved</span>'
       : '<span class="badge unv">Not verified yet</span>') + '</div>';
     if (!j.verified) html += '<p class="muted" style="margin:4px 0 0">Management hasn\'t checked this setup yet. Tell them if something is wrong.</p>';
-    if (j.slipsPerPack) html += '<p class="pack">Pack: <b>' + Number(j.slipsPerPack).toLocaleString() + '</b> slips per stack</p>';
+    if (j.slipsPerPack || j.slipsPerBox) html += '<p class="pack">Pack: ' + [j.slipsPerPack ? '<b>' + Number(j.slipsPerPack).toLocaleString() + '</b> slips per stack' : '',
+      j.slipsPerBox ? '<b>' + Number(j.slipsPerBox).toLocaleString() + '</b> per box' : ''].filter(Boolean).join(' · ') + '</p>';   // 2.057: per box
+    if (j.plateCount) html += '<p class="pack">Plates on hand: ' + esc(j.plateCount) + '</p>';
     if (j.setupNotes) html += '<p class="setupnote"><b>Setup notes:</b> ' + esc(j.setupNotes) + '</p>';   // 2.056 job library
-    if (j.plates) html += '<p class="pack">Plates: ' + esc(j.plates) + '</p>';
+    if (j.plates) html += '<p class="pack">Plate notes: ' + esc(j.plates) + '</p>';
     if (j.proof && /^https:\/\//.test(j.proof)) html += '<p class="pack"><a href="' + esc(j.proof) + '" target="_blank" rel="noopener">Open the proof</a></p>';
     ['Front', 'Back'].forEach(function (side) {
       var inks = j.inks.filter(function (k) { return k.side === side; });
@@ -4380,7 +4400,7 @@
     h += '<div class="wo-grid">' + cell('Type', esc(TYPE[w.type] || w.type)) + cell('Run', esc(run)) + cell('Due', esc(w.due)) +
       cell('Press', esc(w.press ? w.press + (w.line ? ' · #' + w.line + ' in line' : '') : 'Not assigned')) +
       cell('Operator', esc(w.operator)) + cell('Packers', esc(w.packers)) +
-      cell('Pack', w.slipsPerPack ? '<b>' + fmt(w.slipsPerPack, 0) + '</b> slips per stack' : '') +
+      cell('Pack', [w.slipsPerPack ? '<b>' + fmt(w.slipsPerPack, 0) + '</b> slips per stack' : '', w.slipsPerBox ? '<b>' + fmt(w.slipsPerBox, 0) + '</b> per box' : ''].filter(Boolean).join(' · ')) +
       cell('Queued', esc((w.added || '') + (w.addedBy ? ' by ' + w.addedBy : ''))) + '</div>';
     if (w.note && w.job) h += '<div class="wo-for"><b>For:</b> ' + esc(w.note) + '</div>';
     if (w.inks.length) {
@@ -4647,7 +4667,8 @@
       n++;
       if (j.state !== last) { html += '<h3 class="jlstate">' + esc(j.state) + '</h3>'; last = j.state; }
       html += '<button type="button" class="jlrow" data-jl="' + esc(j.key) + '"><span class="jlname"><span class="t">' + esc(j.job) + '</span>' +
-        '<span class="s">' + (j.lastRun ? 'Last run ' + esc(j.lastRun) : 'Not run yet') + ' · ' + j.inks + (j.inks === 1 ? ' ink' : ' inks') + '</span></span>' +
+        '<span class="s">' + (j.lastRun ? 'Last run ' + esc(j.lastRun) : 'Not run yet') + ' · ' + j.inks + (j.inks === 1 ? ' ink' : ' inks') +
+        (j.plateSets === null || j.plateSets === undefined ? '' : ' · ' + j.plateSets + (j.plateSets === 1 ? ' plate set' : ' plate sets')) + '</span></span>' +
         '<span class="jlbadges">' + (j.verified ? badge('ok', 'Verified') : badge('unv', 'Not verified')) +
         (j.active ? '' : badge('gray', 'Not active')) + badge(j.flag, j.runs ? 'Tracked ' + j.runs : 'Never tracked') + '</span></button>';
     });
@@ -4672,6 +4693,7 @@
       badge(d.flag, d.runs ? 'Tracked ' + d.runs + ' of ' + d.goalRuns : 'Never tracked') +
       (d.lastRun ? ' <span class="muted">Last run ' + esc(d.lastRun) + '</span>' : '');
     $('jlView').innerHTML = setupHtml(jlSetupJob(d));
+    plDraw(d);
     var anyRate = d.usage.some(function (u) { return u.per !== null; });
     $('jlUsage').innerHTML = anyRate ? '<p class="muted" style="margin-top:0">Average bottles per ' + fmt(d.orderSize, 0) +
       ' slips from counted runs (0 used counts as ¼), and bottles to have for that order including the startup bottle.</p>' +
@@ -4692,8 +4714,28 @@
       : '<p class="muted" style="margin:0">No changes recorded yet.</p>') +
       '<p class="muted" style="margin-bottom:0"><small>Saves here are recorded from version 2.056 on. Changes typed straight into the Sheet aren\'t recorded.</small></p>';
   }
+  /* 2.057 plates on hand: full sets + extras of single plates */
+  function plDraw(d) {
+    $('jlPlateNow').textContent = d.plateText ? 'Now: ' + d.plateText : 'No plates counted yet.';
+    $('plSets').value = d.plateSets || 0;
+    $('plExtras').innerHTML = d.plateList.map(function (p, i) {
+      return '<label for="plx' + i + '"' + (p.gone ? ' class="gone"' : '') + '>' + esc(p.plate) + (p.gone ? ' (no longer on this job)' : '') + '</label>' +
+        '<input id="plx' + i + '" data-plate="' + esc(p.plate) + '" inputmode="numeric" autocomplete="off" maxlength="3" value="' + (p.count || 0) + '">';
+    }).join('');
+  }
+  $('plSave').addEventListener('click', function () {
+    var d = JB.page; if (!d) return;
+    var extras = {};
+    Array.prototype.forEach.call($('plExtras').querySelectorAll('input[data-plate]'), function (el) { extras[el.getAttribute('data-plate')] = el.value.trim(); });
+    $('plSave').disabled = true; setMsg('mMsg', 'Saving…');
+    srv('plateSave', [d.key, $('plSets').value.trim(), extras], function (r) {
+      $('plSave').disabled = false;
+      jlPage(r);
+      setMsg('mMsg', 'Plates for ' + r.job + ': ' + (r.plateText || 'none') + '.', 'ok');
+    }, function (e) { $('plSave').disabled = false; mErr(e); });
+  });
   function jlSetupJob(d) {   // the setup sheet the operators see, from the editor's rows
-    return { verified: d.verified, slipsPerPack: d.slipsPerPack, plates: d.plates, proof: d.proof, setupNotes: d.setupNotes,
+    return { verified: d.verified, slipsPerPack: d.slipsPerPack, slipsPerBox: d.slipsPerBox, plateCount: d.plateText, plates: d.plates, proof: d.proof, setupNotes: d.setupNotes,
       inks: d.inks.map(function (k) { return { side: k.side, order: k.order === '' ? 999 : k.order, ink: k.ink, color: k.color, anilox: k.anilox, notes: k.notes }; }) };
   }
   $('jlBack').addEventListener('click', function () { JB.cur = ''; jlView('list'); if (JB.list.length) jlDraw(); jlLoad(); });
@@ -4726,6 +4768,7 @@
     $('jbRows').innerHTML = (d.inks.length ? d.inks : [null]).map(jbRowHtml).join('');
     $('jbVerified').checked = !!d.verified;
     $('jbPack').value = d.slipsPerPack ? fmt(d.slipsPerPack, 0) : '';
+    $('jbBox').value = d.slipsPerBox ? fmt(d.slipsPerBox, 0) : '';
     $('jbPlates').value = d.plates || ''; $('jbProof').value = d.proof || ''; $('jbNotes').value = d.setupNotes || '';
     window.scrollTo(0, 0);
     if (JB.isNew) { $('jbName').value = ''; $('jbName').focus(); }
@@ -4763,7 +4806,7 @@
     var job = JB.isNew ? $('jbName').value.trim() : JB.job;
     var state = JB.isNew ? $('jbState').value : JB.page.state;
     var payload = { state: state, job: job, isNew: JB.isNew, verified: $('jbVerified').checked, inks: inks,
-      slipsPerPack: $('jbPack').value.trim(), plates: $('jbPlates').value.trim(), proof: $('jbProof').value.trim(), setupNotes: $('jbNotes').value.trim() };
+      slipsPerPack: $('jbPack').value.trim(), slipsPerBox: $('jbBox').value.trim(), plates: $('jbPlates').value.trim(), proof: $('jbProof').value.trim(), setupNotes: $('jbNotes').value.trim() };
     $('jbSave').disabled = true; setMsg('mMsg', 'Saving…');
     srv('jobSave', [payload], function (d) {
       $('jbSave').disabled = false;
