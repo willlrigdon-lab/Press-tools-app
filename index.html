@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.066", KEY = "pt-site-reloaded";
+    var BUILT = "2.067", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -998,12 +998,10 @@
         <div id="cuWhyBox" class="hidden">
           <label>Why the cleanup</label>
           <div class="seg seg-wrap" id="cuWhy">
-            <button type="button" data-v="Color change">Color change</button>
-            <button type="button" data-v="Contamination / dirty ink">Contamination</button>
-            <button type="button" data-v="End-of-day wash">End-of-day wash</button>
-            <button type="button" data-v="Other">Other</button>
+            <button type="button" data-v="End of week">End of week</button>
+            <button type="button" data-v="End of job">End of job</button>
           </div>
-          <label for="cuNote">Note (optional, needed for Other)</label>
+          <label for="cuNote">Note (optional)</label>
           <input id="cuNote" maxlength="200" autocomplete="off">
           <p class="muted">The job, the roll on the press and the work order keep going. Every ink gets a fresh startup bottle on the new run.</p>
         </div>
@@ -1763,9 +1761,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.066';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.067';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.067', '11/28/2026', 'Cleanup asks only whether it\'s the end of the week or the end of the job.'],
     ['2.066', '11/28/2026', 'Printed work orders: the two blank lines at the end of the sign-off checklist are gone, so it no longer spills onto an extra page. Write exceptions in the space under the heading.'],
     ['2.065', '11/28/2026', 'Press board trimmed to progress: rolls, waste and cleanups are gone (the waste logs have those), and "yesterday" is now the last work day (Monday to Thursday, or a day off if something was printed then).'],
     ['2.064', '11/28/2026', 'Maintenance request: pick who gets it (Taylor, Cody or everyone on call). The phone remembers your last pick.'],
