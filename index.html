@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.063", KEY = "pt-site-reloaded";
+    var BUILT = "2.064", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -1652,9 +1652,11 @@
       <p id="maintAttach" class="muted" style="margin-top:0"></p>
       <label id="maintSevLabel">How bad is it?</label>
       <div class="seg" id="maintSev" role="group" aria-labelledby="maintSevLabel"><button type="button" data-v="Press down">Press down</button><button type="button" data-v="Running with a problem" class="on">Running with a problem</button><button type="button" data-v="Minor">Minor</button></div>
+      <label for="maintTo">Send to</label>
+      <select id="maintTo" name="sendTo"></select>
       <label for="maintText">What's wrong?</label>
       <textarea id="maintText" name="request" rows="4" maxlength="1000" required aria-describedby="maintHint" style="font-family:inherit;resize:vertical" placeholder="e.g. Unit 3 gear grinding at speed"></textarea>
-      <div id="maintHint" class="hint">Goes to Maintenance Tools and emails maintenance. The time, your name, the press and its job are added for you.</div>
+      <div id="maintHint" class="hint">Goes to Maintenance Tools and emails who you picked. The time, your name, the press and its job are added for you.</div>
       <div class="row2">
         <button id="maintCancel" type="button" class="wide">Close</button>
         <button id="maintSend" type="submit" class="primary wide">Send to maintenance</button>
@@ -1761,9 +1763,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.063';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.064';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.064', '11/28/2026', 'Maintenance request: pick who gets it (Taylor, Cody or everyone on call). The phone remembers your last pick.'],
     ['2.063', '11/28/2026', 'A run that ends with nothing entered (like samples) logs no ink or waste: it stays out of the ink averages and its startup bottles go back to stock. It still shows in Job history, marked Not tracked.'],
     ['2.062', '11/28/2026', 'Save Roll double-checks the pallet count: when a roll shows waste below zero or far above what that press usually runs, it asks whether a + Pallet tap was missed or a partial typed wrong. Fix it, or Save anyway with a note.'],
     ['2.061', '11/28/2026', 'Manage opens on the Press board: for each press, the job and how far along it is, the pace today and when it should finish, the crew, pallets today and yesterday, rolls and waste, cleanups and the next job. The shop day runs 5 AM to 4:59 AM.'],
@@ -1920,7 +1923,7 @@
    * The GitHub page's call shim (tools/build-site.js) also uses this list: reads give up after 30 s, saves after 90 s.
    */
   var READS = { me: 1, inkLoad: 1, inkGetRun: 1, wasteRecent: 1, wasteDraft: 1, noticesList: 1, resourcesList: 1, supplyItems: 1,
-    issuesList: 1, invStock: 1, invLastCount: 1, aniloxList: 1, queueList: 1, statesList: 1, jobGet: 1, jobLibList: 1, jobLibGet: 1, pressBoard: 1, wasteReport: 1,
+    issuesList: 1, invStock: 1, invLastCount: 1, aniloxList: 1, queueList: 1, statesList: 1, maintPeople: 1, jobGet: 1, jobLibList: 1, jobLibGet: 1, pressBoard: 1, wasteReport: 1,
     supplyRequests: 1, inkNeeded: 1, manageCounts: 1, workOrder: 1, jobHistory: 1, daysOffMine: 1, daysOffMonth: 1,
     usersList: 1, auditList: 1, appHealth: 1, suggestMine: 1, suggestList: 1, weeklyReportStatus: 1 };
   window.APP_READS = READS;   // the GitHub page's call shim reads this (tools/build-site.js)
@@ -3536,7 +3539,14 @@
     Array.prototype.forEach.call($('maintSev').children, function (b) { b.classList.toggle('on', b.getAttribute('data-v') === MREQ.sev); });
     $('maintAttach').textContent = issueAttachText();
     sheetOpen('maintSheet'); $('maintText').focus();
+    srvCached('maintPeople', [], function (d) {   // 2.064: Taylor, Cody… (Maintenance Tools' On Call list) or everyone
+      var keep = $('maintTo').value || store('maintTo') || d.def;
+      var names = d.people.map(function (p) { return p.name; }).concat([d.everyone]);
+      if (names.indexOf(keep) === -1) keep = d.def;
+      $('maintTo').innerHTML = d.people.map(function (p) { return opt(p.name, p.full, p.name === keep); }).join('') + opt(d.everyone, d.everyone, d.everyone === keep);
+    }, noop);
   });
+  $('maintTo').addEventListener('change', function () { store('maintTo', this.value); });
   segPick('maintSev', function (v) { MREQ.sev = v; });
   $('maintCancel').addEventListener('click', function () { sheetClose('maintSheet'); });
   ['lowSheet', 'issueSheet', 'maintSheet', 'meSheet', 'sugSheet', 'newsSheet', 'handSheet', 'targetSheet'].forEach(sheetSwipe);
@@ -3548,7 +3558,7 @@
     $('maintText').removeAttribute('aria-invalid');
     $('maintSend').disabled = true; setMsg('maintMsg', 'Sending to maintenance…');
     // saved here first, then this page passes it to Maintenance Tools (no extra Google permission), then the answer is recorded
-    srv('maintRequest', [text, MREQ.sev, S.press || ''], function (r) {
+    srv('maintRequest', [text, MREQ.sev, S.press || '', $('maintTo').value || ''], function (r) {
       function done(problem, message) {
         srv('maintResult', [r.id, problem, message], function (d) {
           $('maintSend').disabled = false;
