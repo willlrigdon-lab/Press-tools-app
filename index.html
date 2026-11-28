@@ -45,7 +45,7 @@
 </script>
 <script>
   (function () {
-    var BUILT = "2.061", KEY = "pt-site-reloaded";
+    var BUILT = "2.062", KEY = "pt-site-reloaded";
     var test = /[?&]sw=test(&|$)/.test(location.search);
     if (!("serviceWorker" in navigator) || !(/\.github\.io$/.test(location.hostname) || test)) return;
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
@@ -1089,6 +1089,7 @@
         <textarea id="w_note" rows="2" maxlength="300" style="font-family:inherit;resize:vertical" aria-describedby="w_noteHint" placeholder="e.g. Stopped to run sample plates"></textarea>
         <div id="w_noteHint" class="hint">Anything that explains this roll, like extra setups or a stop. It goes in the log with the roll.</div>
 
+        <div id="w_check" class="push red hidden" role="alert"></div>
         <div class="wbtns">
           <button id="w_calcBtn">Calculate</button>
           <button id="w_saveBtn" class="primary">Save Roll</button>
@@ -1760,9 +1761,10 @@
 <nav id="navBar" class="navbar hidden" aria-label="Areas"><div class="navin" id="navBtns"></div></nav>
 
 <script>
-  var APP_VERSION = '2.061';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
+  var APP_VERSION = '2.062';   // 2.xxx: bump the last part by 1 on every deploy users see, and add it to APP_CHANGES
   /** Update history, newest first: [version, date it went live, what changed]. 1.xxx = the original web app and its beta. */
   var APP_CHANGES = [
+    ['2.062', '11/28/2026', 'Save Roll double-checks the pallet count: when a roll shows waste below zero or far above what that press usually runs, it asks whether a + Pallet tap was missed or a partial typed wrong. Fix it, or Save anyway with a note.'],
     ['2.061', '11/28/2026', 'Manage opens on the Press board: for each press, the job and how far along it is, the pace today and when it should finish, the crew, pallets today and yesterday, rolls and waste, cleanups and the next job. The shop day runs 5 AM to 4:59 AM.'],
     ['2.060', '11/28/2026', 'Cleanup button on the run screen: pick why, enter leftovers (saved or trashed) and the slips on the pallet, and a new ink run starts on the same job with fresh startup bottles. The job, the roll on the press and the work order keep going.'],
     ['2.059', '11/28/2026', 'Each game in the Job library has its NetSuite item # (like IN-9003-03A), so work orders match the purchase orders and supply plan. It shows on the printed work order and you can search for it. Slips per box is filled in for most games.'],
@@ -2082,11 +2084,31 @@
     srv('wasteCalculate', [wRead()], function (r) { wBusy(false); wMsg(''); wShowResult(r, false); }, wError);
   });
 
-  $('w_saveBtn').addEventListener('click', function () {
+  $('w_saveBtn').addEventListener('click', function () { wSave(false); });
+  /* 2.062 waste check: waste below 0% or far above the press's usual is almost always a miscounted pallet. Ask first. */
+  $('w_check').addEventListener('click', function (e) {
+    if (e.target.closest('[data-wfix]')) {
+      show('w_check', false);
+      var f = $(wMode() === 'hand' ? 'w_pallet1' : 'w_palletsDone'); f.focus(); f.scrollIntoView({ block: 'center' });
+    } else if (e.target.closest('[data-wforce]')) { show('w_check', false); wSave(true); }
+  });
+  function wSave(force) {
     if (!S.press) { wMsg('Pick your press first (at the top).', 'err'); return; }
-    wMsg('Saving…'); wBusy(true);
-    srv('wasteSave', [wRead()], function (res) {
+    wMsg('Saving…'); wBusy(true); show('w_check', false);
+    var input = wRead(); if (force) input.force = true;
+    srv('wasteSave', [input], function (res) {
       wBusy(false);
+      if (res.check) {
+        var c = res.check, p = fmt(c.wastePct * 100, 1) + '%';
+        wMsg('');
+        $('w_check').innerHTML = '<b>This roll shows ' + p + ' waste' + (c.kind === 'high' && c.usual !== null ? ' (' + esc(S.press) + ' usually runs about ' + fmt(c.usual * 100, 1) + '%)' : '') + '.</b> ' +
+          (c.kind === 'negative' ? 'Waste can\'t be below zero, so the slips are too high: an extra + Pallet tap, or a partial typed too big?'
+            : 'Did you miss a + Pallet tap, or type a partial wrong?') +
+          '<div class="row2"><button type="button" data-wfix="1">Fix it</button><button type="button" class="primary" data-wforce="1">Save anyway</button></div>' +
+          '<div class="hint">If it\'s right (a web break, extra setups), add a note above before saving.</div>';
+        show('w_check', true); $('w_check').scrollIntoView({ block: 'center' });
+        return;
+      }
       wShowResult(res.saved, true);
       wShowRecent(res.recent);
       if (res.lastEnd) WD.lastEnd = res.lastEnd;
@@ -2096,7 +2118,7 @@
       wMsg('Roll ' + res.saved.rollNumber + ' saved' + (res.run ? ' to the ' + res.run.job + ' run.' : '.'), 'ok');
       if (S.run && S.run.press === S.press && S.run.stale) { S.run.stale = null; show('staleNote', false); }   // a roll counts as an update
     }, wError);
-  });
+  }
 
   /* Typed entries are kept until "Clear for next roll": in the Sheet for the press (survives time-outs,
      reloads and other devices) and on this device as a backup. */
